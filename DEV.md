@@ -63,6 +63,8 @@ bash run.sh
 | 文件 | 用途 |
 | --- | --- |
 | src/rmtc_bot/include/rmtc_bot/match_config.hpp | 比赛前统一配置 |
+| CODE_GUIDE.md | 文件、命名空间、类型、变量和函数主线导读 |
+| src/rmtc_bot/src/practice_launcher.cpp | 只给原版练习程序传配置并启动，不修改practice/ |
 | src/rmtc_bot/src/strategy.cpp | 地图记忆、目标评分、BFS、攻防和效果状态 |
 | src/rmtc_bot/src/events.cpp | 公告解释 Prompt 与模型输出校验 |
 | src/rmtc_bot/src/ai_worker.cpp | curl 后台请求、公告缓存、限额与退避、跨场取消 |
