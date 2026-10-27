@@ -1,5 +1,6 @@
 #include "rmtc_bot/strategy.hpp"
 #include "rmtc_bot/scoring.hpp"
+#include "rmtc_bot/strategy_tuning.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -305,7 +306,7 @@ Json Strategy::decide(const Json &p) {
       const auto node = paths.at(cell);
       if (!e.contains(cell) && node.distance < nearest_exit) { nearest_exit = node.distance; escape = node.first; }
     }
-    if (e.start - tick <= nearest_exit + 2LL && escape >= 0 && !reverse_unknown_)
+    if (e.start - tick <= nearest_exit + rmtc::strategy_tuning.hazard_lead_ticks && escape >= 0 && !reverse_unknown_)
       return move(escape, "escape_announced_hazard");
   }
 
@@ -350,18 +351,18 @@ Json Strategy::decide(const Json &p) {
     const auto &tile = tiles_.at(cell);
     if (node.first >= 0 && tile.visits < least_visits) { least_visits = tile.visits; exploration = node.first; }
     if (tile.value > 0) {
-      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * 0.01);
+      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * rmtc::strategy_tuning.stale_resource_decay);
       double benefit = tile.value;
       if (stage_ == 2) {
         benefit = rmtc::score_delta(resource_value, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
-        if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += 5;
+        if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += rmtc::strategy_tuning.resource_mission_bonus;
         if (need_value) benefit += tile.value * 0.1;
       }
       consider(node.first, benefit * freshness / (node.distance + 1), "collect_resource");
     }
     if (stage_ == 1) continue;
     for (const auto &target : reach) {
-      if (cell == target) consider(node.first, 8.0 / (node.distance + 1), "reach_mission");
+      if (cell == target) consider(node.first, rmtc::strategy_tuning.reach_mission_value / (node.distance + 1), "reach_mission");
       else if (node.first >= 0) {
         // 目标尚未探明时只走已知路线中靠近目标的格子，不穿过未知墙。
         int unknown_neighbors = 0;
@@ -376,13 +377,13 @@ Json Strategy::decide(const Json &p) {
     }
     for (const auto &[key, e] : events_) {
       if (!e.active(tick)) continue;
-      if (e.kind == Kind::heal && hp < 70 && healing_until_ <= tick + 2 && e.contains(cell) && cell != start &&
+      if (e.kind == Kind::heal && hp < rmtc::strategy_tuning.healing_below_hp && healing_until_ <= tick + 2 && e.contains(cell) && cell != start &&
           tick + node.distance - 1 < e.end)
         consider(node.first, std::min(100.0 - hp, e.amount * e.effect_ticks) * 0.2 / (node.distance + 1), "seek_healing");
       if (e.kind == Kind::fortress && !empowered_ && e.contains(cell) &&
           e.end - tick >= node.distance + e.capture_ticks - capture_progress_[key] - (node.distance > 0 ? 1 : 0)) {
-        if (cell == start) consider(-1, 20.0, "hold_fortress");
-        else consider(node.first, 12.0 / (node.distance + e.capture_ticks), "capture_fortress");
+        if (cell == start) consider(-1, rmtc::strategy_tuning.fortress_hold_value, "hold_fortress");
+        else consider(node.first, rmtc::strategy_tuning.fortress_capture_value / (node.distance + e.capture_ticks), "capture_fortress");
       }
       if (e.kind == Kind::chili && (e.contains(cell) || (e.contains(start) && node.distance == 1))) {
         const Cell fire_point = e.contains(start) ? start : cell;
