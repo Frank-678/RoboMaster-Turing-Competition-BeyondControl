@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <memory>
 #include <stdexcept>
@@ -7,7 +8,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 #include "rmtc_bot/protocol.hpp"
-#include "rmtc_bot/strategy.hpp"
+#include "rmtc_bot/session.hpp"
 
 using Json = nlohmann::json;
 using Message = std_msgs::msg::String;
@@ -24,6 +25,16 @@ public:
         name.find_first_of("\r\n") != std::string::npos) {
       throw std::runtime_error("team_name must contain 1-96 UTF-8 bytes and no newline");
     }
+    const auto stage = declare_parameter<std::int64_t>("stage", 2);
+    if (stage != 1 && stage != 2) throw std::runtime_error("stage must be 1 or 2");
+    const auto env = [](const char *key) {
+      const char *value = std::getenv(key);
+      return value ? std::string(value) : std::string();
+    };
+    rmtc::AiConfig ai;
+    ai.url = env("RMTC_AI_URL"); ai.token = env("RMTC_TEAM_TOKEN"); ai.model = env("RMTC_AI_MODEL");
+    if (!env("RMTC_AI_MAX_TOKENS").empty()) ai.max_tokens = std::stoi(env("RMTC_AI_MAX_TOKENS"));
+    session_ = std::make_unique<rmtc::Session>(static_cast<int>(stage), std::move(ai));
     const auto prefix = "/team_" + team;
     const auto live = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile();
     const auto retained = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
@@ -35,50 +46,30 @@ public:
     registration_.data = Json{{"team", team}, {"name", name}}.dump();
     registration_pub_->publish(registration_);
     RCLCPP_INFO(get_logger(), "Ready: seat=%s name=%s", team.c_str(), name.c_str());
+    if (stage == 2 && (env("RMTC_AI_URL").empty() || env("RMTC_TEAM_TOKEN").empty()))
+      RCLCPP_WARN(get_logger(), "AI disabled: set RMTC_AI_URL and RMTC_TEAM_TOKEN; formal AI qualification is unverified");
   }
 
 private:
   void on_perception(const Message &msg) {
     try {
       const auto p = Json::parse(msg.data);
-      const auto tick = rmtc::frame_tick(p);
-      const auto session = p["session_id"].get<std::string>();
-      if (session != session_) {
-        strategy_.reset();
-        session_ = session;
-        latest_tick_ = -1;
-        cached_action_ = Json();
-      }
-      if (tick < latest_tick_) {
-        return;
-      }
-      // Repeated perception after pause: resend, without advancing the strategy.
-      if (tick > latest_tick_) {
-        Json proposed = {{"action", "wait"}};
-        try {
-          proposed = strategy_.decide(p);
-        } catch (const std::exception &e) {
-          RCLCPP_WARN(get_logger(), "Strategy failed; sending wait: %s", e.what());
-        }
-        cached_action_ = rmtc::action_for(p, proposed);
-        latest_tick_ = tick;
-      }
+      const auto action = session_->act(p);
+      if (!action) return;
       Message out;
-      out.data = cached_action_.dump();
+      out.data = action->dump();
       action_pub_->publish(out);
       const auto receipt = p["self"].value("last_action", Json()).dump();
-      RCLCPP_INFO(get_logger(), "tick=%lld sent=%s last_action=%s",
-                  static_cast<long long>(tick),
-                  cached_action_["action"].get<std::string>().c_str(), receipt.c_str());
+      RCLCPP_INFO(get_logger(), "tick=%lld sent=%s reason=%s ai=%s http_success=%d last_action=%s",
+                  static_cast<long long>(rmtc::frame_tick(p)),
+                  action->at("action").get<std::string>().c_str(), session_->reason().c_str(),
+                  session_->ai_status().c_str(), session_->ai_http_success(), receipt.c_str());
     } catch (const std::exception &e) {
       RCLCPP_WARN(get_logger(), "Skipping invalid perception: %s", e.what());
     }
   }
 
-  Strategy strategy_;
-  std::string session_;
-  std::int64_t latest_tick_ = -1;
-  Json cached_action_;
+  std::unique_ptr<rmtc::Session> session_;
   Message registration_;
   rclcpp::Publisher<Message>::SharedPtr action_pub_;
   rclcpp::Publisher<Message>::SharedPtr registration_pub_;

@@ -1,5 +1,6 @@
 #include "rmtc_bot/protocol.hpp"
 #include "rmtc_bot/strategy.hpp"
+#include "rmtc_bot/session.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -9,6 +10,8 @@
 
 using Json = nlohmann::json;
 using Cell = std::pair<int, int>;
+void full_scenarios();
+void gateway_scenarios(const std::string &base);
 
 Json frame(int x = 4, int y = 4, int width = 9, int height = 9, int radius = 4) {
   return {{"tick", 0}, {"session_id", "test-match"}, {"vision_radius", radius},
@@ -33,8 +36,8 @@ void check(bool condition, const char *message) {
 }
 
 void expect(const Json &p, const char *action, const char *direction = nullptr) {
-  Strategy strategy;
-  const auto result = rmtc::action_for(p, strategy.decide(p));
+  rmtc::Session session(1);
+  const auto result = *session.act(p);
   check(result.at("action") == action, "unexpected action");
   if (direction) check(result.at("direction") == direction, "unexpected direction");
   check(result.at("tick") == p.at("tick") && result.at("session_id") == p.at("session_id"),
@@ -72,7 +75,7 @@ void scenarios() {
   expect(p, "wait");
   p = frame();
   p["visible_entities"] = {entity("resource_normal", 0, 0)};
-  expect(p, "move", "up");  // 重叠图没有 2，不能误判为损坏或卡在原地。
+  expect(p, "wait");  // 重叠图没有 2；原地等待也会自动收集。
 
   p = frame(4, 4, 9, 9, 1);
   p["visible_entities"] = {entity("resource_normal", 1, 0)};
@@ -102,7 +105,7 @@ void scenarios() {
   expect(frame(0, 0, 0, 9), "wait");
   expect(frame(0, 0, 9, 9, 5), "wait");
 
-  Strategy strategy;
+  Strategy strategy(1);
   check(strategy.decide(frame()).at("direction") == "up", "initial exploration changed");
   strategy.decide(frame(4, 3));  // 实际到过上方，再回到原格。
   check(strategy.decide(frame()).at("direction") == "right", "visited cells were ignored");
@@ -121,7 +124,7 @@ int collect_in_synthetic_maze() {
   const std::set<Cell> walls = {{2, 0}, {2, 1}, {2, 2}, {2, 3}};
   std::set<Cell> resources = {{4, 0}, {5, 5}, {0, 5}};
   Cell current{0, 0};
-  Strategy strategy;
+  Strategy strategy(1);
   for (int tick = 0; tick < 80; ++tick) {
     auto p = frame(current.first, current.second, 6, 6);
     p["tick"] = tick;
@@ -156,7 +159,9 @@ int collect_in_synthetic_maze() {
 int main() {
   try {
     scenarios();
+    full_scenarios();
     const int ticks = collect_in_synthetic_maze();
+    if (const char *gateway = std::getenv("RMTC_TEST_GATEWAY")) gateway_scenarios(gateway);
     std::cout << "strategy scenarios passed; synthetic maze: 3 resources in " << ticks << " ticks\n";
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
