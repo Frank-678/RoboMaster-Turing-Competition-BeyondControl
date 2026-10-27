@@ -49,9 +49,12 @@ AiWorker::AiWorker(AiConfig config) : config_(std::move(config)) {
       config_.token.find_first_of("\r\n") != std::string::npos)
     throw std::runtime_error("invalid AI URL or token format");
   if (config_.model.empty()) throw std::runtime_error("AI model must be configured explicitly");
-  if (config_.timeout_ms < 100 || config_.timeout_ms > 30000 ||
+  if (config_.timeout_ms < 100 || config_.timeout_ms > 60000 ||
+      config_.connect_timeout_ms < 100 || config_.connect_timeout_ms > config_.timeout_ms ||
       config_.max_tokens < 1 || config_.max_tokens > 8192)
     throw std::runtime_error("AI timeout/max_tokens must be configured explicitly");
+  if (!config_.thinking.empty() && config_.thinking != "enabled" && config_.thinking != "disabled")
+    throw std::runtime_error("AI thinking must be enabled, disabled or empty");
   static CurlRuntime runtime; // 第一个工作线程出现前初始化curl，进程退出时统一清理。
   (void)runtime;
   status_ = "ready";
@@ -76,6 +79,7 @@ void AiWorker::reset(const std::string &session) {
   failures_ = invalid_replies_ = 0;
   started_ = finished_ = successes_ = 0;
   last_http_ = last_curl_ = 0; known_mock_ = false;
+  last_elapsed_ms_ = last_connect_ms_ = last_first_byte_ms_ = 0; last_result_.clear();
   retry_after_ = {};
   if (enabled_) status_ = "ready";
 }
@@ -101,11 +105,14 @@ void AiWorker::observe(const Json &p, const Json &known_events) {
   // 开局understood_=false：即使公告为空，首帧也排一次请求；不用等随机事件才调用。
   if (busy_ || pending_ || ready_ || std::chrono::steady_clock::now() < retry_after_ ||
       invalid_replies_ >= 3 || (understood_ && source == understood_source_)) return;
+  // tick给模型定位公告时间，不要求模型在该Tick内返回。每Tick动作由本地策略独立生成。
   Json context = {{"session_id", session_}, {"tick", p.at("tick")}, {"map", p.at("map")}, // 用户消息内容。
                   {"announcements", source}, {"known_events", known_events}};
   Json body = {{"messages", Json::array({{{"role", "system"}, {"content", event_system_prompt()}}, // Chat Completions请求。
                                           {{"role", "user"}, {"content", context.dump()}}})},
                {"model", config_.model}, {"max_tokens", config_.max_tokens}, {"stream", false}};
+  if (!config_.thinking.empty()) body["thinking"] = {{"type", config_.thinking}};
+  if (config_.json_output) body["response_format"] = {{"type", "json_object"}};
   const auto serialized = body.dump(); // 真正发出的JSON文本；发送前检查2MiB上限。
   if (serialized.size() > 2097152) { status_ = "request_too_large"; return; }
   pending_ = Job{session_, source, serialized, generation_.load()};
@@ -137,7 +144,8 @@ void AiWorker::acknowledge(const Result &r, bool understood, bool partial) {
   } else {
     if (r.http_success) {
       ++invalid_replies_;
-      status_ = partial ? "events_incomplete" : "invalid_model_reply";
+      // HTTP已成功也可能没有最终答案；保留精确原因，不能全改成invalid_model_reply。
+      status_ = partial ? "events_incomplete" : (r.reply.empty() ? r.status : "invalid_model_reply");
     }
     failures_ = std::min(failures_ + 1, 4U);
     retry_after_ = std::chrono::steady_clock::now() + std::chrono::seconds(1U << (failures_ - 1));
@@ -156,7 +164,9 @@ Json AiWorker::diagnostics() const {
   // 返回快照后马上释放锁；日志只含次数/错误码，不含URL中的凭据或令牌。
   std::lock_guard<std::mutex> lock(mutex_); // 本作用域持有共享状态锁，离开作用域自动释放。
   return {{"started", started_}, {"finished", finished_}, {"http_successes", successes_},
-          {"last_http", last_http_}, {"last_curl", last_curl_}, {"known_mock", known_mock_}};
+          {"last_http", last_http_}, {"last_curl", last_curl_}, {"known_mock", known_mock_},
+          {"elapsed_ms", last_elapsed_ms_}, {"connect_ms", last_connect_ms_},
+          {"first_byte_ms", last_first_byte_ms_}, {"last_result", last_result_}};
 }
 
 AiWorker::Result AiWorker::perform(const Job &job) {
@@ -180,7 +190,7 @@ AiWorker::Result AiWorker::perform(const Job &job) {
   curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDS, job.body.c_str());
   curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(job.body.size()));
   curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT_MS, config_.timeout_ms);
-  curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT_MS, std::min(500L, config_.timeout_ms));
+  curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT_MS, config_.connect_timeout_ms);
   curl_easy_setopt(curl.get(), CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 0L);
   curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, &Download::append);
@@ -193,6 +203,13 @@ AiWorker::Result AiWorker::perform(const Job &job) {
   long status = 0; // HTTP状态码，与curl传输错误是两个不同维度。
   curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &status);
   result.http_status = status;
+  double elapsed = 0, connected = 0, first_byte = 0; // curl以秒返回计时；只记录耗时，不记录响应内容。
+  curl_easy_getinfo(curl.get(), CURLINFO_TOTAL_TIME, &elapsed);
+  curl_easy_getinfo(curl.get(), CURLINFO_CONNECT_TIME, &connected);
+  curl_easy_getinfo(curl.get(), CURLINFO_STARTTRANSFER_TIME, &first_byte);
+  result.elapsed_ms = static_cast<long>(elapsed * 1000);
+  result.connect_ms = static_cast<long>(connected * 1000);
+  result.first_byte_ms = static_cast<long>(first_byte * 1000);
   if (code != CURLE_OK) {
     result.status = code == CURLE_OPERATION_TIMEDOUT ? "timeout" : "curl_" + std::to_string(result.curl_code);
     return result;
@@ -206,12 +223,26 @@ AiWorker::Result AiWorker::perform(const Job &job) {
       // 公开练习包明确标记的固定模拟响应。HTTP成功不等于LLM被调用。
       result.mock_response = root.value("model", std::string()) == "practice-mock";
       if (result.mock_response) { result.stop = true; result.status = "mock_gateway"; }
-      else result.reply = root.at("choices").at(0).at("message").at("content").get<std::string>();
+      else {
+        const auto &choice = root.at("choices").at(0); // 只读第一条最终回答，不读取reasoning_content当答案。
+        const auto finish = choice.value("finish_reason", std::string()); // length是截断；不能补括号冒充完整解释。
+        const auto &message = choice.at("message"); // assistant消息外壳。
+        const auto &content = message.at("content"); // 最终答案；可能为null或空字符串。
+        if (finish == "length") result.status = "model_output_truncated";
+        else if (!finish.empty() && finish != "stop") result.status = "model_finish_" + finish;
+        else if (!content.is_string() || content.get_ref<const std::string &>().find_first_not_of(" \t\r\n") == std::string::npos) {
+          const auto reasoning = message.find("reasoning_content"); // 只判断是否存在思考正文，不保存或打印它。
+          result.status = reasoning != message.end() && reasoning->is_string() && !reasoning->get_ref<const std::string &>().empty()
+                            ? "model_reasoning_only" : "model_empty_content";
+        } else { result.reply = content.get<std::string>(); result.status = "model_reply_received"; }
+      }
     }
     else if (status == 429 && root.at("error").value("code", std::string()) == "quota_exceeded") {
       result.stop = true; result.status = "quota_exceeded";
     }
-  } catch (const Json::exception &) { /* 非 JSON 错误正文也走有界退避。 */ }
+  } catch (const Json::exception &) {
+    if (result.http_success) result.status = "invalid_completion_response";
+  }
   return result;
 }
 
@@ -224,6 +255,7 @@ void AiWorker::run() {
       wake_.wait(lock, [&] { return stopping_ || pending_.has_value(); });
       if (stopping_) return;
       job = std::move(*pending_); pending_.reset(); busy_ = true; ++started_;
+      status_ = "requesting"; // queued仅表示排队；后台已开始时明确改成requesting。
     }
     Result result; // 网络结果或捕获异常后合成的失败结果。
     try { result = perform(job); }
@@ -238,6 +270,8 @@ void AiWorker::run() {
         ++finished_;
         successes_ += result.http_success;
         last_http_ = result.http_status; last_curl_ = result.curl_code;
+        last_elapsed_ms_ = result.elapsed_ms; last_connect_ms_ = result.connect_ms;
+        last_first_byte_ms_ = result.first_byte_ms; last_result_ = result.status;
         known_mock_ = known_mock_ || result.mock_response;
         ready_ = std::move(result);
       }

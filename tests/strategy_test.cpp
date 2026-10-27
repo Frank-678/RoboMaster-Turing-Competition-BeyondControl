@@ -13,6 +13,7 @@ using Json = nlohmann::json; // 构造测试消息。
 using Cell = std::pair<int, int>; // 测试地图格子[x,y]。
 void full_scenarios();
 void gateway_scenarios(const std::string &base);
+void practice_gateway_scenario(const std::string &endpoint);
 
 Json frame(int x = 4, int y = 4, int width = 9, int height = 9, int radius = 4) {
   // x/y本车位置，width/height地图尺寸，radius实际视野。省略参数仅用于固定测试夹具。
@@ -175,6 +176,7 @@ int main() {
     full_scenarios();
     const int ticks = collect_in_synthetic_maze(); // 收完三个资源花了多少Tick。
     if (const char *gateway = std::getenv("RMTC_TEST_GATEWAY")) gateway_scenarios(gateway);
+    if (const char *gateway = std::getenv("RMTC_TEST_PRACTICE_GATEWAY")) practice_gateway_scenario(gateway);
     std::cout << "strategy scenarios passed; synthetic maze: 3 resources in " << ticks << " ticks\n";
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';

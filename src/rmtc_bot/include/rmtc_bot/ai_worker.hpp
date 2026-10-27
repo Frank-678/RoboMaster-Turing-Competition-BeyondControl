@@ -18,6 +18,9 @@ struct AiConfig {
   long timeout_ms = 0; // 整次HTTP请求的等待上限，毫秒；0表示尚未配置。
   int max_tokens = 0;  // 请求允许的输出token数；0表示尚未配置。
   std::string proxy;   // 到网关的网络代理；空串明确表示直连。
+  long connect_timeout_ms = 0; // 连接阶段上限；必须明确填写且不超过整次请求上限。
+  std::string thinking; // enabled/disabled，或空串表示不发送这个服务商扩展字段。
+  bool json_output = false; // 是否明确发送response_format=json_object；生产值来自统一配置。
 };
 
 // 主线程负责observe/poll，后台线程负责perform；等待网络不阻塞选动作。
@@ -29,6 +32,7 @@ public:
     std::uint64_t generation = 0; // 本地换场代数，旧代结果必须丢弃。
     long http_status = 0; // 服务返回的HTTP状态；没收到时为0。
     int curl_code = 0; // curl传输错误码；0表示传输完成，28是超时。
+    long elapsed_ms = 0, connect_ms = 0, first_byte_ms = 0; // 整次、连接完成、首字节时刻；均相对请求开始。
     bool http_success = false, stop = false, mock_response = false; // 完整2xx、停止本场重试、明确模拟响应。
   };
   explicit AiWorker(AiConfig config); // 检查配置，配置完整时启动后台线程。
@@ -60,6 +64,8 @@ private:
   long last_http_ = 0; // 最近一次HTTP状态码。
   int last_curl_ = 0; // 最近一次curl传输结果。
   bool known_mock_ = false; // 本场是否见过明确标记的practice-mock响应。
+  long last_elapsed_ms_ = 0, last_connect_ms_ = 0, last_first_byte_ms_ = 0; // 最近请求耗时；首字节0表示尚无首字节计时。
+  std::string last_result_; // 最近后台结果类型；acknowledge不覆盖它，便于区分传输与解析失败。
   std::string session_, understood_source_, status_ = "disabled"; // 当前场次、已理解的原文批次、日志状态。
   std::vector<std::string> announcements_; // 本场按收到顺序保存的公告文本批次。
   std::set<std::string> seen_; // 已收过的完整文本批次，防止重复加入。

@@ -10,23 +10,28 @@ inline constexpr const char *ros_domain_id = "27"; // 同一比赛ROS网络的�
 inline constexpr const char *ros_localhost_only = "0"; // 0允许局域网通信；1只在本机通信。
 inline constexpr const char *rmw_implementation = "rmw_fastrtps_cpp"; // ROS底层DDS实现。
 
-// 三项必须填；第二阶段留空就拒绝启动，防止又跑完整场才发现零次调用。
+// 三项必须明确；这里按当前同机DeepSeek练习填写，正式赛须换成本场官方值。
 // url 必须是完整的 /chat/completions 地址。正式赛填官方网关，不填模型服务主页。
 // 同机练习填 http://127.0.0.1:8080/v1/chat/completions，token 填 practice-A；
 // 练习裁判须另以 real 模式连接真实模型，mock 只验证通信。
-inline constexpr const char *ai_url = "";
-inline constexpr const char *ai_token = "";    // 本场令牌；填入真实令牌后不要提交此内容。
-inline constexpr const char *ai_model = "";    // 使用赛前公布的模型名。
-inline constexpr long ai_timeout_ms = 10000;  // 后台最多等10秒，不阻塞500ms的动作窗口。
+inline constexpr const char *ai_url = "http://127.0.0.1:8080/v1/chat/completions";
+inline constexpr const char *ai_token = "practice-A"; // 仅公开练习令牌；正式令牌不要提交。
+inline constexpr const char *ai_model = "deepseek-flash"; // 请求体中的模型名；练习启动器同时设置PRACTICE_MODEL。
+inline constexpr long ai_timeout_ms = 35000;  // 后台等完整响应；覆盖练习代理5秒连接+25秒读取，不阻塞动作。
+inline constexpr long ai_connect_timeout_ms = 5000; // 建连单独限5秒；原来的500ms对出网/TLS过短。
 inline constexpr int ai_max_tokens = 2200;    // 按当场输出限制修改。
 inline constexpr const char *ai_http_proxy = ""; // 机器人→网关的网络代理；空串明确表示直连。
+// 当前练习使用DeepSeek：明确关闭思考，直接生成事件JSON。空串表示不发送thinking字段。
+// 正式赛按公布的模型能力填写；不支持扩展字段的网关填空串、json_output填false。
+inline constexpr const char *ai_thinking = "disabled";
+inline constexpr bool ai_json_output = true; // 明确请求JSON模式；Prompt也要求JSON，仍需本地校验。
 
-// 只供 bash practice.sh 使用：练习代理→真实模型。正式赛不使用这两项。
+// 只供 bash practice.sh 使用：练习代理→真实模型。正式赛不使用这组上游配置。
 // 模型名共用上面的ai_model。真实服务密钥与practice-A是两种不同的凭据。
 inline constexpr int practice_port = 8080;     // 原版练习代理监听端口，须与本机ai_url一致。
-inline constexpr const char *practice_llm_url = "";
+inline constexpr const char *practice_llm_url = "https://api.deepseek.com/chat/completions"; // DeepSeek文档给出的完整POST端点。
 inline constexpr const char *practice_llm_key = "";
-inline constexpr const char *practice_llm_proxy = ""; // 上游出网代理；空串明确表示直连。
+inline constexpr const char *practice_llm_proxy = ""; // 上游出网代理；如确用WSL本机7890，填http://127.0.0.1:7890。
 
 // 下面只调策略取舍。攻击距离、伤害、计分公式和结算顺序按规则实现，不在这里调。
 inline constexpr double stale_resource_decay = 0.01; // 资源记忆每Tick衰减系数。

@@ -32,7 +32,8 @@ public:
     }
     const int stage = cfg::stage; // 阶段一只移动；阶段二启用攻防/事件/AI。
     if (stage != 1 && stage != 2) throw std::runtime_error("stage must be 1 or 2");
-    rmtc::AiConfig ai{cfg::ai_url, cfg::ai_token, cfg::ai_model, cfg::ai_timeout_ms, cfg::ai_max_tokens, cfg::ai_http_proxy};
+    rmtc::AiConfig ai{cfg::ai_url, cfg::ai_token, cfg::ai_model, cfg::ai_timeout_ms, cfg::ai_max_tokens,
+                      cfg::ai_http_proxy, cfg::ai_connect_timeout_ms, cfg::ai_thinking, cfg::ai_json_output};
     // 缺配置就停在赛前，不能悄悄关闭AI，等打完才发现成功次数为零。
     if (stage == 2 && (ai.url.empty() || ai.token.empty() || ai.model.empty()))
       throw std::runtime_error("Fill ai_url, ai_token and ai_model in match_config.hpp, then rebuild");
@@ -49,9 +50,13 @@ public:
         [this](Message::ConstSharedPtr msg) { on_perception(*msg); });
     registration_.data = Json{{"team", team}, {"name", name}}.dump();
     registration_pub_->publish(registration_);
-    RCLCPP_INFO(get_logger(), "Ready: seat=%s name=%s", team.c_str(), name.c_str());
-    RCLCPP_INFO(get_logger(), "AI configured: status=%s model=%s timeout_ms=%ld max_tokens=%d",
-                session_->ai_status().c_str(), cfg::ai_model, cfg::ai_timeout_ms, cfg::ai_max_tokens);
+    RCLCPP_INFO(get_logger(), "Ready: seat=%s name=%s built=%s %s domain=%s perception=%s action=%s",
+                team.c_str(), name.c_str(), __DATE__, __TIME__, cfg::ros_domain_id,
+                (prefix + "/perception").c_str(), (prefix + "/action").c_str());
+    RCLCPP_INFO(get_logger(), "AI configured: status=%s model=%s timeout_ms=%ld connect_timeout_ms=%ld max_tokens=%d thinking=%s json_output=%d proxy=%s",
+                session_->ai_status().c_str(), cfg::ai_model, cfg::ai_timeout_ms, cfg::ai_connect_timeout_ms,
+                cfg::ai_max_tokens, *cfg::ai_thinking ? cfg::ai_thinking : "omitted", cfg::ai_json_output,
+                *cfg::ai_http_proxy ? "configured" : "direct");
   }
 
 private:
@@ -60,15 +65,21 @@ private:
     try {
       const auto p = Json::parse(msg.data); // 当前完整公开感知。
       const auto action = session_->act(p); // 可选完整动作；为空时本回调不发布。
-      if (!action) return;
-      Message out; // 待发布的ROS消息外壳。
-      out.data = action->dump();
-      action_pub_->publish(out);
+      if (action) {
+        Message out; // 待发布的ROS消息外壳。
+        out.data = action->dump();
+        action_pub_->publish(out);
+      }
       const auto receipt = p["self"].value("last_action", Json()).dump(); // 上Tick真实执行结果，供人工核对。
+      const auto position = p["self"].value("position", Json()).dump(); // 裁判给出的当前绝对坐标，不按指令累加。
+      const auto session = p.at("session_id").get<std::string>(); // 用它确认终端和网页在看同一场。
+      const auto sent = action ? action->at("action").get<std::string>() : "none"; // none表示本回调未发布。
+      const auto direction = action ? action->value("direction", std::string("-")) : "-"; // 计划方向，区别于回执的实际方向。
       const auto ai = session_->ai_diagnostics().dump(); // 本场HTTP统计和最近传输状态。
-      RCLCPP_INFO(get_logger(), "tick=%lld sent=%s reason=%s ai=%s http_success=%d ai_calls=%s last_action=%s",
+      RCLCPP_INFO(get_logger(), "session=%s tick=%lld pos=%s sent=%s direction=%s reason=%s ai=%s http_success=%d ai_calls=%s last_action=%s",
+                  session.c_str(),
                   static_cast<long long>(rmtc::frame_tick(p)),
-                  action->at("action").get<std::string>().c_str(), session_->reason().c_str(),
+                  position.c_str(), sent.c_str(), direction.c_str(), session_->reason().c_str(),
                   session_->ai_status().c_str(), session_->ai_http_success(), ai.c_str(), receipt.c_str());
     } catch (const std::exception &e) { // e只输出错误原因，不输出感知全文、令牌或请求头。
       RCLCPP_WARN(get_logger(), "Skipping invalid perception: %s", e.what());

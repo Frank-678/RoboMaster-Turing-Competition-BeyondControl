@@ -1,6 +1,7 @@
 #include "rmtc_bot/events.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cctype>
 #include <stdexcept>
 
 // 本文件把LLM输出转成事件对象；公告自然语言由LLM解释，本地只做数据校验。
@@ -24,6 +25,50 @@ double number(const Json &j, double lower, double upper) { // 检查有限实数
 }
 const std::vector<std::string> names = {"explosion", "illusion", "heal", "fortress", "split", // 顺序必须与EventKind一致。
                                         "chili", "reflect", "vulnerability"};
+
+// 只整理模型已经返回的JSON外壳，不解释公告。接受围栏/前后说明和字符串外的尾逗号。
+// 缺括号、缺字段、两个相互冲突的对象都拒绝；绝不猜测坐标、时间或场次。
+Json model_object(const std::string &reply) {
+  if (reply.size() > 262144) throw std::runtime_error("model reply too large");
+  const auto strict = Json::parse(reply, nullptr, false); // 标准JSON优先；合法数组不能从中偷取一个子对象。
+  if (!strict.is_discarded()) {
+    if (!strict.is_object()) throw std::runtime_error("model reply must be an object");
+    return strict;
+  }
+  const auto start = reply.find('{'); // 第一个对象起点；前面的自然语言/Markdown不参与事件解释。
+  if (start == std::string::npos || reply.substr(0, start).find('[') != std::string::npos)
+    throw std::runtime_error("model reply has no standalone object");
+  std::string object; // 提取并去掉尾逗号的对象，字符串内容原样保留，包括source证据。
+  int depth = 0; // 花括号层数；字符串里的花括号不计入。
+  bool quoted = false, escaped = false; // 是否在双引号字符串中、上一个字符是否转义。
+  for (std::size_t i = start; i < reply.size(); ++i) { // i是回复中当前字节下标。
+    const char c = reply[i]; // 当前字节；这里只识别ASCII JSON标点，不改中文UTF-8字节。
+    if (quoted) {
+      object += c;
+      if (escaped) escaped = false;
+      else if (c == '\\') escaped = true;
+      else if (c == '"') quoted = false;
+      continue;
+    }
+    if (c == ',') {
+      auto next = i + 1; // 跳过空白后紧跟结束括号，才是可删除的尾逗号。
+      while (next < reply.size() && std::isspace(static_cast<unsigned char>(reply[next]))) ++next;
+      if (next < reply.size() && (reply[next] == '}' || reply[next] == ']')) continue;
+    }
+    object += c;
+    if (c == '"') quoted = true;
+    else if (c == '{') ++depth;
+    else if (c == '}' && --depth == 0) {
+      // 一份回复只接受一个对象；不能从多个候选中挑一个恰好通过校验的。
+      if (reply.find_first_of("{[", i + 1) != std::string::npos)
+        throw std::runtime_error("ambiguous model objects");
+      const auto parsed = Json::parse(object); // 括号类型、引号、数值等仍交给严格JSON解析器。
+      if (!parsed.is_object()) throw std::runtime_error("model reply must be an object");
+      return parsed;
+    }
+  }
+  throw std::runtime_error("incomplete model object");
+}
 }  // namespace
 
 bool Event::contains(Cell cell) const {
@@ -53,7 +98,7 @@ Json event_summary(const Event &e) {
 EventProposal decode_event_proposal(const std::string &reply, const std::string &session,
                                     const std::string &source, int width, int height) {
   if (width <= 0 || height <= 0) throw std::runtime_error("invalid event map size");
-  const auto root = Json::parse(reply);
+  const auto root = model_object(reply); // 先消除输出包装差异，再检查完整事件契约。
   // root是整个模型提案。场次必须原样一致，events/unknown必须是有界数组。
   if (root.at("session_id") != session || !root.at("events").is_array() ||
       root.at("events").size() > 128) throw std::runtime_error("event session/schema mismatch");

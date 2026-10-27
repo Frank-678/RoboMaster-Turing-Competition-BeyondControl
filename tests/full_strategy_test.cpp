@@ -2,6 +2,7 @@
 #include "rmtc_bot/session.hpp"
 #include "rmtc_bot/protocol.hpp"
 #include "rmtc_bot/scoring.hpp"
+#include <algorithm>
 #include <cmath>
 #include <chrono>
 #include <cstdlib>
@@ -146,6 +147,28 @@ void event_validation() {
   root["events"].push_back(second);
   const auto decoded = rmtc::decode_events(root.dump(), "test-match", "fixture", 9, 9); // 正式校验器返回的事件列表。
   check(decoded.size() == 2 && decoded[0].key != decoded[1].key, "same-tick different events collapsed");
+}
+// HelloCV中出现过的输出包装：接受完整对象，仍拒绝截断、错场次、多对象和缺字段。
+void model_formatting() {
+  auto spec = specification("explosion", 5, 6); // 待校验的同一事件，包装变化不能改变它。
+  spec["area"] = {2, 2, 4, 4}; spec["amount"] = 80;
+  spec["source"] = "quote } ,] \\\" stays"; // 字符串里的括号、逗号和转义必须原样保留。
+  const Json root = {{"session_id", "test-match"}, {"events", {spec}}, {"unknown", Json::array()}}; // 完整事件提案。
+  const auto plain = root.dump(); // 标准序列化，作为包装回复的共同内容。
+  auto comma = plain; comma.insert(comma.size() - 1, ","); // 只在人为添加的结尾处制造尾逗号。
+  for (const auto &text : {plain, std::string("```json\n") + plain + "\n```",
+                          std::string("解释如下：\n") + comma + "\n以上为结果。"}) {
+    const auto decoded = rmtc::decode_events(text, "test-match", spec["source"], 9, 9); // 使用正式解析和证据检查。
+    check(decoded.size() == 1 && decoded[0].source == spec["source"], "format cleanup changed or rejected valid evidence");
+  }
+  for (const auto &text : {plain.substr(0, plain.size() - 1), plain + plain, "[" + plain + "]",
+                          std::string("```json\n{\"events\":[]}\n```"),
+                          std::string("{\"session_id\":\"old-match\",\"events\":[],\"unknown\":[],}")}) {
+    bool failed = false; // 所有这些回复必须在采用事件前被拒绝。
+    try { rmtc::decode_events(text, "test-match", spec["source"], 9, 9); }
+    catch (const std::exception &) { failed = true; }
+    check(failed, "format cleanup invented or adopted an invalid event proposal");
+  }
 }
 // 验证爆炸/分裂先于移动，以及幻术的方向、激活资格和到期。
 void hazard_and_illusion() {
@@ -309,7 +332,7 @@ void session_contract() {
 
 // 汇总运行全部第二阶段核心场景；不需要网络或ROS。
 void full_scenarios() {
-  combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); hazard_and_illusion();
+  combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
   future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
 }
@@ -318,7 +341,7 @@ void full_scenarios() {
 void gateway_scenarios(const std::string &base) {
   using namespace std::chrono;
   const auto config = [&](const std::string &path, long timeout = 1800) {
-    return rmtc::AiConfig{base + path, "fixture-token", "fixture-model", timeout, 2200, ""};
+    return rmtc::AiConfig{base + path, "fixture-token", "fixture-model", timeout, 2200, "", std::min(5000L, timeout), "disabled", true};
   };
   rmtc::AiWorker missing({}); // 没有URL/令牌的客户端，用于检查零请求诊断。
   missing.reset("missing-config");
@@ -357,6 +380,16 @@ void gateway_scenarios(const std::string &base) {
     std::this_thread::sleep_for(milliseconds(20));
   }
   check(applied, "mock gateway event never reached strategy");
+  rmtc::Session fenced(2, config("/fenced")); // 经HTTP收到围栏JSON时，也须进入正式校验及真实策略。
+  bool adopted_fenced = false; // 防止只单测解析器而实际HTTP链路仍拒绝包装输出。
+  for (int t = 0; t < 50; ++t) {
+    p["tick"] = t; fenced.act(p);
+    if (fenced.ai_status() == "events_validated" && fenced.reason() == "capture_fortress") {
+      adopted_fenced = true; break;
+    }
+    std::this_thread::sleep_for(milliseconds(10));
+  }
+  check(adopted_fenced, "fenced HTTP model output never reached strategy");
   rmtc::Session partial(2, config("/partial")); // 含未知项的提案或对应被测场次。
   bool saw_incomplete = false, resolved = false; // 是否观察到unknown尚未补齐的状态。
   for (int t = 0; t < 120; ++t) {
@@ -413,6 +446,20 @@ void gateway_scenarios(const std::string &base) {
   rmtc::AiWorker proxied(proxied_config); // 必须通过本机代理访问保留域名的测试客户端。
   proxied.reset("proxy"); q["session_id"] = "proxy"; proxied.observe(q, Json::array());
   check(receive(proxied).http_success, "explicit proxy was not used for outbound request");
+  auto standard_config = config("/standard-only"); // 不支持服务商扩展的网关，只发基础协议字段。
+  standard_config.thinking.clear(); standard_config.json_output = false;
+  rmtc::AiWorker standard(standard_config); // 由夹具确认扩展字段确实省略，不由客户端猜测模型能力。
+  standard.reset("standard"); q["session_id"] = "standard"; standard.observe(q, Json::array());
+  check(receive(standard).http_success, "standard gateway options were not configurable");
+  for (const auto &path : {"/reasoning-only", "/truncated"}) {
+    rmtc::AiWorker incomplete(config(path)); // 最终答案不可用，但HTTP传输成功的两个场景。
+    incomplete.reset(path); q["session_id"] = path; incomplete.observe(q, Json::array());
+    const auto result = receive(incomplete); // 必须记录精确问题，不能读取reasoning当答案或采用截断对象。
+    const std::string expected = std::string(path) == "/reasoning-only" ? "model_reasoning_only" : "model_output_truncated";
+    check(result.http_success && result.reply.empty() && result.status == expected, "nonfinal model answer was adopted or misdiagnosed");
+    incomplete.acknowledge(result, false);
+    check(incomplete.status() == expected, "acknowledge erased model failure reason");
+  }
   for (const std::string path : {"/auth", "/garbage", "/bad-response"}) {
     rmtc::AiWorker failure(config(path));
     failure.reset(path); q["session_id"] = path; failure.observe(q, Json::array());
@@ -457,4 +504,22 @@ void gateway_scenarios(const std::string &base) {
   rmtc::Session stage1(1, config("/stage1-must-not-call")); // 配置了网关但第一阶段必须零请求的场次。
   stage1.act(fresh());
   std::cout << "mock HTTP: async event pipeline, quota, timeout, session cancellation, stage1 isolation passed\n";
+}
+
+// endpoint是原版practice处理器监听的本机地址；上游仍是固定夹具，不声称真实LLM/ROS通过。
+void practice_gateway_scenario(const std::string &endpoint) {
+  rmtc::Session session(2, {endpoint, "practice-A", "fixture-model", 1800, 2200, "", 1000, "disabled", true});
+  auto p = fresh(); // 真实Session收到的公开感知；不读取原裁判配置或观赛数据。
+  p["event_text"] = "fixture fortress announcement";
+  for (int tick = 0; tick < 100; ++tick) {
+    p["tick"] = tick;
+    session.act(p);
+    if (session.ai_status() == "events_validated" && session.reason() == "capture_fortress") {
+      check(session.ai_http_success(), "original relay event was adopted without HTTP completion");
+      std::cout << "C++ Session -> original practice HTTP -> canned upstream -> validated event passed\n";
+      return;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  throw std::runtime_error("original practice forwarding did not reach the strategy: " + session.ai_status());
 }

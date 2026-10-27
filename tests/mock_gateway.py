@@ -28,6 +28,11 @@ class Handler(BaseHTTPRequestHandler):
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))  # 客户端完整请求体。
         assert request["stream"] is False and request["max_tokens"] > 0
         assert request["model"] == "fixture-model"
+        if self.path == "/standard-only":
+            assert "thinking" not in request and "response_format" not in request
+        else:
+            assert request["thinking"] == {"type": "disabled"}
+            assert request["response_format"] == {"type": "json_object"}
         context = json.loads(request["messages"][1]["content"])  # 用户消息里的场次、公告和已知事件。
         with lock:
             counts[self.path] += 1
@@ -61,6 +66,12 @@ class Handler(BaseHTTPRequestHandler):
                 events = []  # 固定模型事件列表，与真实语义推理无关。
             answer = {"session_id": context["session_id"], "events": events, "unknown": unknown}  # 内层模型JSON。
             body = {"choices": [{"message": {"content": json.dumps(answer)}}]}
+            if self.path == "/fenced":
+                body["choices"][0]["message"]["content"] = "```json\n" + json.dumps(answer) + "\n```"
+            elif self.path == "/reasoning-only":
+                body["choices"][0]["message"] = {"content": None, "reasoning_content": "fixture reasoning, never an answer"}
+            elif self.path == "/truncated":
+                body["choices"][0]["finish_reason"] = "length"
             if self.path == "/practice-mock":
                 body["model"] = "practice-mock"
         raw = json.dumps(body).encode() if body is not None else b"temporary upstream failure"  # 真正写入HTTP的字节。
@@ -95,6 +106,7 @@ def main():
             assert counts["/auth"] == 1 and counts["/garbage"] == 1, counts
             assert counts["/bad-response"] == 1, counts
             assert counts["/practice-mock"] == 1, counts
+            assert all(counts[p] == 1 for p in ("/fenced", "/reasoning-only", "/truncated", "/standard-only")), counts
             assert counts["http://upstream.invalid/proxy-target"] == 1, counts
         print("mock gateway request-count and authorization assertions passed")
     finally:
