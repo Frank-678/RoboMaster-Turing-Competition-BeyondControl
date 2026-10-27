@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -eo pipefail
+# 启动已经编译好的选手程序。比赛配置只取match_config.hpp，不在这里补值。
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 if (( $# != 0 )); then
   echo '所有配置写在 src/rmtc_bot/include/rmtc_bot/match_config.hpp；修改后构建，再 bash run.sh' >&2

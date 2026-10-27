@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -eo pipefail
+# 运行我们自己的配置启动器；被调用的practice/start_referee.sh始终保持原样。
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 if (( $# != 0 )); then
   echo '所有配置写在 src/rmtc_bot/include/rmtc_bot/match_config.hpp，启动脚本不收参数。' >&2
