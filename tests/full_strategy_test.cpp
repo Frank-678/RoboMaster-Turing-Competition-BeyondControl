@@ -301,7 +301,7 @@ void full_scenarios() {
 void gateway_scenarios(const std::string &base) {
   using namespace std::chrono;
   const auto config = [&](const std::string &path, long timeout = 1800) {
-    return rmtc::AiConfig{base + path, "fixture-token", "fixture-model", timeout, 2200};
+    return rmtc::AiConfig{base + path, "fixture-token", "fixture-model", timeout, 2200, ""};
   };
   rmtc::AiWorker missing({});
   missing.reset("missing-config");
@@ -390,6 +390,12 @@ void gateway_scenarios(const std::string &base) {
   check(retried.http_success, "transient rate limit never retried");
   rate.acknowledge(retried, true);
   check(rate.observed_http_success(), "successful forwarded HTTP reply not recorded");
+  auto proxied_config = config("/unused");
+  proxied_config.url = "http://upstream.invalid/proxy-target";
+  proxied_config.proxy = base;
+  rmtc::AiWorker proxied(proxied_config);
+  proxied.reset("proxy"); q["session_id"] = "proxy"; proxied.observe(q, Json::array());
+  check(receive(proxied).http_success, "explicit proxy was not used for outbound request");
   for (const std::string path : {"/auth", "/garbage", "/bad-response"}) {
     rmtc::AiWorker failure(config(path));
     failure.reset(path); q["session_id"] = path; failure.observe(q, Json::array());

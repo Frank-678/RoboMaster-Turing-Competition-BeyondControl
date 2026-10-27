@@ -30,7 +30,7 @@ public:
     }
     const int stage = cfg::stage;
     if (stage != 1 && stage != 2) throw std::runtime_error("stage must be 1 or 2");
-    rmtc::AiConfig ai{cfg::ai_url, cfg::ai_token, cfg::ai_model, cfg::ai_timeout_ms, cfg::ai_max_tokens};
+    rmtc::AiConfig ai{cfg::ai_url, cfg::ai_token, cfg::ai_model, cfg::ai_timeout_ms, cfg::ai_max_tokens, cfg::ai_http_proxy};
     // 缺配置就停在赛前，不能悄悄关闭AI，等打完才发现成功次数为零。
     if (stage == 2 && (ai.url.empty() || ai.token.empty() || ai.model.empty()))
       throw std::runtime_error("Fill ai_url, ai_token and ai_model in match_config.hpp, then rebuild");

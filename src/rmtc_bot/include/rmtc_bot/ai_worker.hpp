@@ -16,6 +16,7 @@ struct AiConfig {
   std::string url, token, model;
   long timeout_ms = 0;
   int max_tokens = 0;
+  std::string proxy;
 };
 
 class AiWorker {

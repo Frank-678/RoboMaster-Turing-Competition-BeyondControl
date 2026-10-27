@@ -20,7 +20,7 @@ bash run.sh
 
 第二阶段的 `ai_url`、`ai_token`、`ai_model` 必须填，留空会拒绝启动。URL必须是完整的 `/chat/completions` 地址，不能只填服务主页。超时和输出长度也取配置中的明确值；请求在后台等待，不阻塞动作回调。
 
-正式比赛填本场官方网关、席位令牌和指定模型。练习时机器人填本地代理 `http://127.0.0.1:8080/v1/chat/completions` 和 `practice-A`（按席位改），真实模型服务配置在练习裁判端，并以 `--ai-mode real` 启动；`mock`只返回固定响应。更换配置、阶段或席位后必须重新编译并重启。
+正式比赛填本场官方网关、席位令牌和指定模型。练习时机器人填本地代理 `http://127.0.0.1:8080/v1/chat/completions` 和 `practice-A`（按席位改），同一头文件还提供`practice_llm_url/key/proxy`；`bash practice.sh`将这些配置交给原版练习程序，第二阶段明确使用real模式，不修改`practice/`。更换配置、阶段或席位后必须重新编译并重启。地址关系和完整操作步骤见[README.md](README.md)。
 
 ## 最小策略
 

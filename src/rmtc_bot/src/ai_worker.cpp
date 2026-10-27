@@ -160,6 +160,9 @@ AiWorker::Result AiWorker::perform(const Job &job) {
   Download response;
   Cancellation cancel{generation_, job.generation};
   curl_easy_setopt(curl.get(), CURLOPT_URL, config_.url.c_str());
+  // 只走配置中指定的网关/代理，不继承终端HTTP_PROXY或NO_PROXY的隐式路径。
+  curl_easy_setopt(curl.get(), CURLOPT_PROXY, config_.proxy.c_str());
+  curl_easy_setopt(curl.get(), CURLOPT_NOPROXY, "");
   curl_easy_setopt(curl.get(), CURLOPT_HTTPHEADER, headers.get());
   curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDS, job.body.c_str());
   curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(job.body.size()));

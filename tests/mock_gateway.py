@@ -75,6 +75,10 @@ def main():
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     env = os.environ.copy()
+    # 故意给坏的终端代理；客户端必须按自身配置直连夹具。
+    for key in ("http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):
+        env[key] = "http://127.0.0.1:1"
+    env["NO_PROXY"] = env["no_proxy"] = ""
     env["RMTC_TEST_GATEWAY"] = f"http://127.0.0.1:{server.server_port}"
     try:
         subprocess.run([str(Path(sys.argv[1]).resolve())], env=env, check=True, timeout=30)
@@ -87,6 +91,7 @@ def main():
             assert counts["/auth"] == 1 and counts["/garbage"] == 1, counts
             assert counts["/bad-response"] == 1, counts
             assert counts["/practice-mock"] == 1, counts
+            assert counts["http://upstream.invalid/proxy-target"] == 1, counts
         print("mock gateway request-count and authorization assertions passed")
     finally:
         server.shutdown()

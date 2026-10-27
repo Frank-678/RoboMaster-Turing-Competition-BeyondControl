@@ -19,6 +19,14 @@ inline constexpr const char *ai_token = "";    // 本场令牌；填入真实令
 inline constexpr const char *ai_model = "";    // 使用赛前公布的模型名。
 inline constexpr long ai_timeout_ms = 10000;  // 后台最多等10秒，不阻塞500ms的动作窗口。
 inline constexpr int ai_max_tokens = 2200;    // 按当场输出限制修改。
+inline constexpr const char *ai_http_proxy = ""; // 机器人→网关的网络代理；空串明确表示直连。
+
+// 只供 bash practice.sh 使用：练习代理→真实模型。正式赛不使用这两项。
+// 模型名共用上面的ai_model。真实服务密钥与practice-A是两种不同的凭据。
+inline constexpr int practice_port = 8080;     // 原版练习代理监听端口，须与本机ai_url一致。
+inline constexpr const char *practice_llm_url = "";
+inline constexpr const char *practice_llm_key = "";
+inline constexpr const char *practice_llm_proxy = ""; // 上游出网代理；空串明确表示直连。
 
 // 下面只调策略取舍。攻击距离、伤害、计分公式和结算顺序按规则实现，不在这里调。
 inline constexpr double stale_resource_decay = 0.01; // 资源记忆每Tick衰减系数。
