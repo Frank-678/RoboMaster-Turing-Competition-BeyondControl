@@ -25,6 +25,13 @@ struct Event {
 };
 
 // 只解析模型返回的 JSON；不匹配或解释公告中的关键词、句式、时间表。
+struct EventProposal {
+  std::vector<Event> events;
+  std::vector<std::string> unknown;
+};
+EventProposal decode_event_proposal(const std::string &reply, const std::string &session,
+                                    const std::string &source, int width, int height);
+// Convenience for callers interested only in already-validated events.
 std::vector<Event> decode_events(const std::string &reply, const std::string &session,
                                  const std::string &source, int width, int height);
 nlohmann::json event_summary(const Event &event);

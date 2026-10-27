@@ -104,18 +104,21 @@ std::optional<AiWorker::Result> AiWorker::poll() {
   return result;
 }
 
-void AiWorker::acknowledge(const Result &r, bool understood) {
+void AiWorker::acknowledge(const Result &r, bool understood, bool partial) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (r.generation != generation_.load() || r.session != session_) return;
   http_success_ = http_success_ || r.http_success;
   disabled_ = r.stop;
   status_ = r.status;
-  if (understood) {
+  if (understood && !partial) {
     understood_ = true; understood_source_ = r.source;
     failures_ = invalid_replies_ = 0;
     status_ = "events_validated";
   } else {
-    if (r.http_success) { ++invalid_replies_; status_ = "invalid_model_reply"; }
+    if (r.http_success) {
+      ++invalid_replies_;
+      status_ = partial ? "events_incomplete" : "invalid_model_reply";
+    }
     failures_ = std::min(failures_ + 1, 4U);
     retry_after_ = std::chrono::steady_clock::now() + std::chrono::seconds(1U << (failures_ - 1));
   }

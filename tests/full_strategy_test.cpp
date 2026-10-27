@@ -38,7 +38,7 @@ Json specification(const char *kind, int start, int end) {
   return {{"kind", kind}, {"start", start}, {"end", end}, {"source", "fixture"}};
 }
 std::vector<rmtc::Event> events(const Json &spec) {
-  return rmtc::decode_events(Json{{"session_id", "test-match"}, {"events", Json::array({spec})}}.dump(),
+  return rmtc::decode_events(Json{{"session_id", "test-match"}, {"events", Json::array({spec})}, {"unknown", Json::array()}}.dump(),
                              "test-match", "synthetic fixture announcement", 9, 9);
 }
 void rejected(const Json &root, const std::string &source = "fixture") {
@@ -97,7 +97,13 @@ void event_validation() {
   auto j = specification("explosion", 5, 6);
   j["area"] = {2, 2, 4, 4}; j["amount"] = 80;
   check(events(j).size() == 1, "valid event rejected");
-  Json root = {{"session_id", "test-match"}, {"events", {j}}};
+  Json root = {{"session_id", "test-match"}, {"events", {j}}, {"unknown", Json::array()}};
+  auto partial = root; partial["unknown"] = {"activation tick missing for another event"};
+  const auto proposal = rmtc::decode_event_proposal(partial.dump(), "test-match", "fixture", 9, 9);
+  check(proposal.events.size() == 1 && proposal.unknown.size() == 1, "partial event proposal lost uncertainty");
+  auto malformed = root; malformed.erase("unknown"); rejected(malformed);
+  malformed = root; malformed["unknown"] = "none"; rejected(malformed);
+  malformed = root; malformed["unknown"] = {nullptr}; rejected(malformed);
   auto bad = root; bad["session_id"] = "old-match"; rejected(bad);
   bad = root; bad["events"][0]["source"] = "invented quote"; rejected(bad);
   bad = root; bad["events"][0]["area"] = {0, 0, 9, 8}; rejected(bad);
@@ -260,6 +266,19 @@ void gateway_scenarios(const std::string &base) {
     std::this_thread::sleep_for(milliseconds(20));
   }
   check(applied, "mock gateway event never reached strategy");
+  rmtc::Session partial(2, config("/partial"));
+  bool saw_incomplete = false, resolved = false;
+  for (int t = 0; t < 120; ++t) {
+    p["tick"] = t; partial.act(p);
+    if (partial.ai_http_success() && !saw_incomplete) {
+      check(partial.ai_status() == "events_incomplete", "unknown fields were marked fully understood");
+      check(partial.reason() == "capture_fortress", "validated part of model reply was discarded");
+      saw_incomplete = true;
+    }
+    if (saw_incomplete && partial.ai_status() == "events_validated") { resolved = true; break; }
+    std::this_thread::sleep_for(milliseconds(20));
+  }
+  check(saw_incomplete && resolved, "unknown fields were never retried and resolved");
   // 一个成功的空公告请求也必须真实发往网关，不在本地伪造成功。
   rmtc::AiWorker quota(config("/quota"));
   quota.reset("quota");

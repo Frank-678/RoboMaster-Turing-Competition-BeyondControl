@@ -18,16 +18,18 @@ std::optional<Json> Session::act(const Json &p) {
   if (tick < latest_tick_) return std::nullopt;
   if (tick == latest_tick_) return cached_;  // 暂停重发不推进策略、AI 请求和访问次数。
   if (const auto result = ai_.poll()) {
-    bool understood = false;
+    bool understood = false, partial = false;
     try {
       if (result->http_success && result->session == session_) {
-        const auto events = decode_events(result->reply, session_, result->source,
+        const auto proposal = decode_event_proposal(result->reply, session_, result->source,
                                           p.at("map").at("width").get<int>(),
                                           p.at("map").at("height").get<int>());
-        strategy_.merge_events(events); understood = true;
+        strategy_.merge_events(proposal.events);
+        partial = !proposal.unknown.empty();
+        understood = !partial;
       }
     } catch (const std::exception &) { /* 模型异常降级，不能把模型输出当作动作。 */ }
-    ai_.acknowledge(*result, understood);
+    ai_.acknowledge(*result, understood, partial);
   }
   try { ai_.observe(p, strategy_.known_events()); }
   catch (const std::exception &) { /* 非法输入不阻塞本地决策。 */ }

@@ -93,6 +93,8 @@ ROS 网络仍读取 `ROS_DOMAIN_ID`、`ROS_LOCALHOST_ONLY`、`RMW_IMPLEMENTATION
 
 日志含 sent、reason、ai、http_success 和后续 last_action。http_success 只表示本程序收到本场一次 2xx 转发响应；模型结果还须通过校验，正式资格仍以裁判记录为准。令牌不写日志或命令行参数。
 
+模型的 unknown 字段必须是字符串数组。存在未知项时只合并已校验的事件，标记 events_incomplete，按原退避和尝试次数上限重试；不能因为 JSON 有效或 HTTP 成功就标记整批公告已理解。后续补齐未知项后才标记 events_validated。
+
 程序仅订阅自己的 /team_X/perception，其中已经含任务和近期公告；使用其公开字段和自己保存的历史，不读取观赛全图、练习配置、内部话题或对手专属输入。
 
 ## 验证

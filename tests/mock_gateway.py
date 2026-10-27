@@ -52,7 +52,11 @@ class Handler(BaseHTTPRequestHandler):
                     "area": [6, 6, 7, 7], "capture_ticks": 2,
                     "amount": 50, "defended_damage": 10, "source": "fixture",
                 }]
-            answer = {"session_id": context["session_id"], "events": events, "unknown": []}
+            unknown = ["fixture uncertainty"] if self.path == "/partial" and attempt == 1 else []
+            if self.path == "/partial" and attempt > 1:
+                assert context["known_events"], "validated partial events were discarded"
+                events = []
+            answer = {"session_id": context["session_id"], "events": events, "unknown": unknown}
             body = {"choices": [{"message": {"content": json.dumps(answer)}}]}
         raw = json.dumps(body).encode() if body is not None else b"temporary upstream failure"
         try:
@@ -74,6 +78,7 @@ def main():
         subprocess.run([str(Path(sys.argv[1]).resolve())], env=env, check=True, timeout=30)
         with lock:
             assert counts["/ok"] == 1, ("announcement deduplication failed", counts)
+            assert counts["/partial"] == 2, ("partial interpretation was not retried exactly once", counts)
             assert counts["/quota"] == 1, ("quota retried", counts)
             assert counts["/stage1-must-not-call"] == 0, counts
             assert counts["/rate"] == 2, counts

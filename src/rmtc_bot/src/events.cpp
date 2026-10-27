@@ -46,13 +46,20 @@ Json event_summary(const Event &e) {
           {"multiplier", e.multiplier}, {"source", e.source}};
 }
 
-std::vector<Event> decode_events(const std::string &reply, const std::string &session,
-                                 const std::string &source, int width, int height) {
+EventProposal decode_event_proposal(const std::string &reply, const std::string &session,
+                                    const std::string &source, int width, int height) {
   if (width <= 0 || height <= 0) throw std::runtime_error("invalid event map size");
   const auto root = Json::parse(reply);
   if (root.at("session_id") != session || !root.at("events").is_array() ||
       root.at("events").size() > 128) throw std::runtime_error("event session/schema mismatch");
-  std::vector<Event> out;
+  const auto &unknown = root.at("unknown");
+  if (!unknown.is_array() || unknown.size() > 128) throw std::runtime_error("event unknown schema");
+  EventProposal out;
+  for (const auto &item : unknown) {
+    const auto explanation = item.get<std::string>();
+    if (explanation.empty() || explanation.size() > 4096) throw std::runtime_error("event unknown explanation");
+    out.unknown.push_back(explanation);
+  }
   for (const auto &j : root.at("events")) {
     const auto name = j.at("kind").get<std::string>();
     const auto it = std::find(names.begin(), names.end(), name);
@@ -103,9 +110,14 @@ std::vector<Event> decode_events(const std::string &reply, const std::string &se
     }
     // 去重键不依赖模型自造 ID；同 Tick 不同区域仍保留为不同事件。
     e.key = Json::array({name, e.start, e.area, e.points}).dump();
-    out.push_back(std::move(e));
+    out.events.push_back(std::move(e));
   }
   return out;
+}
+
+std::vector<Event> decode_events(const std::string &reply, const std::string &session,
+                                 const std::string &source, int width, int height) {
+  return decode_event_proposal(reply, session, source, width, height).events;
 }
 
 std::string event_system_prompt() {
@@ -117,6 +129,8 @@ with known_events, preserving the original activation start. Return only new or 
 do not repeat unchanged known events. Use absolute ticks, inclusive start and
 exclusive end. If uncertain, omit that event and describe uncertainty in unknown. Output ONLY JSON:
 {"session_id":"echo input","events":[...],"unknown":[]}.
+unknown must be an array of nonempty explanatory strings; use [] only when all new announcements
+are understood. Omit an uncertain event, retain independently understood events, and explain the gap.
 Every event requires kind,start,end,source. source must be an exact nonempty quote from announcements,
 at most 4096 UTF-8 bytes; quote only the relevant evidence, not the whole history.
 area means [left,top,right,bottom], inclusive coordinates. points means [[x,y],...].

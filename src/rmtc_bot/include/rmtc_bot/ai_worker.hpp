@@ -32,7 +32,7 @@ public:
   void reset(const std::string &session);
   void observe(const nlohmann::json &perception, const nlohmann::json &known_events);
   std::optional<Result> poll();
-  void acknowledge(const Result &result, bool understood);
+  void acknowledge(const Result &result, bool understood, bool partial = false);
   std::string status() const;
   bool enabled() const { return enabled_; }
   bool observed_http_success() const;
