@@ -39,8 +39,9 @@ AiWorker::AiWorker(AiConfig config) : config_(std::move(config)) {
   if ((config_.url.rfind("http://", 0) != 0 && config_.url.rfind("https://", 0) != 0) ||
       config_.token.find_first_of("\r\n") != std::string::npos)
     throw std::runtime_error("invalid AI URL or token format");
-  config_.timeout_ms = std::clamp(config_.timeout_ms, 100L, 5000L);
-  config_.max_tokens = std::clamp(config_.max_tokens, 1, 8192);
+  if (config_.timeout_ms < 100 || config_.timeout_ms > 30000 ||
+      config_.max_tokens < 1 || config_.max_tokens > 8192)
+    throw std::runtime_error("AI timeout/max_tokens must be configured explicitly");
   static CurlRuntime runtime;
   (void)runtime;
   status_ = "ready";

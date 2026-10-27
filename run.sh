@@ -1,22 +1,15 @@
 #!/usr/bin/env bash
 set -eo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
+if (( $# != 0 )); then
+  echo '所有配置写在 src/rmtc_bot/include/rmtc_bot/match_config.hpp；修改后构建，再 bash run.sh' >&2
+  exit 2
+fi
 if [[ ! -f install/setup.bash ]]; then
   echo '请先在 ~/cst 中运行 bash build.sh' >&2
   exit 1
 fi
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-cst_seat="${1:-A}"
-cst_name="${2:-Frank}"
-cst_stage="${3:-stage2}"
-case "$cst_seat" in A|B|C|D) ;; *) echo '席位须为 A/B/C/D' >&2; exit 2 ;; esac
-case "$cst_stage" in
-  stage1) cst_stage_id=1 ;;
-  stage2) cst_stage_id=2 ;;
-  *) echo '阶段须为 stage1 或 stage2' >&2; exit 2 ;;
-esac
-export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-27}"
-export ROS_LOCALHOST_ONLY="${ROS_LOCALHOST_ONLY:-0}"
-export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
-exec ros2 run rmtc_bot bot --ros-args -p "team:=$cst_seat" -p "team_name:=$cst_name" -p "stage:=$cst_stage_id"
+# 席位、阶段、AI和ROS网络参数全部由编译进程序的match_config.hpp提供。
+exec ros2 run rmtc_bot bot

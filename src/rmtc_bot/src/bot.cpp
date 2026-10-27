@@ -5,19 +5,22 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <iostream>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 #include "rmtc_bot/protocol.hpp"
 #include "rmtc_bot/session.hpp"
+#include "rmtc_bot/match_config.hpp"
 
 using Json = nlohmann::json;
 using Message = std_msgs::msg::String;
+namespace cfg = rmtc::match_config;
 
 class Bot final : public rclcpp::Node {
 public:
   Bot() : Node("rmtc_bot") {
-    const auto team = declare_parameter<std::string>("team", "A");
-    const auto name = declare_parameter<std::string>("team_name", "Frank");
+    const std::string team = cfg::team;
+    const std::string name = cfg::team_name;
     if (team != "A" && team != "B" && team != "C" && team != "D") {
       throw std::runtime_error("team must be A, B, C or D");
     }
@@ -25,15 +28,14 @@ public:
         name.find_first_of("\r\n") != std::string::npos) {
       throw std::runtime_error("team_name must contain 1-96 UTF-8 bytes and no newline");
     }
-    const auto stage = declare_parameter<std::int64_t>("stage", 2);
+    const int stage = cfg::stage;
     if (stage != 1 && stage != 2) throw std::runtime_error("stage must be 1 or 2");
-    const auto env = [](const char *key) {
-      const char *value = std::getenv(key);
-      return value ? std::string(value) : std::string();
-    };
-    rmtc::AiConfig ai;
-    ai.url = env("RMTC_AI_URL"); ai.token = env("RMTC_TEAM_TOKEN"); ai.model = env("RMTC_AI_MODEL");
-    if (!env("RMTC_AI_MAX_TOKENS").empty()) ai.max_tokens = std::stoi(env("RMTC_AI_MAX_TOKENS"));
+    rmtc::AiConfig ai{cfg::ai_url, cfg::ai_token, cfg::ai_model, cfg::ai_timeout_ms, cfg::ai_max_tokens};
+    // 缺配置就停在赛前，不能悄悄关闭AI，等打完才发现成功次数为零。
+    if (stage == 2 && (ai.url.empty() || ai.token.empty() || ai.model.empty()))
+      throw std::runtime_error("Fill ai_url, ai_token and ai_model in match_config.hpp, then rebuild");
+    if (stage == 2 && (ai.url.size() < 17 || ai.url.compare(ai.url.size() - 17, 17, "/chat/completions") != 0))
+      throw std::runtime_error("ai_url must be the full /chat/completions endpoint");
     session_ = std::make_unique<rmtc::Session>(static_cast<int>(stage), std::move(ai));
     const auto prefix = "/team_" + team;
     const auto live = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile();
@@ -46,8 +48,6 @@ public:
     registration_.data = Json{{"team", team}, {"name", name}}.dump();
     registration_pub_->publish(registration_);
     RCLCPP_INFO(get_logger(), "Ready: seat=%s name=%s", team.c_str(), name.c_str());
-    if (stage == 2 && (env("RMTC_AI_URL").empty() || env("RMTC_TEAM_TOKEN").empty()))
-      RCLCPP_WARN(get_logger(), "AI disabled: set RMTC_AI_URL and RMTC_TEAM_TOKEN; formal AI qualification is unverified");
   }
 
 private:
@@ -77,6 +77,13 @@ private:
 };
 
 int main(int argc, char **argv) {
+  // DDS在init时读这些变量；这里用固定配置设置，启动终端不用手工export。
+  if (::setenv("ROS_DOMAIN_ID", cfg::ros_domain_id, 1) != 0 ||
+      ::setenv("ROS_LOCALHOST_ONLY", cfg::ros_localhost_only, 1) != 0 ||
+      ::setenv("RMW_IMPLEMENTATION", cfg::rmw_implementation, 1) != 0) {
+    std::cerr << "Cannot apply ROS settings from match_config.hpp\n";
+    return 1;
+  }
   rclcpp::init(argc, argv);
   int status = 0;
   try {

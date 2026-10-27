@@ -11,35 +11,16 @@ cd ~/cst
 bash build.sh
 ```
 
-先在另一个终端启动练习裁判，退出占用本席位的参考车。第一阶段：
+赛前只改 `src/rmtc_bot/include/rmtc_bot/match_config.hpp`：席位、队名、阶段、ROS网络、AI地址/令牌/模型/超时/输出长度及策略权重都在这里。没有启动参数或环境变量兜底。改完重新编译，再运行：
 
 ```bash
-bash run.sh A 'Frank' stage1
+bash build.sh
+bash run.sh
 ```
 
-第二阶段练习（测试令牌仅用于公开练习代理）：
+第二阶段的 `ai_url`、`ai_token`、`ai_model` 必须填，留空会拒绝启动。URL必须是完整的 `/chat/completions` 地址，不能只填服务主页。超时和输出长度也取配置中的明确值；请求在后台等待，不阻塞动作回调。
 
-```bash
-export RMTC_AI_URL='http://127.0.0.1:8080/v1/chat/completions'
-export RMTC_TEAM_TOKEN='practice-A'
-bash run.sh A 'Frank' stage2
-```
-
-两个参数的旧命令 `bash run.sh A 'Frank'` 默认 stage2。切换阶段、席位、更换令牌或重编译后重启机器人；已运行进程不会读取另一个终端中新设置的环境变量。
-
-正式比赛把 `RMTC_AI_URL` 换成官方发放的完整 Chat Completions 地址，令牌换成本场席位令牌；模型及输出限制按当场通知设置：
-
-```bash
-read -rsp '本场席位令牌: ' RMTC_TEAM_TOKEN
-export RMTC_TEAM_TOKEN
-printf '\n'
-# 按现场通知设置：RMTC_AI_URL、RMTC_AI_MODEL、RMTC_AI_MAX_TOKENS
-bash run.sh A 'Frank' stage2
-```
-
-`RMTC_AI_MODEL` 未设置时省略 model，由网关使用默认模型。`RMTC_AI_MAX_TOKENS` 默认 2200，可设为 1–8192；必须服从官方公布的输出上限。网络请求超时默认 1800 ms，在后台线程执行。
-
-ROS 网络仍读取 `ROS_DOMAIN_ID`、`ROS_LOCALHOST_ONLY`、`RMW_IMPLEMENTATION`，默认分别为 `27`、`0`、`rmw_fastrtps_cpp`，正式接入以现场值为准。缺少 AI 地址或令牌时程序会明确告警，继续运行本地策略；不能据此认定满足正式 AI 调用资格。
+正式比赛填本场官方网关、席位令牌和指定模型。练习时机器人填本地代理 `http://127.0.0.1:8080/v1/chat/completions` 和 `practice-A`（按席位改），真实模型服务配置在练习裁判端，并以 `--ai-mode real` 启动；`mock`只返回固定响应。更换配置、阶段或席位后必须重新编译并重启。
 
 ## 最小策略
 
@@ -60,7 +41,7 @@ ROS 网络仍读取 `ROS_DOMAIN_ID`、`ROS_LOCALHOST_ONLY`、`RMW_IMPLEMENTATION
 
 资源和战斗的直接收益按 v1.2 §10.2 的封顶前后分差计算，包括跨过 120/500 的部分收益；每帧重读允许下降、小数和超过 500 的官方 D。击杀独享估计为 60 D，辣椒损血不计普通伤害贡献；多人分奖与对手行动仍有不确定性。另有很小且有界的争夺/同分启发权重，不作为额外计分。
 
-少量赛前参数集中在 `src/rmtc_bot/include/rmtc_bot/strategy_tuning.hpp`：资源记忆衰减、资源任务奖励、reach 任务价值、求治疗血量阈值、堡垒驻留/前往价值和避险提前量。它们是启发式权衡，默认值与集中前一致；官方伤害、攻击距离、得分封顶和结算顺序不属于调参项。修改头文件后重新编译，再使用不同地图、席位和对手组合评估，保留独立验证场景，最后封存选定版本。运行时没有调参或热更新；目前尚未建立真实裁判自动对战、统计与参数搜索流程，离线回归通过也不代表找到最佳参数。
+少量赛前参数也集中在 `src/rmtc_bot/include/rmtc_bot/match_config.hpp`：资源记忆衰减、资源任务奖励、reach 任务价值、求治疗血量阈值、堡垒驻留/前往价值和避险提前量。它们是启发式权衡，当前数值与集中前一致；官方伤害、攻击距离、得分封顶和结算顺序不属于调参项。修改头文件后重新编译，再使用不同地图、席位和对手组合评估，保留独立验证场景，最后封存选定版本。运行时没有调参或热更新；目前尚未建立真实裁判自动对战、统计与参数搜索流程，离线回归通过也不代表找到最佳参数。
 
 ## 八类事件
 
@@ -83,6 +64,7 @@ ROS 网络仍读取 `ROS_DOMAIN_ID`、`ROS_LOCALHOST_ONLY`、`RMW_IMPLEMENTATION
 
 | 文件 | 用途 |
 | --- | --- |
+| src/rmtc_bot/include/rmtc_bot/match_config.hpp | 比赛前统一配置 |
 | src/rmtc_bot/src/strategy.cpp | 地图记忆、目标评分、BFS、攻防和效果状态 |
 | src/rmtc_bot/src/events.cpp | 公告解释 Prompt 与模型输出校验 |
 | src/rmtc_bot/src/ai_worker.cpp | curl 后台请求、公告缓存、限额与退避、跨场取消 |
