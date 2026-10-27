@@ -24,6 +24,8 @@ int main() {
   }
   // 这些变量由原版练习代理读取。用户只改头文件，不需要手工export。
   const auto set = [](const char *key, const char *value) { return ::setenv(key, value, 1) == 0; }; // key变量名/value明确值；覆盖继承环境。
+  // 测试也不刷新原版practice/__pycache__中的字节码文件。
+  if (!set("PYTHONDONTWRITEBYTECODE", "1")) return 1;
   if (!set("ROS_DOMAIN_ID", cfg::ros_domain_id) || !set("ROS_LOCALHOST_ONLY", cfg::ros_localhost_only) ||
       !set("RMW_IMPLEMENTATION", cfg::rmw_implementation) ||
       !set("PRACTICE_LLM_URL", cfg::practice_llm_url) || !set("PRACTICE_LLM_KEY", cfg::practice_llm_key) ||
