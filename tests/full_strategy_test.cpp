@@ -1,5 +1,7 @@
 #include "rmtc_bot/session.hpp"
 #include "rmtc_bot/protocol.hpp"
+#include "rmtc_bot/scoring.hpp"
+#include <cmath>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -71,6 +73,25 @@ void combat_and_missions() {
   p["score"]["resource_value"] = 130;
   p["missions"] = {{{"id", "reach2"}, {"type", "reach"}, {"position", {4, 5}}, {"target", 1}}};
   check(choose(p)["direction"] == "down", "resource cap prevented reach task selection");
+}
+void capped_score_decisions() {
+  check(std::abs(rmtc::score_delta(119, 20, 120, 30) - 0.25) < 1e-9, "resource cap crossing arithmetic");
+  check(rmtc::score_delta(120, 20, 120, 30) == 0, "resource cap arithmetic");
+  check(std::abs(rmtc::score_delta(490.5, 20, 500, 15) - 0.285) < 1e-9, "fractional damage cap crossing");
+  check(std::abs(rmtc::score_delta(520, -60, 500, 15) + 1.2) < 1e-9, "death score loss at 520 D");
+  check(rmtc::score_delta(600, -60, 500, 15) == 0, "excess damage buffer was truncated before death");
+  auto p = fresh();
+  p["visible_entities"] = {entity("resource_normal", 0, -1), robot(1, 0)};
+  p["score"]["resource_value"] = 119;
+  check(choose(p)["action"] == "attack", "resource crossing 120 was credited its full uncapped value");
+  rmtc::Session session(2);
+  p["score"]["effective_damage"] = 600.5;
+  auto action = *session.act(p);
+  check(action["action"] == "move" && action["direction"] == "up", "combat beyond 500 retained uncapped direct reward");
+  p["tick"] = 1;
+  p["score"]["effective_damage"] = 40.5;
+  action = *session.act(p);
+  check(action["action"] == "attack", "decreased official damage did not restore combat value");
 }
 void event_validation() {
   auto j = specification("explosion", 5, 6);
@@ -216,7 +237,7 @@ void session_contract() {
 }  // namespace
 
 void full_scenarios() {
-  combat_and_missions(); event_validation(); hazard_and_illusion();
+  combat_and_missions(); capped_score_decisions(); event_validation(); hazard_and_illusion();
   fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
 }
