@@ -1,6 +1,8 @@
 #pragma once
+#include <array>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -37,6 +39,7 @@ private:
   };
   bool split_wall(Cell cell, Tick tick) const;
   bool dangerous(Cell cell, Tick tick) const;
+  std::array<bool, 5> safe_first_steps(Cell start, Tick tick, const std::set<Cell> &occupied) const;
   void update_effects(Tick tick);
   int stage_, width_ = 0, height_ = 0;
   bool reversed_ = false, reverse_unknown_ = false, empowered_ = false;

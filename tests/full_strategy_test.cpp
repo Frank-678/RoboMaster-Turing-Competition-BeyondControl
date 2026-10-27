@@ -154,6 +154,36 @@ void hazard_and_illusion() {
   p = fresh(2); p["visible_entities"] = {entity("resource_normal", 1, 0)};
   check(uncertain.decide(p)["action"] == "wait", "late join guessed unobserved illusion eligibility");
 }
+void future_escape_route() {
+  Strategy strategy;
+  strategy.decide(fresh(0, 1, 1));  // Initial spawn is elsewhere; [4,4] is not exempt.
+  auto split = specification("split", 12, 16); split["points"] = {{0, 4}};
+  auto explosion = specification("explosion", 13, 14);
+  explosion["area"] = {4, 3, 4, 3}; explosion["amount"] = 80;
+  strategy.merge_events(events(split)); strategy.merge_events(events(explosion));
+  auto p = fresh(10); p["self"]["hp"] = 50;
+  p["visible_entities"] = {entity("resource_normal", 0, -1), entity("obstacle", -1, -1),
+                           entity("obstacle", 1, -1), entity("obstacle", 0, -2)};
+  const auto action = strategy.decide(p);
+  check(action["action"] == "move" && action["direction"] == "down",
+        "nearest escape entered a dead end sealed before the next explosion");
+
+  Strategy corridor;
+  auto blast = specification("explosion", 11, 12);
+  blast["area"] = {4, 3, 4, 3}; blast["amount"] = 80;
+  corridor.merge_events(events(blast));
+  auto later_blast = specification("explosion", 15, 16);
+  later_blast["area"] = {8, 8, 8, 8}; later_blast["amount"] = 80;
+  corridor.merge_events(events(later_blast));  // Keep the temporal filter active after the first blast.
+  p = fresh(10);
+  p["visible_entities"] = {entity("resource_high", 0, -2), entity("obstacle", -1, 0),
+                           entity("obstacle", 1, 0), entity("obstacle", 0, 1)};
+  check(corridor.decide(p)["action"] == "wait", "route did not wait for next-tick explosion");
+  p["tick"] = 11;
+  const auto after_blast = corridor.decide(p);
+  check(after_blast["action"] == "move" && after_blast["direction"] == "up",
+        "movement into a cell after its explosion was incorrectly prohibited");
+}
 void fortress_and_effects() {
   auto fortress = specification("fortress", 0, 20);
   fortress["area"] = {2, 2, 3, 3}; fortress["capture_ticks"] = 2;
@@ -244,7 +274,7 @@ void session_contract() {
 
 void full_scenarios() {
   combat_and_missions(); capped_score_decisions(); event_validation(); hazard_and_illusion();
-  fortress_and_effects(); session_contract();
+  future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
 }
 

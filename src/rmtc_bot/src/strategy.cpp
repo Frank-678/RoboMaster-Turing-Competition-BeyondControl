@@ -94,6 +94,54 @@ bool Strategy::dangerous(Cell cell, Tick tick) const {
   }
   return false;
 }
+std::array<bool, 5> Strategy::safe_first_steps(Cell start, Tick tick, const std::set<Cell> &occupied) const {
+  constexpr int horizon = 8;
+  const std::array<bool, 5> unrestricted = {true, true, true, true, true};
+  const bool relevant = std::any_of(events_.begin(), events_.end(), [&](const auto &entry) {
+    const auto &e = entry.second;
+    return (e.kind == Kind::split && e.end > tick && e.start <= tick + horizon) ||
+           (e.kind == Kind::explosion && e.start > tick && e.start <= tick + horizon);
+  });
+  if (!relevant) return unrestricted;
+
+  // At most 145 known cells: certify a continuation, without assuming unknown ground is empty.
+  std::vector<Cell> cells;
+  std::map<Cell, std::size_t> index;
+  for (int dy = -horizon; dy <= horizon; ++dy) {
+    for (int dx = -horizon; dx <= horizon; ++dx) {
+      if (std::abs(dx) + std::abs(dy) > horizon) continue;
+      const Cell cell{start.first + dx, start.second + dy};
+      const auto tile = tiles_.find(cell);
+      if (tile == tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(cell)) continue;
+      index[cell] = cells.size(); cells.push_back(cell);
+    }
+  }
+  std::array<std::vector<bool>, horizon + 1> good;
+  for (auto &layer : good) layer.resize(cells.size(), false);
+  for (std::size_t i = 0; i < cells.size(); ++i) good[horizon][i] = !dangerous(cells[i], tick + horizon);
+  for (int k = horizon - 1; k >= 1; --k) {
+    for (std::size_t i = 0; i < cells.size(); ++i) {
+      const auto cell = cells[i];
+      if (dangerous(cell, tick + k)) continue;
+      for (int action = 0; action < 5; ++action) {
+        const Cell next = action == 4 ? cell : Cell{cell.first + steps[action].first, cell.second + steps[action].second};
+        const auto found = index.find(next);
+        // Explosion precedes movement; only the next pre-action state must avoid it (§5.2).
+        if (found != index.end() && !split_wall(next, tick + k) && good[k + 1][found->second]) {
+          good[k][i] = true; break;
+        }
+      }
+    }
+  }
+  std::array<bool, 5> safe = {};
+  for (int action = 0; action < 5; ++action) {
+    const Cell next = action == 4 ? start : Cell{start.first + steps[action].first, start.second + steps[action].second};
+    const auto found = index.find(next);
+    safe[action] = found != index.end() && !split_wall(next, tick) && good[1][found->second];
+  }
+  // No certified route is not proof of unavoidable death; keep the existing legal fallback.
+  return std::any_of(safe.begin(), safe.end(), [](bool value) { return value; }) ? safe : unrestricted;
+}
 void Strategy::update_effects(Tick tick) {
   reversed_ = reverse_unknown_ = empowered_ = false;
   vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
@@ -269,6 +317,7 @@ Json Strategy::decide(const Json &p) {
     return damage;
   };
 
+  const auto safe_steps = safe_first_steps(start, tick, occupied);
   struct Node { int first, distance; };
   std::map<Cell, Node> paths;
   std::vector<Cell> order;
@@ -278,6 +327,7 @@ Json Strategy::decide(const Json &p) {
     const Cell current = queue.front(); queue.pop(); order.push_back(current);
     const auto node = paths.at(current);
     for (int i = 0; i < 4; ++i) {
+      if (node.first == -1 && !safe_steps[i]) continue;
       const Cell next{current.first + steps[i].first, current.second + steps[i].second};
       const auto tile = tiles_.find(next);
       if (tile == tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(next) ||
@@ -341,6 +391,7 @@ Json Strategy::decide(const Json &p) {
   double best_utility = -1;
   const char *best_reason = "explore";
   const auto consider = [&](int step, double utility, const char *reason) {
+    if (!safe_steps[step < 0 ? 4 : step]) return;
     if (utility > best_utility + 1e-9) { best_utility = utility; best_step = step; best_reason = reason; }
   };
   unsigned least_visits = std::numeric_limits<unsigned>::max();
@@ -439,12 +490,15 @@ Json Strategy::decide(const Json &p) {
     }
   }
   // 留在堡垒仍可攻击/防御；不能把上一帧 defending 当成对手本 Tick 的承诺。
-  if (attack_direction >= 0 && attack_utility > 0 &&
+  if (safe_steps[4] && attack_direction >= 0 && attack_utility > 0 &&
       (attack_utility > best_utility || std::string(best_reason) == "hold_fortress")) {
     reason_ = "attack_opportunity";
     return {{"action", "attack"}, {"direction", directions[attack_direction]}};
   }
   if (best_step >= 0 && !reverse_unknown_) return move(best_step, best_reason);
-  if (stage_ == 2 && incoming > 0) { reason_ = "defend_while_holding"; return {{"action", "defend"}}; }
+  if (stage_ == 2 && incoming > 0 && safe_steps[4]) { reason_ = "defend_while_holding"; return {{"action", "defend"}}; }
+  if (!reverse_unknown_ && safe_steps[4] &&
+      std::none_of(safe_steps.begin(), safe_steps.begin() + 4, [](bool value) { return value; }))
+    return wait("wait_for_safe_route");
   return wait(reverse_unknown_ ? "uncertain_illusion" : best_utility >= 0 ? best_reason : "no_path");
 }
