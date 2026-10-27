@@ -1,4 +1,6 @@
 #pragma once
+#include <map>
+#include <utility>
 #include <nlohmann/json.hpp>
 
 class Strategy {
@@ -11,5 +13,6 @@ public:
   nlohmann::json decide(const nlohmann::json &perception);
 
 private:
-  // Add your strategy state here.
+  // 只记录真正到达过的格子，不把计划中的移动当作已执行。
+  std::map<std::pair<int, int>, unsigned> visits_;
 };

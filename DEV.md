@@ -27,7 +27,7 @@ bash run.sh A 'Frank'
 | `src/rmtc_bot/CMakeLists.txt` | 增加新源文件或依赖 |
 | `src/rmtc_bot/package.xml` | 依赖与包信息；维护者邮箱是待替换占位值 |
 
-初始策略仅返回 `wait`。返回值示例：
+当前最小策略是“就近采集 + 局部探索”，`decide()` 返回值示例：
 
 ```cpp
 return {{"action", "move"}, {"direction", "right"}};
@@ -40,7 +40,13 @@ return {{"action", "move"}, {"direction", "right"}};
 
 原样接收公开感知 JSON。`self.position` 是绝对坐标数组；可见实体的 `position` 是九行相对位置字符串。
 当前代码仅订阅自己的 `/team_X/perception`；任务和近期事件文本也包含在感知中。
-尚未接入 LLM，没有事件理解或采集、寻路、对抗策略。不要在同步 `decide()` 中执行耗时网络请求。
+策略按公开协议 §3 逐个解析实体的 9×9 相对图，再加上本车绝对坐标。
+仅在当前视野与地图边界内做 BFS，绕开可见障碍和其他存活机器人，走向步数最少的可达资源；同距离按上、右、下、左破平局，暂不按资源价值加权。
+没有可达资源时，选实际到达次数最少的可达格，同次数选较近者；无路可走、视野为 0 或实体位置图不可靠时等待。
+每 Tick 只返回路径第一步，下一帧重新规划，不假设上一条移动成功。`reset()` 清空访问次数，新场次从实际感知重新开始。
+
+这是待对战的采集基线：未实现全局地图记忆、任务规划、攻击防御、事件效果或 LLM。
+公告文本尚未解析，也不据此猜测固定堡垒或事件时间。不要在同步 `decide()` 中执行耗时网络请求。
 正式比赛前须按当场通知设置 ROS 网络参数、席位，另行实现并验证真实 AI 网关调用。
 
 ## 修改后运行
@@ -66,6 +72,19 @@ ros2 pkg prefix rmtc_bot
 日志中 `sent=wait` 表示已发布动作；后续 `last_action` 回执才可用于确认裁判接收和执行。
 
 ## 验证范围
+
+不依赖 ROS 的策略回归检查（需要上述 `g++` 和 `nlohmann-json3-dev`）：
+
+```bash
+g++ -std=c++17 -Wall -Wextra -Wpedantic \
+  -I src/rmtc_bot/include \
+  src/rmtc_bot/src/strategy.cpp tests/strategy_test.cpp \
+  -o /tmp/rmtc_strategy_test
+/tmp/rmtc_strategy_test
+```
+
+检查覆盖就近采集、障碍/车辆绕行、不可达资源、地图边界、缩小视野、重叠图、畸形位置图、阵亡等待、实际位置重规划和换场清空记忆；另用合成迷宫逐帧生成公开感知，检查采集与移动合法性。
+本次检查使用 C++17、nlohmann/json 3.10.5、`-Werror`、AddressSanitizer 与 UndefinedBehaviorSanitizer 通过；合成迷宫 24 Tick 收集 3 个资源。运行环境不支持 LeakSanitizer，因此关闭泄漏检测；这些结果不代表真实裁判联调或对战性能。
 
 初始化脚本经过临时目录安装、重复运行保护、已有 README 与 practice 文件保留检查。
 协议与策略部分使用 C++17 和 nlohmann/json 3.10.5 编译运行检查。
