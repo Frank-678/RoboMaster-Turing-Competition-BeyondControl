@@ -33,7 +33,9 @@ bash run.sh
 | LLM | 通过配置的官方兼容网关真实发送 HTTP 请求，后台解释公告，严格校验模型 JSON、场次、时间、坐标和公告原文证据；模型不能直接发布动作 |
 | 时序与换场 | 新 Tick 重新决策；同 Tick 重发复用缓存动作，旧 Tick 与已退役场次丢弃；新场次清空地图、历史、效果及请求状态，跨场 HTTP 结果丢弃 |
 
-第一阶段只执行 MOVE/WAIT，不发 AI 请求。第二阶段使用同一套基础规则并启用任务、攻防和已解释事件。
+第一阶段只提交MOVE，不发AI请求。第二阶段使用同一套基础规则并启用任务、攻防和已解释事件。第二阶段存活时无目标/异常回退DEFEND，驻留或等危险结束也用DEFEND；阵亡、动作前必死、分裂强制等待以及第一阶段无合法动作时不发布。程序不生成默认WAIT；未提交时裁判仍按自身规则结算。
+
+没有已知路线且邻格尚未探明时，优先尝试地图内、没有已知占位/墙/公告危险的邻格。失败后优先换一个较少尝试的方向，绝不自行把未知格标成空地或把本车坐标加一步。普通移动失败不增加无效动作；错误场次、格式或状态仍须避免。
 
 每次只执行路线第一步，下一帧采用实际 self.position 与 last_action 更新；不假设移动成功，不重复反转回执中的 effective_direction，也不缓存未来动作让其自动执行。
 
@@ -68,7 +70,7 @@ bash run.sh
 | src/rmtc_bot/src/strategy.cpp | 地图记忆、目标评分、BFS、攻防和效果状态 |
 | src/rmtc_bot/src/events.cpp | 公告解释 Prompt 与模型输出校验 |
 | src/rmtc_bot/src/ai_worker.cpp | curl 后台请求、公告缓存、限额与退避、跨场取消 |
-| src/rmtc_bot/src/session.cpp | Tick/场次去重、缓存、采纳模型结果、异常等待回退 |
+| src/rmtc_bot/src/session.cpp | Tick/场次去重、缓存、采纳模型结果、防御或不发布回退 |
 | src/rmtc_bot/src/bot.cpp | ROS 订阅/发布、注册和日志 |
 | src/rmtc_bot/include/rmtc_bot/protocol.hpp | 感知信封与动作字段检查 |
 | tests/ | 离线回归与本地 HTTP 协议夹具 |

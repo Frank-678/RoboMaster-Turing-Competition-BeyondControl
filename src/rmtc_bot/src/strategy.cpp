@@ -66,7 +66,7 @@ Strategy::Strategy(int stage) : stage_(stage) {
   if (stage != 1 && stage != 2) throw std::runtime_error("stage must be 1 or 2");
 }
 void Strategy::reset() {
-  tiles_.clear(); history_.clear(); events_.clear(); capture_progress_.clear(); spawn_.reset();
+  tiles_.clear(); probe_attempts_.clear(); history_.clear(); events_.clear(); capture_progress_.clear(); spawn_.reset();
   width_ = height_ = 0; reversed_ = reverse_unknown_ = empowered_ = false;
   vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
   reason_ = "new_session";
@@ -184,7 +184,11 @@ void Strategy::update_effects(Tick tick) {
 }
 
 Json Strategy::decide(const Json &p) {
-  const auto wait = [&](const char *reason) { reason_ = reason; return Json{{"action", "wait"}}; };
+  const auto fallback = [&](const char *reason) {
+    reason_ = reason;
+    return stage_ == 2 && p.at("self").at("alive") == true ? Json{{"action", "defend"}} : Json();
+  };
+  const auto skip = [&](const char *reason) { reason_ = reason; return Json(); };
   const auto &self = p.at("self");
   const Tick tick = p.at("tick").get<Tick>();
   const bool alive = self.at("alive").get<bool>();
@@ -193,11 +197,11 @@ Json Strategy::decide(const Json &p) {
   const int radius = integer(p.at("vision_radius"));
   if (width <= 0 || height <= 0 || width > 1000000 || height > 1000000 ||
       start.first < 0 || start.first >= width || start.second < 0 || start.second >= height ||
-      radius < 0 || radius > 4 || !p.at("visible_entities").is_array()) return wait("invalid_frame");
-  if (width_ != 0 && (width != width_ || height != height_)) return wait("map_changed_without_session");
+      radius < 0 || radius > 4 || !p.at("visible_entities").is_array()) return fallback("invalid_frame");
+  if (width_ != 0 && (width != width_ || height != height_)) return fallback("map_changed_without_session");
   const bool protected_spawn = self.value("protected", false);
   const double hp = self.value("hp", 100.0);
-  if (!std::isfinite(hp) || hp < 0) return wait("invalid_hp");
+  if (!std::isfinite(hp) || hp < 0) return fallback("invalid_hp");
   const bool respawn = self.value("position_reason", std::string()) == "respawn";
   const auto receipt = self.value("last_action", Json());
   bool moved = false;
@@ -213,7 +217,7 @@ Json Strategy::decide(const Json &p) {
   history_[tick] = Snapshot{start, alive, protected_spawn, respawn, moved, receipt_tick};
   if (alive && (tick == 0 || self.value("position_reason", std::string()) == "initial")) spawn_ = start;
   update_effects(tick);
-  if (!alive) return wait("dead");
+  if (!alive) return skip("dead");
 
   std::vector<Entity> entities;
   std::vector<Enemy> enemies;
@@ -222,18 +226,18 @@ Json Strategy::decide(const Json &p) {
     const auto type = j.at("type").get<std::string>();
     if (type != "obstacle" && type != "robot" && type != "resource_normal" && type != "resource_high") continue;
     const auto offset = relative_position(j.at("position"));
-    if (!offset) return wait("invalid_entity_grid");
+    if (!offset) return fallback("invalid_entity_grid");
     const auto [dx, dy] = *offset;
     if (std::abs(dx) > radius || std::abs(dy) > radius || dx < -start.first ||
         dx >= width - start.first || dy < -start.second || dy >= height - start.second)
-      return wait("invalid_entity_coordinate");
+      return fallback("invalid_entity_coordinate");
     const Cell cell{start.first + dx, start.second + dy};
     const double value = j.value("value", type == "resource_high" ? 20.0 : 10.0);
-    if (!std::isfinite(value) || value < 0) return wait("invalid_resource_value");
+    if (!std::isfinite(value) || value < 0) return fallback("invalid_resource_value");
     entities.push_back({type, cell, value, value >= 20});
     if (type == "robot") {
       const double enemy_hp = j.value("hp", 100.0);
-      if (!std::isfinite(enemy_hp) || enemy_hp < 0) return wait("invalid_enemy_hp");
+      if (!std::isfinite(enemy_hp) || enemy_hp < 0) return fallback("invalid_enemy_hp");
       occupied.insert(cell);
       enemies.push_back({cell, enemy_hp, j.value("defending", false), j.value("protected", false)});
     }
@@ -283,9 +287,9 @@ Json Strategy::decide(const Json &p) {
     }
     if (e.kind == Kind::explosion && e.start == tick && e.contains(start) && !protected_spawn)
       pre_damage += e.amount;
-    if (e.kind == Kind::split && e.start == tick && split_wall(start, tick)) return wait("split_forced_wait");
+    if (e.kind == Kind::split && e.start == tick && split_wall(start, tick)) return skip("split_forced_wait");
   }
-  if (pre_damage >= hp) return wait("lethal_activation_before_action");
+  if (pre_damage >= hp) return skip("lethal_activation_before_action");
   double incoming = 0, defended_incoming = 0;
   for (const auto &enemy : enemies) {
     if (enemy.protected_spawn || protected_spawn) continue;
@@ -498,9 +502,27 @@ Json Strategy::decide(const Json &p) {
     return {{"action", "attack"}, {"direction", directions[attack_direction]}};
   }
   if (best_step >= 0 && !reverse_unknown_) return move(best_step, best_reason);
+  // 没有已知路线时，试探地图内的未知邻格。移动失败不加无效动作；位置仍取下一帧感知。
+  if (best_utility < 0 && !reverse_unknown_) {
+    int probe = -1;
+    unsigned fewest = std::numeric_limits<unsigned>::max();
+    for (int i = 0; i < 4; ++i) {
+      const Cell next{start.first + steps[i].first, start.second + steps[i].second};
+      if (next.first < 0 || next.first >= width || next.second < 0 || next.second >= height ||
+          occupied.count(next) || !safe_steps[i] || split_wall(next, tick) || dangerous(next, tick + 1) ||
+          possible_fire(next) >= hp - pre_damage) continue;
+      const auto tile = tiles_.find(next);
+      if (tile != tiles_.end() && (tile->second.seen || tile->second.wall)) continue;
+      if (probe_attempts_[next] < fewest) { fewest = probe_attempts_[next]; probe = i; }
+    }
+    if (probe >= 0) {
+      ++probe_attempts_[{start.first + steps[probe].first, start.second + steps[probe].second}];
+      return move(probe, "probe_unknown_cell");
+    }
+  }
   if (stage_ == 2 && incoming > 0 && safe_steps[4]) { reason_ = "defend_while_holding"; return {{"action", "defend"}}; }
   if (!reverse_unknown_ && safe_steps[4] &&
       std::none_of(safe_steps.begin(), safe_steps.begin() + 4, [](bool value) { return value; }))
-    return wait("wait_for_safe_route");
-  return wait(reverse_unknown_ ? "uncertain_illusion" : best_utility >= 0 ? best_reason : "no_path");
+    return fallback("defend_for_safe_route");
+  return fallback(reverse_unknown_ ? "uncertain_illusion" : best_utility >= 0 ? best_reason : "no_path");
 }

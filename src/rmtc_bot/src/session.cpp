@@ -16,7 +16,7 @@ std::optional<Json> Session::act(const Json &p) {
     strategy_.reset(); ai_.reset(session);
   }
   if (tick < latest_tick_) return std::nullopt;
-  if (tick == latest_tick_) return cached_;  // 暂停重发不推进策略、AI 请求和访问次数。
+  if (tick == latest_tick_) return cached_.is_null() ? std::nullopt : std::optional<Json>(cached_);
   if (const auto result = ai_.poll()) {
     bool understood = false, partial = false;
     try {
@@ -33,12 +33,12 @@ std::optional<Json> Session::act(const Json &p) {
   }
   try { ai_.observe(p, strategy_.known_events()); }
   catch (const std::exception &) { /* 非法输入不阻塞本地决策。 */ }
-  Json proposed = {{"action", "wait"}};
+  Json proposed = Json::object();  // 异常交给动作检查层：存活第二阶段回退DEFEND。
   try { proposed = strategy_.decide(p); reason_ = strategy_.reason(); }
   catch (const std::exception &) { reason_ = "invalid_strategy_input"; }
-  if (stage_ == 1 && proposed.value("action", std::string()) != "move" &&
-      proposed.value("action", std::string()) != "wait") proposed = {{"action", "wait"}};
-  cached_ = action_for(p, proposed); latest_tick_ = tick;
-  return cached_;
+  // 策略明确返回null：已知会在动作前死亡/被强制等待，或第一阶段无合法动作。
+  cached_ = proposed.is_null() ? Json() : action_for(p, proposed, stage_);
+  latest_tick_ = tick;
+  return cached_.is_null() ? std::nullopt : std::optional<Json>(cached_);
 }
 }  // namespace rmtc

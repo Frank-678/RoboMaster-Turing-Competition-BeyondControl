@@ -93,6 +93,26 @@ void capped_score_decisions() {
   action = *session.act(p);
   check(action["action"] == "attack", "decreased official damage did not restore combat value");
 }
+void defend_fallback() {
+  auto p = fresh();
+  p["visible_entities"] = {entity("obstacle", 0, -1), entity("obstacle", 1, 0),
+                           entity("obstacle", 0, 1), entity("obstacle", -1, 0)};
+  check(choose(p)["action"] == "defend", "surrounded stage2 robot fell back to WAIT");
+  check(rmtc::action_for(p, Json{{"action", "move"}, {"direction", "invalid"}}, 2)["action"] == "defend",
+        "invalid proposal did not fall back to DEFEND");
+  check(rmtc::action_for(p, Json::object(), 1).is_null(), "stage1 fallback illegally defended");
+  p["self"]["alive"] = false;
+  check(rmtc::action_for(p, Json::object(), 2).is_null(), "dead robot emitted a fallback action");
+  rmtc::Session probe(2);
+  p = fresh(); p["vision_radius"] = 0;
+  const auto first = probe.act(p);
+  check(first && first->at("direction") == "up", "unknown neighbor was never probed");
+  check(probe.act(p) == first, "duplicate tick consumed a probe attempt");
+  p["tick"] = 1;
+  p["self"]["last_action"] = {{"tick", 0}, {"action", "move"}, {"moved", false}};
+  const auto next = probe.act(p);
+  check(next && next->at("direction") == "right", "failed probe repeated instead of trying another neighbor");
+}
 void event_validation() {
   auto j = specification("explosion", 5, 6);
   j["area"] = {2, 2, 4, 4}; j["amount"] = 80;
@@ -124,7 +144,7 @@ void hazard_and_illusion() {
   auto p = fresh(1);
   check(s.decide(p)["action"] == "move" && s.reason() == "escape_announced_hazard", "explosion not escaped before activation");
   p = fresh(3); p["self"]["hp"] = 70;
-  check(s.decide(p)["action"] == "wait" && s.reason() == "lethal_activation_before_action", "late MOVE survived pre-move explosion");
+  check(s.decide(p).is_null() && s.reason() == "lethal_activation_before_action", "late MOVE survived pre-move explosion");
   p["self"]["protected"] = true;
   check(s.decide(p)["action"] == "move", "explosion ignored spawn protection");
 
@@ -135,7 +155,7 @@ void hazard_and_illusion() {
   const auto escape = wall.decide(p);
   check(escape["action"] == "move" && (escape["direction"] == "right" || escape["direction"] == "left"), "split cross not escaped");
   p = fresh(2, 5, 4);
-  check(wall.decide(p)["action"] == "wait", "split activation did not force WAIT");
+  check(wall.decide(p).is_null(), "split activation did not force WAIT");
 
   auto illusion = specification("illusion", 0, 5); illusion["area"] = {3, 3, 5, 5};
   Strategy reversed;
@@ -152,7 +172,7 @@ void hazard_and_illusion() {
   Strategy uncertain;
   uncertain.merge_events(events(illusion));
   p = fresh(2); p["visible_entities"] = {entity("resource_normal", 1, 0)};
-  check(uncertain.decide(p)["action"] == "wait", "late join guessed unobserved illusion eligibility");
+  check(uncertain.decide(p)["action"] == "defend", "late join guessed unobserved illusion eligibility");
 }
 void future_escape_route() {
   Strategy strategy;
@@ -178,7 +198,7 @@ void future_escape_route() {
   p = fresh(10);
   p["visible_entities"] = {entity("resource_high", 0, -2), entity("obstacle", -1, 0),
                            entity("obstacle", 1, 0), entity("obstacle", 0, 1)};
-  check(corridor.decide(p)["action"] == "wait", "route did not wait for next-tick explosion");
+  check(corridor.decide(p)["action"] == "defend", "route did not wait for next-tick explosion");
   p["tick"] = 11;
   const auto after_blast = corridor.decide(p);
   check(after_blast["action"] == "move" && after_blast["direction"] == "up",
@@ -190,13 +210,13 @@ void fortress_and_effects() {
   fortress["amount"] = 50; fortress["defended_damage"] = 10;
   Strategy s; s.merge_events(events(fortress));
   auto p = fresh(0, 3, 3);
-  check(s.decide(p)["action"] == "wait", "offset fortress ignored or hardcoded");
+  check(s.decide(p)["action"] == "defend", "offset fortress ignored or hardcoded");
   p = fresh(1, 3, 3); p["visible_entities"] = {robot(1, 1, 30)};
   check(s.decide(p)["action"] != "attack", "fortress upgrade applied before battle-after capture");
   p["tick"] = 2; p["self"]["last_action"]["tick"] = 1;
   check(s.decide(p)["action"] == "attack", "fortress did not upgrade diagonal area attack");
   p = fresh(3, 3, 3); p["self"]["alive"] = false;
-  check(s.decide(p)["action"] == "wait", "dead fortress holder acted");
+  check(s.decide(p).is_null(), "dead fortress holder acted");
   p = fresh(4, 7, 7); p["self"]["position_reason"] = "respawn";
   p["visible_entities"] = {robot(-1, -1, 30)};
   check(s.decide(p)["action"] == "attack", "fortress buff lost on exit/death");
@@ -268,12 +288,12 @@ void session_contract() {
   p["session_id"] = "test-match"; p["tick"] = 100;
   check(!s.act(p), "late old-session perception reset new match");
   p = fresh(); p["session_id"] = "third-session"; p["self"]["position"] = {3.5, 4};
-  check(s.act(p)->at("action") == "wait", "bad strategy input did not fall back to WAIT");
+  check(s.act(p)->at("action") == "defend", "bad strategy input did not fall back to DEFEND");
 }
 }  // namespace
 
 void full_scenarios() {
-  combat_and_missions(); capped_score_decisions(); event_validation(); hazard_and_illusion();
+  combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); hazard_and_illusion();
   future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
 }

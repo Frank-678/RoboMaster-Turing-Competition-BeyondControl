@@ -47,6 +47,7 @@ private:
   Tick healing_until_ = -1;
   std::optional<Cell> spawn_;
   std::map<Cell, Tile> tiles_;
+  std::map<Cell, unsigned> probe_attempts_;  // 未知格的试探次数；不算已到达或已探明。
   std::map<Tick, Snapshot> history_;
   std::map<std::string, rmtc::Event> events_;
   std::map<std::string, int> capture_progress_;

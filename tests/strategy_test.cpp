@@ -37,7 +37,13 @@ void check(bool condition, const char *message) {
 
 void expect(const Json &p, const char *action, const char *direction = nullptr) {
   rmtc::Session session(1);
-  const auto result = *session.act(p);
+  const auto chosen = session.act(p);
+  if (std::string(action) == "none") {
+    check(!chosen, "stage1 published a fallback action");
+    return;
+  }
+  check(chosen.has_value(), "expected action was suppressed");
+  const auto &result = *chosen;
   check(result.at("action") == action, "unexpected action");
   if (direction) check(result.at("direction") == direction, "unexpected direction");
   check(result.at("tick") == p.at("tick") && result.at("session_id") == p.at("session_id"),
@@ -65,26 +71,26 @@ void scenarios() {
 
   expect(frame(0, 0, 6, 6), "move", "right");
   expect(frame(5, 5, 6, 6), "move", "up");
-  expect(frame(0, 0, 1, 1), "wait");
-  expect(frame(4, 4, 9, 9, 0), "wait");
+  expect(frame(0, 0, 1, 1), "none");
+  expect(frame(4, 4, 9, 9, 0), "move", "up");
   p = frame();
   p["visible_entities"] = {entity("obstacle", 0, -1), entity("obstacle", 1, 0),
                            entity("obstacle", 0, 1), entity("obstacle", -1, 0)};
-  expect(p, "wait");
+  expect(p, "none");
   p["self"]["alive"] = false;
-  expect(p, "wait");
+  expect(p, "none");
   p = frame();
   p["visible_entities"] = {entity("resource_normal", 0, 0)};
-  expect(p, "wait");  // 重叠图没有 2；原地等待也会自动收集。
+  expect(p, "none");  // 重叠图没有 2；不发布动作也会自动收集。
 
   p = frame(4, 4, 9, 9, 1);
   p["visible_entities"] = {entity("resource_normal", 1, 0)};
   expect(p, "move", "right");
   p["visible_entities"] = {entity("resource_normal", 2, 0)};
-  expect(p, "wait");
+  expect(p, "none");
   p = frame(0, 0, 6, 6);
   p["visible_entities"] = {entity("resource_normal", -1, 0)};
-  expect(p, "wait");
+  expect(p, "none");
   p = frame();
   p["visible_entities"] = {entity("obstacle", 1, 0)};
   const auto valid_grid = p["visible_entities"][0]["position"].get<std::string>();
@@ -92,18 +98,18 @@ void scenarios() {
     auto invalid_grid = valid_grid;
     invalid_grid[index] = '2';  // 坏换行、坏中心、多个 2。
     p["visible_entities"][0]["position"] = invalid_grid;
-    expect(p, "wait");
+    expect(p, "none");
   }
   p["visible_entities"][0]["position"] = Json::array({1, 0});
-  expect(p, "wait");
+  expect(p, "none");
   p["visible_entities"][0]["position"] = "000";
-  expect(p, "wait");
+  expect(p, "none");
   p = frame();
   p["self"]["position"] = {4.5, 4};
-  expect(p, "wait");
-  expect(frame(-1, 0), "wait");
-  expect(frame(0, 0, 0, 9), "wait");
-  expect(frame(0, 0, 9, 9, 5), "wait");
+  expect(p, "none");
+  expect(frame(-1, 0), "none");
+  expect(frame(0, 0, 0, 9), "none");
+  expect(frame(0, 0, 9, 9, 5), "none");
 
   Strategy strategy(1);
   check(strategy.decide(frame()).at("direction") == "up", "initial exploration changed");
@@ -138,7 +144,7 @@ int collect_in_synthetic_maze() {
     };
     add_visible(walls, "obstacle");
     add_visible(resources, "resource_normal");
-    const auto action = rmtc::action_for(p, strategy.decide(p));
+    const auto action = rmtc::action_for(p, strategy.decide(p), 1);
     check(action.at("action") == "move", "collector stopped in a traversable maze");
     const auto direction = action.at("direction").get<std::string>();
     Cell next = current;
