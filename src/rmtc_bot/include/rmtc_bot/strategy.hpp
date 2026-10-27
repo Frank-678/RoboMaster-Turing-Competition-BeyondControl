@@ -13,7 +13,7 @@
 // 不在这里收发ROS或等待模型；Session保证同一Tick只推进一次。
 class Strategy {
 public:
-  explicit Strategy(int stage = 2);
+  explicit Strategy(int stage = 2); // stage：比赛阶段；实际入口明确传入配置中的1或2。
   // 只在换场调用。普通死亡不会清掉地图和仍有效的增益。
   void reset();
 
@@ -23,42 +23,44 @@ public:
   void merge_events(const std::vector<rmtc::Event> &events);
   // 把已校验事件交给下一次LLM请求，避免模型反复“重新发现”同一个事件。
   nlohmann::json known_events() const;
-  const std::string &reason() const { return reason_; }
+  const std::string &reason() const { return reason_; } // 最近动作的原因，供日志解释。
 
 private:
-  using Cell = rmtc::Cell;
-  using Tick = rmtc::Tick;
+  using Cell = rmtc::Cell; // 一个绝对格子[x,y]，不是相对方向。
+  using Tick = rmtc::Tick; // 裁判逻辑回合，不能拿墙钟时间代替。
   struct Tile {
     // seen=false是未知；wall=false不代表已经确认可以走。
-    bool seen = false, wall = false;
-    Tick last_seen = -1, wall_since = -1;
+    bool seen = false, wall = false; // 是否已探明、最后是否看见墙。
+    Tick last_seen = -1, wall_since = -1; // 最后观测Tick、首次连续看见此墙的Tick。
     // visits只算感知确认到过的格子；发出MOVE不增加目的地访问次数。
-    unsigned visits = 0;
-    double value = 0;
-    bool high = false;
+    unsigned visits = 0; // 实际访问次数。
+    double value = 0;    // 最后观测到的资源价值；0表示没有资源记录。
+    bool high = false;  // 该资源是否属于高价值资源。
   };
   struct Snapshot {
     // position属于当前感知；moved/receipt_tick解释上一Tick的实际执行结果。
-    Cell position;
-    bool alive, protected_spawn, respawn, moved;
-    Tick receipt_tick;
+    Cell position; // 此帧裁判确认的本车位置。
+    bool alive, protected_spawn, respawn, moved; // 存活、出生保护、刚复活、上Tick成功移动。
+    Tick receipt_tick; // 本帧last_action对应的执行Tick；-1表示缺少可信回执。
   };
   bool split_wall(Cell cell, Tick tick) const;
   // 只判断已知爆炸和分裂，不把所有对手预测混成确定危险。
   bool dangerous(Cell cell, Tick tick) const;
+  // start为当前位置，tick为当前回合，occupied为当前看见的敌车占位。
+  // 返回值依次是上/右/下/左/原地，表示第一步是否存在安全接续。
   std::array<bool, 5> safe_first_steps(Cell start, Tick tick, const std::set<Cell> &occupied) const;
   // 从实际历史重建本车效果：幻术看激活位置，易伤/回血看成功移动，堡垒看连续驻留。
   void update_effects(Tick tick);
-  int stage_, width_ = 0, height_ = 0;
-  bool reversed_ = false, reverse_unknown_ = false, empowered_ = false;
+  int stage_, width_ = 0, height_ = 0; // 比赛阶段、本场地图宽高；0表示尚未收到地图。
+  bool reversed_ = false, reverse_unknown_ = false, empowered_ = false; // 幻术反转、资格未知、已获无双。
   // 不知道幻术激活时的位置时，reverse_unknown_=true，避免猜反方向。
-  double vulnerability_ = 1, attack_damage_ = 20, defended_damage_ = 10;
-  Tick healing_until_ = -1;
-  std::optional<Cell> spawn_;
-  std::map<Cell, Tile> tiles_;
+  double vulnerability_ = 1, attack_damage_ = 20, defended_damage_ = 10; // 本车易伤倍率、攻击/对防御者伤害。
+  Tick healing_until_ = -1; // 已知回血效果的绝对结束Tick。
+  std::optional<Cell> spawn_; // 已确认的初始出生点；未知时为空。
+  std::map<Cell, Tile> tiles_; // 格子坐标→地图记忆。
   std::map<Cell, unsigned> probe_attempts_;  // 未知格的试探次数；不算已到达或已探明。
-  std::map<Tick, Snapshot> history_;
-  std::map<std::string, rmtc::Event> events_;
-  std::map<std::string, int> capture_progress_;
-  std::string reason_;
+  std::map<Tick, Snapshot> history_; // 感知Tick→本车历史快照。
+  std::map<std::string, rmtc::Event> events_; // 稳定事件key→最后一次校验通过的解释。
+  std::map<std::string, int> capture_progress_; // 堡垒key→当前已确认连续驻留Tick数。
+  std::string reason_; // 决策日志使用的短原因。
 };

@@ -9,24 +9,25 @@
 #include <set>
 #include <stdexcept>
 
-namespace {
-using Json = nlohmann::json;
-using Cell = rmtc::Cell;
-using Tick = rmtc::Tick;
-using Kind = rmtc::EventKind;
-namespace cfg = rmtc::match_config;
-constexpr std::array<Cell, 4> steps = {{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}};
-constexpr std::array<const char *, 4> directions = {{"up", "right", "down", "left"}};
+namespace { // 匿名命名空间：下面的解析/几何小工具只供本文件使用。
+using Json = nlohmann::json; // JSON对象/数组/值。
+using Cell = rmtc::Cell;     // 格子坐标。
+using Tick = rmtc::Tick;     // 逻辑回合。
+using Kind = rmtc::EventKind; // 八种事件枚举。
+namespace cfg = rmtc::match_config; // cfg::前缀表示读取赛前固定配置。
+constexpr std::array<Cell, 4> steps = {{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}}; // 上右下左的位移。
+constexpr std::array<const char *, 4> directions = {{"up", "right", "down", "left"}}; // 同顺序的协议方向名。
+// j必须是能装进int的整数，避免小数坐标或超大无符号数被截断。
 int integer(const Json &j) {
   if (!j.is_number_integer() || (j.is_number_unsigned() &&
       j.get<std::uint64_t>() > static_cast<std::uint64_t>(std::numeric_limits<int>::max())))
     throw std::runtime_error("invalid integer field");
-  const auto value = j.get<std::int64_t>();
+  const auto value = j.get<std::int64_t>(); // 先用64位暂存，再检查int范围。
   if (value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max())
     throw std::runtime_error("integer out of range");
   return static_cast<int>(value);
 }
-Cell absolute_position(const Json &j) {
+Cell absolute_position(const Json &j) { // 解析本车/任务的[x,y]数组。
   if (!j.is_array() || j.size() != 2) throw std::runtime_error("invalid absolute position");
   return {integer(j[0]), integer(j[1])};
 }
@@ -34,14 +35,14 @@ Cell absolute_position(const Json &j) {
 // 图中的0只是占位字符，不能据此把整张9×9都当成可走地面。
 std::optional<Cell> relative_position(const Json &position) {
   if (!position.is_string()) return std::nullopt;
-  const auto &grid = position.get_ref<const std::string &>();
+  const auto &grid = position.get_ref<const std::string &>(); // 引用原字符串，避免复制9×9图。
   if (grid.size() != 89 || grid[44] != '1') return std::nullopt;
-  Cell offset{0, 0};
-  bool found = false;
+  Cell offset{0, 0}; // 实体相对本车的dx/dy；没有2时保持[0,0]。
+  bool found = false; // 保证同一实体图最多只有一个2。
   for (int y = 0; y < 9; ++y) {
     if (y < 8 && grid[y * 10 + 9] != '\n') return std::nullopt;
     for (int x = 0; x < 9; ++x) {
-      const char ch = grid[y * 10 + x];
+      const char ch = grid[y * 10 + x]; // 每行9个字符加换行，所以步长是10。
       if (x == 4 && y == 4) continue;
       if (ch == '2' && !found) { offset = {x - 4, y - 4}; found = true; }
       else if (ch != '0') return std::nullopt;
@@ -49,20 +50,20 @@ std::optional<Cell> relative_position(const Json &position) {
   }
   return offset;
 }
-int manhattan(Cell a, Cell b) {
+int manhattan(Cell a, Cell b) { // 四向走格子的距离：|dx|+|dy|。
   return std::abs(a.first - b.first) + std::abs(a.second - b.second);
 }
 int ray(Cell from, Cell target) {
   // 普通攻击只看同一直线1–2格。最近目标筛选在后面做，墙不挡攻击。
-  const int dx = target.first - from.first, dy = target.second - from.second;
+  const int dx = target.first - from.first, dy = target.second - from.second; // 目标相对攻击者的位置。
   if (dx == 0 && dy >= -2 && dy <= -1) return 0;
   if (dy == 0 && dx >= 1 && dx <= 2) return 1;
   if (dx == 0 && dy >= 1 && dy <= 2) return 2;
   if (dy == 0 && dx >= -2 && dx <= -1) return 3;
   return -1;
 }
-struct Enemy { Cell position; double hp; bool defending, protected_spawn; };
-struct Entity { std::string type; Cell position; double value; bool high; };
+struct Enemy { Cell position; double hp; bool defending, protected_spawn; }; // 当前可见敌车的位置、血量和上帧状态。
+struct Entity { std::string type; Cell position; double value; bool high; }; // 解析后的实体类型、坐标和资源信息。
 }  // namespace
 
 Strategy::Strategy(int stage) : stage_(stage) {
@@ -80,7 +81,7 @@ void Strategy::merge_events(const std::vector<rmtc::Event> &events) {
   for (const auto &e : events) events_[e.key] = e;
 }
 Json Strategy::known_events() const {
-  auto result = Json::array();
+  auto result = Json::array(); // 返回给LLM的已知事件摘要列表。
   for (const auto &[key, event] : events_) { (void)key; result.push_back(rmtc::event_summary(event)); }
   return result;
 }
@@ -102,39 +103,39 @@ bool Strategy::dangerous(Cell cell, Tick tick) const {
   return false;
 }
 std::array<bool, 5> Strategy::safe_first_steps(Cell start, Tick tick, const std::set<Cell> &occupied) const {
-  constexpr int horizon = 8;
-  const std::array<bool, 5> unrestricted = {true, true, true, true, true};
+  constexpr int horizon = 8; // 向前检查的Tick数，也是可检查格子的半径。
+  const std::array<bool, 5> unrestricted = {true, true, true, true, true}; // 未能筛选时交回原策略。
   const bool relevant = std::any_of(events_.begin(), events_.end(), [&](const auto &entry) {
-    const auto &e = entry.second;
+    const auto &e = entry.second; // entry是key/事件对；e是这个事件。
     return (e.kind == Kind::split && e.end > tick && e.start <= tick + horizon) ||
            (e.kind == Kind::explosion && e.start > tick && e.start <= tick + horizon);
   });
   if (!relevant) return unrestricted;
 
   // 只查8格内最多145个已知格。这里只筛第一步，不缓存一串未来动作。
-  std::vector<Cell> cells;
-  std::map<Cell, std::size_t> index;
+  std::vector<Cell> cells; // 本次时空检查涉及的格子。
+  std::map<Cell, std::size_t> index; // 坐标→cells下标，方便查邻格。
   for (int dy = -horizon; dy <= horizon; ++dy) {
     for (int dx = -horizon; dx <= horizon; ++dx) {
       if (std::abs(dx) + std::abs(dy) > horizon) continue;
-      const Cell cell{start.first + dx, start.second + dy};
-      const auto tile = tiles_.find(cell);
+      const Cell cell{start.first + dx, start.second + dy}; // dx/dy是对当前格的扫描偏移。
+      const auto tile = tiles_.find(cell); // 格子的历史观测；找不到就属于未知。
       if (tile == tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(cell)) continue;
       index[cell] = cells.size(); cells.push_back(cell);
     }
   }
-  std::array<std::vector<bool>, horizon + 1> good;
+  std::array<std::vector<bool>, horizon + 1> good; // k是未来回合偏移，i是cells中的格子下标。
   // good[k][i]：到第tick+k回合开始时站在格i，之后还有一条能避开已知危险的路。
   // 从第8回合倒着算；第五种转移是留在原地，实际可以提交DEFEND。
   for (auto &layer : good) layer.resize(cells.size(), false);
   for (std::size_t i = 0; i < cells.size(); ++i) good[horizon][i] = !dangerous(cells[i], tick + horizon);
   for (int k = horizon - 1; k >= 1; --k) {
     for (std::size_t i = 0; i < cells.size(); ++i) {
-      const auto cell = cells[i];
+      const auto cell = cells[i]; // 倒推当前检查的格子。
       if (dangerous(cell, tick + k)) continue;
       for (int action = 0; action < 5; ++action) {
-        const Cell next = action == 4 ? cell : Cell{cell.first + steps[action].first, cell.second + steps[action].second};
-        const auto found = index.find(next);
+        const Cell next = action == 4 ? cell : Cell{cell.first + steps[action].first, cell.second + steps[action].second}; // 后一回合的候选落点。
+        const auto found = index.find(next); // action=4留在原格，否则按steps移动。
         // 爆炸先于移动：可在爆炸已结算后进入该格，但下一Tick开始时必须安全。
         if (found != index.end() && !split_wall(next, tick + k) && good[k + 1][found->second]) {
           good[k][i] = true; break;
@@ -142,10 +143,10 @@ std::array<bool, 5> Strategy::safe_first_steps(Cell start, Tick tick, const std:
       }
     }
   }
-  std::array<bool, 5> safe = {};
+  std::array<bool, 5> safe = {}; // 回到当前时刻，只提取能接上good[1]的第一步。
   for (int action = 0; action < 5; ++action) {
-    const Cell next = action == 4 ? start : Cell{start.first + steps[action].first, start.second + steps[action].second};
-    const auto found = index.find(next);
+    const Cell next = action == 4 ? start : Cell{start.first + steps[action].first, start.second + steps[action].second}; // 本Tick第一步落点。
+    const auto found = index.find(next); // 查落点是否在已知格列表中。
     safe[action] = found != index.end() && !split_wall(next, tick) && good[1][found->second];
   }
   // 找不到可认证路线时继续原策略；未知地图或远期危险不能据此判成“必死”。
@@ -159,16 +160,16 @@ void Strategy::update_effects(Tick tick) {
   for (const auto &[key, e] : events_) {
     if (e.kind == Kind::illusion && e.active(tick)) {
       // 幻术在激活时判定谁中招；离开区域、死亡都不能提前解除。
-      const auto initial = history_.find(e.start);
+      const auto initial = history_.find(e.start); // 幻术激活时本车的历史状态。
       if (initial == history_.end()) reverse_unknown_ = true;
       else if (initial->second.alive && e.contains(initial->second.position)) reversed_ = true;
     }
-    int consecutive = 0;
-    Tick previous = -2;
-    bool awarded = false;
+    int consecutive = 0; // 当前重建到的连续堡垒驻留次数。
+    Tick previous = -2;  // 上一条有效回执的执行Tick；-2用于让首条触发连续性检查。
+    bool awarded = false; // 本事件内是否曾经达标；达标后死亡不会撤销。
     for (const auto &[state_tick, state] : history_) {
       (void)state_tick;
-      const auto executed = state.receipt_tick;
+      const auto executed = state.receipt_tick; // state是历史快照，executed是其回执对应的执行Tick。
       // 当前感知N的回执解释N-1；用执行Tick判断触发窗口，不能用收到消息的时刻。
       if (executed < e.start || executed >= e.end) continue;
       if (e.kind == Kind::vulnerability && e.active(tick) && state.moved && executed < e.trigger_end)
@@ -197,30 +198,31 @@ void Strategy::update_effects(Tick tick) {
 
 Json Strategy::decide(const Json &p) {
   const auto fallback = [&](const char *reason) {
+    // reason是本次兜底原因；只在已知存活的第二阶段返回合法DEFEND。
     reason_ = reason;
     return stage_ == 2 && p.at("self").at("alive") == true ? Json{{"action", "defend"}} : Json();
   };
-  const auto skip = [&](const char *reason) { reason_ = reason; return Json(); };
+  const auto skip = [&](const char *reason) { reason_ = reason; return Json(); }; // 明确不发布，不产生默认WAIT。
   // 1. 读本车真实状态，记上一Tick实际发生了什么。
-  const auto &self = p.at("self");
-  const Tick tick = p.at("tick").get<Tick>();
-  const bool alive = self.at("alive").get<bool>();
-  const Cell start = absolute_position(self.at("position"));
-  const int width = integer(p.at("map").at("width")), height = integer(p.at("map").at("height"));
-  const int radius = integer(p.at("vision_radius"));
+  const auto &self = p.at("self"); // p是本队感知，self是其中的本车状态。
+  const Tick tick = p.at("tick").get<Tick>(); // 当前动作窗口的逻辑回合。
+  const bool alive = self.at("alive").get<bool>(); // 阵亡时不得提交防御/攻击/移动。
+  const Cell start = absolute_position(self.at("position")); // 本帧确认位置，也是所有路径的起点。
+  const int width = integer(p.at("map").at("width")), height = integer(p.at("map").at("height")); // 当前地图宽、高。
+  const int radius = integer(p.at("vision_radius")); // 实际视野半径；width/height是本场地图边界。
   if (width <= 0 || height <= 0 || width > 1000000 || height > 1000000 ||
       start.first < 0 || start.first >= width || start.second < 0 || start.second >= height ||
       radius < 0 || radius > 4 || !p.at("visible_entities").is_array()) return fallback("invalid_frame");
   if (width_ != 0 && (width != width_ || height != height_)) return fallback("map_changed_without_session");
-  const bool protected_spawn = self.value("protected", false);
-  const double hp = self.value("hp", 100.0);
+  const bool protected_spawn = self.value("protected", false); // 本车是否有出生保护。
+  const double hp = self.value("hp", 100.0); // 当前生命值；兼容旧感知缺字段时的100HP。
   if (!std::isfinite(hp) || hp < 0) return fallback("invalid_hp");
-  const bool respawn = self.value("position_reason", std::string()) == "respawn";
-  const auto receipt = self.value("last_action", Json());
-  bool moved = false;
-  Tick receipt_tick = -1;
+  const bool respawn = self.value("position_reason", std::string()) == "respawn"; // 此帧是否刚复活。
+  const auto receipt = self.value("last_action", Json()); // 上Tick动作回执，不能当成当前坐标。
+  bool moved = false; // 是否有可信的“上一Tick成功MOVE”证据。
+  Tick receipt_tick = -1; // -1表示没有当前可采纳的回执。
   if (receipt.is_object() && receipt.contains("tick") && receipt.at("tick").is_number_integer()) {
-    const auto reported = receipt.at("tick").get<Tick>();
+    const auto reported = receipt.at("tick").get<Tick>(); // 回执自带的执行Tick。
     if (reported == tick - 1) {
       receipt_tick = reported;
       moved = receipt.value("moved", false) && receipt.value("action", std::string()) == "move";
@@ -233,24 +235,24 @@ Json Strategy::decide(const Json &p) {
   if (!alive) return skip("dead");
 
   // 2. 把当前可见实体换成绝对坐标，覆盖当前视野；视野外保留旧记忆。
-  std::vector<Entity> entities;
-  std::vector<Enemy> enemies;
-  std::set<Cell> occupied;
+  std::vector<Entity> entities; // 当前帧的实体，先校验完再更新地图。
+  std::vector<Enemy> enemies; // 当前可见敌车，只在本帧估计攻防。
+  std::set<Cell> occupied; // 当前敌车占格，MOVE不能交换位置或跟进离开的敌车。
   for (const auto &j : p.at("visible_entities")) {
-    const auto type = j.at("type").get<std::string>();
+    const auto type = j.at("type").get<std::string>(); // j是一个原始JSON实体条目。
     if (type != "obstacle" && type != "robot" && type != "resource_normal" && type != "resource_high") continue;
-    const auto offset = relative_position(j.at("position"));
+    const auto offset = relative_position(j.at("position")); // 可选相对坐标；解析失败为空。
     if (!offset) return fallback("invalid_entity_grid");
     const auto [dx, dy] = *offset;
     if (std::abs(dx) > radius || std::abs(dy) > radius || dx < -start.first ||
         dx >= width - start.first || dy < -start.second || dy >= height - start.second)
       return fallback("invalid_entity_coordinate");
-    const Cell cell{start.first + dx, start.second + dy};
-    const double value = j.value("value", type == "resource_high" ? 20.0 : 10.0);
+    const Cell cell{start.first + dx, start.second + dy}; // 用本车绝对坐标加相对dx/dy。
+    const double value = j.value("value", type == "resource_high" ? 20.0 : 10.0); // 资源价值；旧格式缺字段按资源类型处理。
     if (!std::isfinite(value) || value < 0) return fallback("invalid_resource_value");
     entities.push_back({type, cell, value, value >= 20});
     if (type == "robot") {
-      const double enemy_hp = j.value("hp", 100.0);
+      const double enemy_hp = j.value("hp", 100.0); // 当前敌车生命；不跨帧累加猜测伤害。
       if (!std::isfinite(enemy_hp) || enemy_hp < 0) return fallback("invalid_enemy_hp");
       occupied.insert(cell);
       enemies.push_back({cell, enemy_hp, j.value("defending", false), j.value("protected", false)});
@@ -259,12 +261,12 @@ Json Strategy::decide(const Json &p) {
   width_ = width; height_ = height;
   for (int y = std::max(0, start.second - radius); y <= std::min(height - 1, start.second + radius); ++y) {
     for (int x = std::max(0, start.first - radius); x <= std::min(width - 1, start.first + radius); ++x) {
-      auto &tile = tiles_[{x, y}];
+      auto &tile = tiles_[{x, y}]; // x/y扫描本帧有效视野，tile是该格记忆的可写引用。
       tile.seen = true; tile.wall = false; tile.value = 0; tile.last_seen = tick;
     }
   }
   for (const auto &entity : entities) {
-    auto &tile = tiles_.at(entity.position);
+    auto &tile = tiles_.at(entity.position); // entity是已校验实体，tile是它所在格的地图记录。
     if (entity.type == "obstacle") {
       tile.wall = true;
       if (tile.wall_since < 0) tile.wall_since = tick;
@@ -273,6 +275,7 @@ Json Strategy::decide(const Json &p) {
     }
   }
   for (auto &[cell, tile] : tiles_) {
+    // cell是记忆坐标，tile是其观测；key/e分别是事件去重键和事件内容。
     if (!tile.wall) tile.wall_since = -1;
     // 没看到墙消失时只退回未知，不能把临时墙所在格直接认作空地。
     for (const auto &[key, e] : events_) {
@@ -286,12 +289,13 @@ Json Strategy::decide(const Json &p) {
   ++tiles_.at(start).visits;
   // 规划始终用世界方向。只有最后发MOVE时补偿幻术，ATTACK方向保持不变。
   const auto move = [&](int step, const char *reason) {
+    // step是世界方向索引；reason记录为什么选它，返回前才补偿幻术。
     reason_ = reason;
     return Json{{"action", "move"}, {"direction", directions[reversed_ ? (step + 2) % 4 : step]}};
   };
   // 3. 先算移动前的危险。先挨打、存活后才移动，当前MOVE救不了已命中的攻击。
-  bool reflection = false, potential_area_enemy = false;
-  double reflection_amount = 0, pre_damage = 0, potential_area_damage = 0;
+  bool reflection = false, potential_area_enemy = false; // 是否有反伤事件、敌方是否可能已有无双。
+  double reflection_amount = 0, pre_damage = 0, potential_area_damage = 0; // 反伤值、动作前爆炸伤害、可能的无双伤害。
   for (const auto &[key, e] : events_) {
     (void)key;
     if (e.kind == Kind::reflect && e.active(tick)) {
@@ -306,11 +310,11 @@ Json Strategy::decide(const Json &p) {
     if (e.kind == Kind::split && e.start == tick && split_wall(start, tick)) return skip("split_forced_wait");
   }
   if (pre_damage >= hp) return skip("lethal_activation_before_action");
-  double incoming = 0, defended_incoming = 0;
+  double incoming = 0, defended_incoming = 0; // 不防御/防御时的本Tick可能受伤总量。
   // 这是可见敌车可能造成的伤害上界，不是对手已提交的动作或实测概率。
   for (const auto &enemy : enemies) {
     if (enemy.protected_spawn || protected_spawn) continue;
-    const bool area = potential_area_enemy && std::abs(enemy.position.first - start.first) <= 2 &&
+    const bool area = potential_area_enemy && std::abs(enemy.position.first - start.first) <= 2 && // 是否在可能的5×5内。
                       std::abs(enemy.position.second - start.second) <= 2;
     if (area || ray(enemy.position, start) != -1) {
       incoming += (area ? std::max(20.0, potential_area_damage) : 20) * vulnerability_;
@@ -325,7 +329,7 @@ Json Strategy::decide(const Json &p) {
 
   // 对手下一步可能踩辣椒，属于保守估计；不把其未知动作当作事实。
   const auto possible_fire = [&](Cell cell) {
-    double damage = 0;
+    double damage = 0; // cell被可见对手下一步踩辣椒所波及的可能环境伤害。
     if (protected_spawn && cell == start) return damage;
     for (const auto &[key, e] : events_) {
       (void)key;
@@ -341,19 +345,19 @@ Json Strategy::decide(const Json &p) {
   };
 
   // 4. 在已知地图上BFS。每格只保存第一步和距离，每帧都会重算。
-  const auto safe_steps = safe_first_steps(start, tick, occupied);
-  struct Node { int first, distance; };
-  std::map<Cell, Node> paths;
-  std::vector<Cell> order;
-  std::queue<Cell> queue;
+  const auto safe_steps = safe_first_steps(start, tick, occupied); // 五个第一步的安全接续标志。
+  struct Node { int first, distance; }; // first是起点第一步方向，-1表示起点；distance是最少步数。
+  std::map<Cell, Node> paths; // 每个已到达格子的最短路径摘要。
+  std::vector<Cell> order; // BFS弹出顺序，后续按这个稳定顺序评估目标。
+  std::queue<Cell> queue; // 等待扩展的格子队列。
   paths[start] = {-1, 0}; queue.push(start);
   while (!queue.empty()) {
-    const Cell current = queue.front(); queue.pop(); order.push_back(current);
-    const auto node = paths.at(current);
+    const Cell current = queue.front(); queue.pop(); order.push_back(current); // 取出当前BFS格。
+    const auto node = paths.at(current); // current为当前扩展格，node为它的最短路径摘要。
     for (int i = 0; i < 4; ++i) {
       if (node.first == -1 && !safe_steps[i]) continue;
-      const Cell next{current.first + steps[i].first, current.second + steps[i].second};
-      const auto tile = tiles_.find(next);
+      const Cell next{current.first + steps[i].first, current.second + steps[i].second}; // i是上右下左索引，next是邻格。
+      const auto tile = tiles_.find(next); // 邻格的已知地图记录，可能不存在。
       if (tile == tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(next) ||
           paths.count(next) || split_wall(next, tick + node.distance) ||
           (node.distance == 0 && possible_fire(next) >= hp - pre_damage) ||
@@ -364,7 +368,7 @@ Json Strategy::decide(const Json &p) {
   }
   if (stage_ == 2 && possible_fire(start) >= hp - pre_damage && !reverse_unknown_) {
     for (const auto &cell : order) {
-      const auto node = paths.at(cell);
+      const auto node = paths.at(cell); // 这个候选格的第一步和最短步数。
       if (node.distance == 1 && possible_fire(cell) < hp - pre_damage)
         return move(node.first, "avoid_possible_chili_fire");
     }
@@ -374,9 +378,9 @@ Json Strategy::decide(const Json &p) {
     (void)key;
     if ((e.kind != Kind::explosion && e.kind != Kind::split) || e.start <= tick || !e.contains(start)) continue;
     if (e.kind == Kind::split && spawn_ && start == *spawn_) continue;
-    int nearest_exit = std::numeric_limits<int>::max(), escape = -1;
+    int nearest_exit = std::numeric_limits<int>::max(), escape = -1; // 最短退出步数、对应第一步。
     for (const auto &cell : order) {
-      const auto node = paths.at(cell);
+      const auto node = paths.at(cell); // 这个候选格的第一步和最短步数。
       if (!e.contains(cell) && node.distance < nearest_exit) { nearest_exit = node.distance; escape = node.first; }
     }
     if (e.start - tick <= nearest_exit + static_cast<Tick>(cfg::hazard_lead_ticks) && escape >= 0 && !reverse_unknown_)
@@ -384,51 +388,53 @@ Json Strategy::decide(const Json &p) {
   }
 
   // 5. 给采集、任务、回血、堡垒和踩辣椒机会算收益，统一比较第一步。
-  std::set<std::string> completed;
-  const auto score = p.value("score", Json::object());
-  const double resource_value = score.value("resource_value", 0.0);
-  const double effective_damage = score.value("effective_damage", 0.0);
+  std::set<std::string> completed; // 裁判已经确认完成的任务ID集合。
+  const auto score = p.value("score", Json::object()); // 最新官方计分状态。
+  const double resource_value = score.value("resource_value", 0.0); // 官方当前资源累计R。
+  const double effective_damage = score.value("effective_damage", 0.0); // 官方当前D，可下降，也可超过500。
   // 封顶后的直接分差接近0；再给很小的争夺权重，不把它算成官方额外加分。
   const auto combat_value = [&](double contribution) {
+    // contribution是某候选攻击预计新增的D；返回的是决策估值，不是修改官方成绩。
     return rmtc::score_delta(effective_damage, contribution, 500, 15) +
            std::min(contribution, 60.0) * 0.001;
   };
   if (score.contains("mission_completed_ids")) {
     for (const auto &id : score.at("mission_completed_ids")) completed.insert(id.get<std::string>());
   }
-  const auto missions = p.value("missions", Json::array());
-  bool need_normal = false, need_high = false, need_damage = false, need_value = false;
-  std::vector<Cell> reach;
+  const auto missions = p.value("missions", Json::array()); // 结构化任务；与自然语言随机事件分开处理。
+  bool need_normal = false, need_high = false, need_damage = false, need_value = false; // 尚未完成的四类任务需求。
+  std::vector<Cell> reach; // 尚未完成的到点任务坐标。
   for (const auto &mission : missions) {
+    // mission是一个任务；先按id跳过已完成项，再按type决定需要什么收益。
     if (completed.count(mission.at("id").get<std::string>())) continue;
-    const auto type = mission.at("type").get<std::string>();
+    const auto type = mission.at("type").get<std::string>(); // 当前任务类型。
     need_normal = need_normal || type == "normal_resources";
     need_high = need_high || type == "high_resources";
     need_damage = need_damage || (type == "effective_damage" && effective_damage < mission.value("target", 0.0));
     need_value = need_value || (type == "resource_value" && resource_value < mission.value("target", 0.0));
     if (type == "reach") {
-      const Cell target = absolute_position(mission.at("position"));
+      const Cell target = absolute_position(mission.at("position")); // 公开到点任务的绝对坐标。
       if (target.first >= 0 && target.first < width && target.second >= 0 && target.second < height)
         reach.push_back(target);
     }
   }
-  int best_step = -1;
-  double best_utility = -1;
-  const char *best_reason = "explore";
+  int best_step = -1; // 当前收益最高的第一步；-1也可能表示值得留在原地。
+  double best_utility = -1; // 当前最高启发式收益，-1表示还没有候选。
+  const char *best_reason = "explore"; // 与best_step一起更新，便于日志解释。
   const auto consider = [&](int step, double utility, const char *reason) {
     // step=-1代表留在当前格；安全检查也必须允许这一Tick继续原地驻留。
     if (!safe_steps[step < 0 ? 4 : step]) return;
     if (utility > best_utility + 1e-9) { best_utility = utility; best_step = step; best_reason = reason; }
   };
-  unsigned least_visits = std::numeric_limits<unsigned>::max();
-  int exploration = -1;
+  unsigned least_visits = std::numeric_limits<unsigned>::max(); // 已知路线候选中最少访问次数。
+  int exploration = -1; // 没有更高收益时采用的探索第一步。
   for (const auto &cell : order) {
-    const auto node = paths.at(cell);
-    const auto &tile = tiles_.at(cell);
+    const auto node = paths.at(cell); // 这个候选格的第一步和最短步数。
+    const auto &tile = tiles_.at(cell); // 当前候选格的资源、观测时间和访问次数。
     if (node.first >= 0 && tile.visits < least_visits) { least_visits = tile.visits; exploration = node.first; }
     if (tile.value > 0) {
-      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * cfg::stale_resource_decay);
-      double benefit = tile.value;
+      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * cfg::stale_resource_decay); // 旧资源记忆可信权重。
+      double benefit = tile.value; // 第一阶段按资源价值；第二阶段改用封顶分差和任务机会。
       if (stage_ == 2) {
         // R=119再拿20，只剩1点资源价值参与封顶计分，不能按20全额估值。
         benefit = rmtc::score_delta(resource_value, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
@@ -442,9 +448,9 @@ Json Strategy::decide(const Json &p) {
       if (cell == target) consider(node.first, cfg::reach_mission_value / (node.distance + 1), "reach_mission");
       else if (node.first >= 0) {
         // 目标尚未探明时只走已知路线中靠近目标的格子，不穿过未知墙。
-        int unknown_neighbors = 0;
+        int unknown_neighbors = 0; // 这个格子旁有多少尚未探明的地图内邻格。
         for (const auto &delta : steps) {
-          const Cell next{cell.first + delta.first, cell.second + delta.second};
+          const Cell next{cell.first + delta.first, cell.second + delta.second}; // delta为四向位移，next用于检查未知边界。
           if (next.first >= 0 && next.first < width && next.second >= 0 && next.second < height &&
               !tiles_.count(next)) ++unknown_neighbors;
         }
@@ -464,8 +470,8 @@ Json Strategy::decide(const Json &p) {
         else consider(node.first, cfg::fortress_capture_value / (node.distance + e.capture_ticks), "capture_fortress");
       }
       if (e.kind == Kind::chili && (e.contains(cell) || (e.contains(start) && node.distance == 1))) {
-        const Cell fire_point = e.contains(start) ? start : cell;
-        double reward = 0;
+        const Cell fire_point = e.contains(start) ? start : cell; // 计划进入/重新进入的辣椒点。
+        double reward = 0; // 这条火线的机会收益；尚未发生，不能加到官方D里。
         for (const auto &enemy : enemies) {
           if (!enemy.protected_spawn && enemy.position != fire_point &&
               (enemy.position.first == fire_point.first || enemy.position.second == fire_point.second))
@@ -478,8 +484,8 @@ Json Strategy::decide(const Json &p) {
     }
     for (const auto &enemy : enemies) {
       if (!enemy.protected_spawn && node.first >= 0 && ray(cell, enemy.position) >= 0) {
-        const double damage = enemy.defending ? defended_damage_ : attack_damage_;
-        const double contribution = std::min(damage, enemy.hp) + (enemy.hp <= damage ? 60.0 : 0.0);
+        const double damage = enemy.defending ? defended_damage_ : attack_damage_; // 接近后按当前可见状态估计伤害。
+        const double contribution = std::min(damage, enemy.hp) + (enemy.hp <= damage ? 60.0 : 0.0); // 实际损血加可能击杀奖励。
         consider(node.first, (combat_value(contribution) + (need_damage ? 0.5 : 0.0)) /
                  (node.distance + 2), "approach_enemy");
       }
@@ -488,31 +494,31 @@ Json Strategy::decide(const Json &p) {
   if (best_utility < 0 && exploration >= 0) consider(exploration, 0.01, "explore");
 
   // 6. 用移动前站位评估ATTACK。普通攻击只取最近一辆，无双才取整个5×5。
-  int attack_direction = -1;
-  double attack_utility = -1;
+  int attack_direction = -1; // 当前最好的攻击方向；-1表示没有有价值的攻击。
+  double attack_utility = -1; // 与其他任务收益比较的攻击估值。
   if (stage_ == 2 && !protected_spawn) {
     for (int direction = 0; direction < 4; ++direction) {
-      std::vector<const Enemy *> targets;
+      std::vector<const Enemy *> targets; // 此方向实际可命中的敌车引用，不复制敌车数据。
       if (empowered_) {
         for (const auto &enemy : enemies)
           if (std::abs(enemy.position.first - start.first) <= 2 && std::abs(enemy.position.second - start.second) <= 2)
             targets.push_back(&enemy);
       } else {
-        const Enemy *nearest = nullptr;
+        const Enemy *nearest = nullptr; // 普通攻击只能命中的最近一辆，包括有保护的挡路目标。
         for (const auto &enemy : enemies)
           if (ray(start, enemy.position) == direction && (!nearest ||
               manhattan(start, enemy.position) < manhattan(start, nearest->position))) nearest = &enemy;
         if (nearest) targets.push_back(nearest);  // 近处保护敌车仍阻挡后方，障碍不挡攻击。
       }
-      double contribution = 0, reflected = 0;
+      double contribution = 0, reflected = 0; // 预计获得D、预计自己承受的反伤。
       for (const auto *enemy : targets) {
         if (enemy->protected_spawn) continue;
         if (reflection && enemy->defending) { reflected += reflection_amount; continue; }
-        const double damage = enemy->defending ? defended_damage_ : attack_damage_;
+        const double damage = enemy->defending ? defended_damage_ : attack_damage_; // 此目标预计受到的普通/防御伤害。
         // 按独自击杀估值；多人同时贡献时奖励会平分，所以只是机会估计。
         contribution += std::min(damage, enemy->hp) + (enemy->hp <= damage ? 60.0 : 0.0);
       }
-      double utility = combat_value(contribution) + (need_damage && contribution > 0 ? 0.5 : 0.0);
+      double utility = combat_value(contribution) + (need_damage && contribution > 0 ? 0.5 : 0.0); // 此攻击方向的最终机会分。
       utility -= reflected * 0.05;
       if (reflected + pre_damage >= hp) continue;
       if (utility > attack_utility) { attack_utility = utility; attack_direction = direction; }
@@ -527,14 +533,14 @@ Json Strategy::decide(const Json &p) {
   if (best_step >= 0 && !reverse_unknown_) return move(best_step, best_reason);
   // 没有已知路线时，试探地图内的未知邻格。移动失败不加无效动作；位置仍取下一帧感知。
   if (best_utility < 0 && !reverse_unknown_) {
-    int probe = -1;
-    unsigned fewest = std::numeric_limits<unsigned>::max();
+    int probe = -1; // 未知邻格中本次准备试探的方向。
+    unsigned fewest = std::numeric_limits<unsigned>::max(); // 优先试以前较少试过的格子。
     for (int i = 0; i < 4; ++i) {
-      const Cell next{start.first + steps[i].first, start.second + steps[i].second};
+      const Cell next{start.first + steps[i].first, start.second + steps[i].second}; // i方向的待试探邻格。
       if (next.first < 0 || next.first >= width || next.second < 0 || next.second >= height ||
           occupied.count(next) || !safe_steps[i] || split_wall(next, tick) || dangerous(next, tick + 1) ||
           possible_fire(next) >= hp - pre_damage) continue;
-      const auto tile = tiles_.find(next);
+      const auto tile = tiles_.find(next); // 邻格的已知地图记录，可能不存在。
       if (tile != tiles_.end() && (tile->second.seen || tile->second.wall)) continue;
       if (probe_attempts_[next] < fewest) { fewest = probe_attempts_[next]; probe = i; }
     }

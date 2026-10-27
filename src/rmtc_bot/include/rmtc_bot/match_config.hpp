@@ -3,12 +3,12 @@
 // 比赛前只改这里，然后 bash build.sh。以下都是明确配置，不读环境变量、不猜缺失值。
 namespace rmtc::match_config {
 inline constexpr const char *team = "A";       // 裁判分配的本场席位。
-inline constexpr const char *team_name = "Frank";
+inline constexpr const char *team_name = "Frank"; // 注册显示队名，不代替席位或令牌身份。
 inline constexpr int stage = 2;               // 1：采集；2：对抗。
 
-inline constexpr const char *ros_domain_id = "27";
-inline constexpr const char *ros_localhost_only = "0";
-inline constexpr const char *rmw_implementation = "rmw_fastrtps_cpp";
+inline constexpr const char *ros_domain_id = "27"; // 同一比赛ROS网络的域编号。
+inline constexpr const char *ros_localhost_only = "0"; // 0允许局域网通信；1只在本机通信。
+inline constexpr const char *rmw_implementation = "rmw_fastrtps_cpp"; // ROS底层DDS实现。
 
 // 三项必须填；第二阶段留空就拒绝启动，防止又跑完整场才发现零次调用。
 // url 必须是完整的 /chat/completions 地址。正式赛填官方网关，不填模型服务主页。
