@@ -70,3 +70,5 @@ Testing/
 /install/
 /log/
 /compile_commands.json
+
+.vscode/
