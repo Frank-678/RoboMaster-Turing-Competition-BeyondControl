@@ -1,4 +1,5 @@
 #include "rmtc_bot/strategy.hpp"
+#include "rmtc_bot/scoring.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -310,6 +311,13 @@ Json Strategy::decide(const Json &p) {
 
   std::set<std::string> completed;
   const auto score = p.value("score", Json::object());
+  const double resource_value = score.value("resource_value", 0.0);
+  const double effective_damage = score.value("effective_damage", 0.0);
+  // Tiny, bounded denial/tie-break value is a heuristic, not additional awarded score.
+  const auto combat_value = [&](double contribution) {
+    return rmtc::score_delta(effective_damage, contribution, 500, 15) +
+           std::min(contribution, 60.0) * 0.001;
+  };
   if (score.contains("mission_completed_ids")) {
     for (const auto &id : score.at("mission_completed_ids")) completed.insert(id.get<std::string>());
   }
@@ -321,8 +329,8 @@ Json Strategy::decide(const Json &p) {
     const auto type = mission.at("type").get<std::string>();
     need_normal = need_normal || type == "normal_resources";
     need_high = need_high || type == "high_resources";
-    need_damage = need_damage || type == "effective_damage";
-    need_value = need_value || type == "resource_value";
+    need_damage = need_damage || (type == "effective_damage" && effective_damage < mission.value("target", 0.0));
+    need_value = need_value || (type == "resource_value" && resource_value < mission.value("target", 0.0));
     if (type == "reach") {
       const Cell target = absolute_position(mission.at("position"));
       if (target.first >= 0 && target.first < width && target.second >= 0 && target.second < height)
@@ -345,7 +353,7 @@ Json Strategy::decide(const Json &p) {
       const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * 0.01);
       double benefit = tile.value;
       if (stage_ == 2) {
-        benefit = tile.value * (score.value("resource_value", 0.0) < 120 ? 0.25 : 0.02);
+        benefit = rmtc::score_delta(resource_value, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
         if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += 5;
         if (need_value) benefit += tile.value * 0.1;
       }
@@ -382,15 +390,20 @@ Json Strategy::decide(const Json &p) {
         for (const auto &enemy : enemies) {
           if (!enemy.protected_spawn && enemy.position != fire_point &&
               (enemy.position.first == fire_point.first || enemy.position.second == fire_point.second))
-            reward += enemy.hp <= e.amount ? 3.0 : 0.3;
+            // Chili damage itself adds no D; only a potential kill earns 60 D (§8.7).
+            reward += enemy.hp <= e.amount ? combat_value(60) : 0.02;
         }
         if (reward > 0 && cell != start)
           consider(node.first, reward / (node.distance + (e.contains(start) ? 2 : 1)), "trigger_chili");
       }
     }
     for (const auto &enemy : enemies) {
-      if (!enemy.protected_spawn && node.first >= 0 && ray(cell, enemy.position) >= 0)
-        consider(node.first, (need_damage ? 4.0 : 0.4) / (node.distance + 1), "approach_enemy");
+      if (!enemy.protected_spawn && node.first >= 0 && ray(cell, enemy.position) >= 0) {
+        const double damage = enemy.defending ? defended_damage_ : attack_damage_;
+        const double contribution = std::min(damage, enemy.hp) + (enemy.hp <= damage ? 60.0 : 0.0);
+        consider(node.first, (combat_value(contribution) + (need_damage ? 0.5 : 0.0)) /
+                 (node.distance + 2), "approach_enemy");
+      }
     }
   }
   if (best_utility < 0 && exploration >= 0) consider(exploration, 0.01, "explore");
@@ -411,14 +424,15 @@ Json Strategy::decide(const Json &p) {
               manhattan(start, enemy.position) < manhattan(start, nearest->position))) nearest = &enemy;
         if (nearest) targets.push_back(nearest);  // 近处保护敌车仍阻挡后方，障碍不挡攻击。
       }
-      double utility = 0, reflected = 0;
+      double contribution = 0, reflected = 0;
       for (const auto *enemy : targets) {
         if (enemy->protected_spawn) continue;
         if (reflection && enemy->defending) { reflected += reflection_amount; continue; }
         const double damage = enemy->defending ? defended_damage_ : attack_damage_;
-        utility += std::min(damage, enemy->hp) * 0.03 + (enemy->hp <= damage ? 3.0 : 0.0);
-        if (need_damage) utility += 0.5;
+        // Sole-contributor estimate; unseen simultaneous contributors may share the reward.
+        contribution += std::min(damage, enemy->hp) + (enemy->hp <= damage ? 60.0 : 0.0);
       }
+      double utility = combat_value(contribution) + (need_damage && contribution > 0 ? 0.5 : 0.0);
       utility -= reflected * 0.05;
       if (reflected + pre_damage >= hp) continue;
       if (utility > attack_utility) { attack_utility = utility; attack_direction = direction; }
