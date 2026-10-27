@@ -34,7 +34,11 @@ int main() {
   }
   for (const char *key : {"http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"})
     if (!set(key, cfg::practice_llm_proxy)) return 1;
-  if (!set("NO_PROXY", "") || !set("no_proxy", "")) return 1;
+  // 只让代理→上游出网走网络代理。陪练→本机8080必须直连，否则也会被送到出网代理。
+  if (!set("NO_PROXY", "localhost,127.0.0.1,::1") || !set("no_proxy", "localhost,127.0.0.1,::1")) return 1;
+  std::cout << "Practice: stage=" << cfg::stage << " port=" << cfg::practice_port << " mode=" << (real ? "real" : "mock")
+            << " model=" << cfg::ai_model << " upstream_proxy=" << (*cfg::practice_llm_proxy ? "configured" : "direct")
+            << " local_gateway=direct built=" << __DATE__ << ' ' << __TIME__ << '\n' << std::flush;
   const auto stage = std::to_string(cfg::stage); // 原版命令行需要字符串形式的阶段。
   const auto port = std::to_string(cfg::practice_port); // 代理监听端口的字符串形式。
   // 第一阶段不需要LLM；第二阶段明确选real，避免误开mock后仍以为在调用模型。

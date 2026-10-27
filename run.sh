@@ -12,5 +12,15 @@ if [[ ! -f install/setup.bash ]]; then
 fi
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-# 席位、阶段、AI和ROS网络参数全部由编译进程序的match_config.hpp提供。
-exec ros2 run rmtc_bot bot
+# 改过配置或尚未用当前构建脚本构建时，明确停下；不能运行旧模型、旧地址或旧令牌。
+if [[ ! -f build/rmtc_bot/match_config.sha256 ]] || ! sha256sum --check --status build/rmtc_bot/match_config.sha256; then
+  echo '当前配置尚未构建。请 bash build.sh，停止旧进程，再 bash run.sh。' >&2
+  exit 2
+fi
+rmtc_bot_executable="$PWD/install/rmtc_bot/lib/rmtc_bot/bot" # 只运行本工作空间的二进制，不受其他overlay影响。
+if [[ ! -x "$rmtc_bot_executable" ]]; then
+  echo '本工作空间没有可执行bot，请先 bash build.sh。' >&2
+  exit 1
+fi
+echo "启动：$rmtc_bot_executable"
+exec "$rmtc_bot_executable"
