@@ -112,7 +112,7 @@ RMTC_SANITIZE=1 bash tests/run.sh
 
 tests/mock_gateway.py 仅在本机临时端口提供固定模拟模型响应，测试结束自动退出。测试不会请求正式网关，不能代替真实 LLM 效果或正式调用资格验证。CMake 的 BUILD_TESTING 也会注册不依赖 HTTP 服务的核心回归，可用 colcon test 运行。
 
-`tests/startup_test.py`检查旧配置摘要拦截、固定工作空间执行路径及启动器设置的本机绕过/出网代理环境；系统ROS仅在临时脚本副本中用空操作替代。`tests/practice_gateway.py`校验原版practice.py对象哈希，只读加载其原始HTTP处理器；ROS导入用占位，裁判节点不启动。真实C++ Session经这个原始处理器转发至固定上游夹具，再检查事件进入策略、A席位记录、model优先级、令牌替换和代理路径。夹具模式名虽为real，仍不代表调用了真实模型。完整仓库中run.sh自动运行该项；原文件不在本地时明确打印跳过。
+`tests/startup_test.py`检查旧配置摘要拦截、固定工作空间执行路径及启动器设置的本机绕过/出网代理环境；系统ROS仅在临时脚本副本中用空操作替代。`tests/practice_gateway.py`校验原版practice.py对象哈希，只读加载其原始HTTP处理器；ROS导入用占位，裁判节点不启动。真实C++ Session经这个原始处理器转发至固定上游夹具，再检查事件进入策略、A席位记录、model优先级、令牌替换和代理路径。夹具模式名虽为real，仍不代表调用了真实模型。完整仓库中`tests/run.sh`自动运行该项；原文件不在本地时明确打印跳过。
 
 可以用`bash tests/run.sh /只读原件路径/practice.py`指定同一发行原件。此参数只供测试，生产启动配置仍集中在头文件。
 
