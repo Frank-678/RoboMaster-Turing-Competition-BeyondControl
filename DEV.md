@@ -81,9 +81,15 @@ bash run.sh
 
 429 quota_exceeded 后本场停止请求，429 rate_limit/concurrency_limit、连接失败、超时和非 JSON 服务错误按 1、2、4、8 秒退避；401/403/400/404 停止无意义重试。HTTP 2xx 但模型 JSON 不可用时仍保持本地策略，同一批公告最多尝试三次；新公告到达可再次尝试。
 
-日志含 sent、reason、ai、http_success 和后续 last_action。http_success 只表示本程序收到本场一次 2xx 转发响应；模型结果还须通过校验，正式资格仍以裁判记录为准。令牌不写日志或命令行参数。
+日志含 session、tick、pos、sent、direction、reason、ai、http_success 和后续 last_action。pos取裁判的self.position；sent/direction是当前意图，last_action是已经结算的反馈。即使本Tick不发布动作也记录当前状态和AI诊断。http_success只表示本程序收到本场一次完整2xx响应；模型结果还须通过校验，正式资格仍以裁判记录为准。令牌不写日志或命令行参数。
 
 `ai_calls`直接显示本场开始请求数`started`、完成数`finished`、完整HTTP成功数`http_successes`、最近HTTP状态`last_http`、curl错误码`last_curl`和是否识别到练习模拟响应`known_mock`。`started=0`说明本客户端还未开始请求；`last_curl=28`是超时。明确的`practice-mock`响应标为`mock_gateway`，停止本场无意义重试，不采纳其中的事件。HTTP成功、事件校验通过、真实模型调用和正式资格是不同证据；没有模拟标记也不能单凭客户端证明资格。
+
+新增`elapsed_ms/connect_ms/first_byte_ms/last_result`保留最近完成请求的总耗时、连接耗时、首字节时刻和原始结果类别。在途状态明确为`requesting`；第一字节计时为0且超时，只能说明未取得首字节计时，不能直接判定是哪一段网络坏了。
+
+当前DeepSeek练习明确发送`thinking.type=disabled`和`response_format.type=json_object`。两项都在头文件中配置；不支持的正式网关可明确省略，没有报400后自动换参数的逻辑。总请求35000ms、连接5000ms，避免旧10秒客户端先于原版代理的5秒连接/25秒读取上限放弃；真实模型是否能及时完成仍需实测。`finish_reason=length`、仅reasoning_content、空答案和坏Chat Completions外壳分别诊断，不采用思考正文或补齐截断事件。
+
+模型最终正文可以带Markdown围栏、前后说明或字符串外尾逗号；仅整理完整JSON对象，然后照常检查session、证据、坐标和字段。拒绝多个对象、缺括号、缺必填字段和错场次；不从公告自然语言提取规则，不修补事件语义。
 
 模型的 unknown 字段必须是字符串数组。存在未知项时只合并已校验的事件，标记 events_incomplete，按原退避和尝试次数上限重试；不能因为 JSON 有效或 HTTP 成功就标记整批公告已理解。后续补齐未知项后才标记 events_validated。
 
@@ -91,7 +97,7 @@ bash run.sh
 
 ## 验证
 
-不需要 ROS 的完整回归（g++、nlohmann-json3-dev、libcurl4-openssl-dev、python3）：
+不需要ROS的回归依赖g++、nlohmann-json3-dev、libcurl4-openssl-dev、python3；只读运行原版转发器另需python3-requests（原练习环境已要求安装）。
 
 ```bash
 cd ~/cst
@@ -105,6 +111,10 @@ RMTC_SANITIZE=1 bash tests/run.sh
 ```
 
 tests/mock_gateway.py 仅在本机临时端口提供固定模拟模型响应，测试结束自动退出。测试不会请求正式网关，不能代替真实 LLM 效果或正式调用资格验证。CMake 的 BUILD_TESTING 也会注册不依赖 HTTP 服务的核心回归，可用 colcon test 运行。
+
+`tests/startup_test.py`检查旧配置摘要拦截、固定工作空间执行路径及启动器设置的本机绕过/出网代理环境；系统ROS仅在临时脚本副本中用空操作替代。`tests/practice_gateway.py`校验原版practice.py对象哈希，只读加载其原始HTTP处理器；ROS导入用占位，裁判节点不启动。真实C++ Session经这个原始处理器转发至固定上游夹具，再检查事件进入策略、A席位记录、model优先级、令牌替换和代理路径。夹具模式名虽为real，仍不代表调用了真实模型。完整仓库中run.sh自动运行该项；原文件不在本地时明确打印跳过。
+
+可以用`bash tests/run.sh /只读原件路径/practice.py`指定同一发行原件。此参数只供测试，生产启动配置仍集中在头文件。
 
 回归覆盖采集/绕路/地图边界/缩小视野/重叠与畸形图、任务完成去重、攻防/保护/反伤、八类事件执行、跨死亡保留与到期、暂停/漏帧/换场，以及异步 HTTP、429 限流与额度耗尽、401、非 JSON 503、坏模型响应、超时与跨场取消。合成迷宫中 18 Tick 收集 3 个资源，移动未撞墙或越界。
 

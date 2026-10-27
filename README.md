@@ -14,14 +14,17 @@ RMTC 机甲大师图灵对决赛 C++17 / ROS 2 Humble 选手工程。
 | `ai_url` | 官方完整网关地址 | `http://127.0.0.1:8080/v1/chat/completions` |
 | `ai_token` | 本场席位令牌 | A席位填`practice-A`，其他席位相应修改 |
 | `ai_model` | 主办方指定的模型名 | 真实模型服务支持的模型名，必须填 |
-| `ai_timeout_ms` / `ai_max_tokens` | 本场超时和输出限制 | 明确填写，当前配置为10000ms/2200 |
+| `ai_timeout_ms` / `ai_connect_timeout_ms` / `ai_max_tokens` | 本场超时和输出限制 | 当前明确为35000ms/5000ms/2200；HTTP在后台等待 |
+| `ai_thinking` / `ai_json_output` | 按官方模型/网关支持填写 | 当前DeepSeek练习：`"disabled"` / `true`；不支持时明确填`""` / `false` |
 | `ai_http_proxy` | 机器人访问网关的网络代理；空串为直连 | 通常空串，机器人直连本机代理 |
 | `practice_llm_url` | 不使用 | 真实模型服务的完整`/chat/completions`地址 |
 | `practice_port` | 不使用 | 本机练习监听端口，须与`ai_url`中的端口一致 |
 | `practice_llm_key` | 不使用 | 模型服务API Key，与`practice-A`不同 |
 | `practice_llm_proxy` | 不使用 | 练习代理访问真实模型的网络代理；空串为直连 |
 
-所有配置都在同一个头文件。URL、令牌、模型名不会自动补值，第二阶段留空就拒绝启动。令牌和真实服务密钥只在自己的机器填写，不要提交到仓库。
+所有配置都在同一个头文件。当前写明了同机练习地址、`practice-A`、`deepseek-flash`及DeepSeek上游地址；上游Key留空，由你在本机填新密钥。正式赛按现场通知更换地址、令牌、模型和扩展选项。第二阶段缺必要值就拒绝启动，没有隐式补值。
+
+**模型名不放在URL中。** 机器人把`ai_model`放进POST正文，原版practice将它转给上游；请求带`model`时优先于`PRACTICE_MODEL`，没带时才用后者。我们的启动器也把同一个`ai_model`交给`PRACTICE_MODEL`，只需维护一处模型名。教程中的SDK `base_url`会自动补请求路径；这里使用curl，必须填写完整`/chat/completions`端点。
 
 ## 两条通信链路
 
@@ -31,7 +34,11 @@ RMTC 机甲大师图灵对决赛 C++17 / ROS 2 Humble 选手工程。
 **LLM：机器人 → `ai_url`网关 → 真实模型 → 原路返回机器人。**
 `ai_url`是机器人发POST的接收端。机器人从同一条HTTP请求读取响应，不另外开回调端口。网关地址与网络代理地址是两回事；`ai_http_proxy`只决定怎样到达网关，不替代网关。
 
+**动作JSON和模型JSON是两种结果。** 每Tick的`{tick,session_id,action,direction}`由本地策略按时生成；LLM只在有新公告时异步返回`{session_id,events,unknown}`，可跨多个Tick。收到后校验场次/证据/有效期，再影响后续动作，不拿旧Tick模型结果直接发布动作。规则v1.2 §11.1明确不要求逐Tick由AI生成动作；AI超时也不延长动作窗口。
+
 本机练习时，网关就是原版`practice/`提供的8080代理；它再用`practice_llm_url/key`访问真实模型。正式比赛的转发由主办方管理，选手只配置官方网关，不填写主办方的上游模型密钥。
+
+你的HelloCV笔记记录过WSL镜像网络和`127.0.0.1:7890`代理。如果当前机器确实依赖该代理出网，把`practice_llm_proxy`填为`http://127.0.0.1:7890`；机器人访问本机8080的`ai_http_proxy`仍填空串。启动器保留本机地址的`NO_PROXY`，陪练访问8080不绕出网代理。代理端口和WSL网络模式必须以当前机器为准，不能仅凭旧笔记断言7890仍在监听。
 
 ## 构建与启动
 
@@ -41,6 +48,8 @@ RMTC 机甲大师图灵对决赛 C++17 / ROS 2 Humble 选手工程。
 cd ~/cst
 bash build.sh
 ```
+
+更新配置前先用`Ctrl+C`停止旧机器人和旧练习裁判，再构建并重启两者。`run.sh`和`practice.sh`会检查本次构建的配置摘要；头文件改了但没构建时直接提示错误。启动固定使用`~/cst`自身的安装产物，终端会显示路径、构建时间、实际模型和思考模式。若日志仍打印旧模型，先处理旧进程/旧构建，不要继续改令牌。
 
 本机练习开两个终端，均在`~/cst`：
 
@@ -56,7 +65,7 @@ bash run.sh
 
 打开练习页面`http://127.0.0.1:8080`，确认自己的席位没有陪练占用，再开始比赛。第一阶段只需把头文件`stage`改为1并重新编译；不调用LLM。正式比赛只运行自己的`bash run.sh`，裁判由主办方启动。
 
-`practice.sh`通过我们自己的启动器传入原版程序需要的配置，**不修改`practice/`任何文件**。修改头文件后必须重新编译并重启对应进程。
+`practice.sh`通过我们自己的启动器传入原版程序需要的配置，**不修改`practice/`任何文件**。点击开始前先确认页面的模式是`real`、席位A留给自己的程序。按裁判教程先只接自己的程序，确认后再勾B/C/D陪练，减少同席位冲突与其他调用干扰。
 
 启动器也关闭Python字节码写入，避免测试刷新原版`__pycache__`。排查时同时保留选手终端的`ai_calls`日志；练习包里的陪练日志不能代替自己的C++选手日志。
 
@@ -68,7 +77,14 @@ bash run.sh
 | `started=0` | 本客户端还未开始请求，不能把陪练记录当成自己的记录 |
 | `last_http=400/401/429` | 分别检查请求/模型名、令牌、限流或配额状态 |
 | `last_curl=28` | 请求超时；检查链路和头文件中的超时 |
+| `ai=requesting` | 后台已开始HTTP请求；不再把在途状态叫queued |
+| `first_byte_ms=0`且超时 | curl未取得首字节计时；不能单凭这项区分网关、上游网络或模型生成等待 |
+| `model_reasoning_only` / `model_output_truncated` | 只有思考正文 / 输出被截断；检查思考模式、输出限制与延迟，不能把思考内容当事件答案 |
 | `known_mock=true`、`ai=mock_gateway` | 收到固定模拟响应，没有验证真实LLM；以real模式重开练习 |
 | `http_successes>0` | 完整HTTP请求成功；仍要核对模型输出、实际动作和裁判的本席位LLM记录 |
 
 动作没有合适机会时，第二阶段存活车辆回退`DEFEND`；视野不足时可试探未知邻格。第一阶段或阵亡时不发送违法的防御动作。详细策略、源码注释和离线回归见[DEV.md](DEV.md)。
+
+如果网页上A看起来没动，先看自己日志：同一`session`的`pos`是否变化，下一帧`last_action.moved`是否为`true`。`sent=move`只代表发布意图，`moved=true`才是裁判确认移动；`direction`是提交方向，`effective_direction`是实际方向。你提供的日志已有连续`moved=true`，不能把那段记录解释为整场没有执行移动。再核对浏览器的场次、Tick及是否打开了另一个练习进程；这些网页数据只用于人工排查，不输入机器人策略。
+
+材料与修复对应关系见[MATERIALS_CHECK.md](MATERIALS_CHECK.md)。

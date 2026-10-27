@@ -21,6 +21,7 @@
 | `README.md` | 先看这里：地址、令牌、模型分别填哪，两个终端如何启动，零次调用如何查 |
 | `DEV.md` | 依赖、策略机制、事件表、测试方法和当前验证范围 |
 | `CODE_GUIDE.md` | 本文件：主线、文件、类型和函数索引 |
+| `MATERIALS_CHECK.md` | 原始材料和已有学习笔记具体对应哪些修复，以及验证范围 |
 | `LICENSE` | 本工程许可证 |
 | `.gitignore` | 排除构建、安装和日志等产物 |
 | `build.sh` | 在正确工作空间构建选手包，生成编辑器编译数据库 |
@@ -45,6 +46,8 @@
 | `tests/strategy_test.cpp` | 基础感知生成、地图/边界/坏输入回归和合成迷宫 |
 | `tests/full_strategy_test.cpp` | 任务、攻防、事件、场次、DEFEND/试探和HTTP场景 |
 | `tests/mock_gateway.py` | 本机固定HTTP响应，验证真实客户端的协议/错误处理；没有真实模型 |
+| `tests/practice_gateway.py` | 只读加载原版HTTP处理器，验证模型名优先级、令牌替换、代理和A席位记录；上游仍是夹具 |
+| `tests/startup_test.py` | 在临时工作空间检查旧配置启动拦截、固定二进制路径和练习启动环境 |
 | `tests/run.sh` | 用g++构建离线测试，启动HTTP夹具，退出时清理临时文件 |
 
 表中的`include/`和`src/`短路径均相对`src/rmtc_bot/`。
@@ -90,7 +93,7 @@
 | `decide`局部函数 | `fallback`合法防御或不发布；`skip`明确不发布；`move`补偿幻术；`possible_fire`估计可见敌人踩辣椒风险；`combat_value`估计新增D价值；`consider`更新最高收益候选 |
 | 计分 | `score_delta`用当前累计值和预计变化计算封顶前后分差，不修改官方成绩 |
 | 事件 | `active`检查[start,end)；`contains`检查范围；`event_summary`生成摘要；`decode_event_proposal`校验完整提案；`decode_events`是只取events的测试便捷接口；`event_system_prompt`返回解释公告的提示词 |
-| 事件数值工具 | `integer`检查有界整数，`number`检查有界有限实数；这两个工具不解释公告语言 |
+| 事件私有工具 | `integer`检查有界整数；`number`检查有界有限实数；`model_object`提取模型输出中的单一完整JSON并去掉字符串外尾逗号；都不解释公告语言 |
 | AI入口 | 构造函数检查配置并启线程；析构函数取消并join；`reset`换场；`observe`收公告并排请求；`poll`取结果；`acknowledge`接收校验反馈并决定退避/停用 |
 | AI后台 | `perform`发一次HTTP；`run`取任务、释放锁、联网、放结果；`status/enabled/observed_http_success/diagnostics`只读取工作状态 |
 | curl回调 | `CurlRuntime`构造/析构初始化/清理；`Download::append`收正文并限长；`Cancellation::progress`检查代数，换场取消 |
@@ -99,6 +102,8 @@
 | 高阶测试夹具 | `fresh/robot/specification`生成感知/敌车/事件；`choose`运行一帧；`events/rejected`验证正式解析器 |
 | 高阶测试场景 | `combat_and_missions/capped_score_decisions/defend_fallback/event_validation/hazard_and_illusion/future_escape_route/fortress_and_effects/session_contract`分别验证其命名机制；`full_scenarios`汇总；`gateway_scenarios`测本机HTTP |
 | Python夹具 | `Handler.log_message`静默访问日志；`do_POST`校验请求并返回指定夹具；`main`开服务、运行测试、核对次数并清理 |
+| 原版代理测试 | `original_handler`核对原件并只读导入；`ModelProxy.do_POST`检查实际转发的模型名/头/选项；`main`启动临时HTTP链路并核对原版A席位计数；`practice_gateway_scenario`验证正式Session采用结果 |
+| 启动测试 | `run_guard`只在临时副本替代ROS加载；`main`检查配置摘要，再编译真实启动器并用exec占位断言环境/参数；不启动裁判 |
 
 函数参数和成员含义以声明旁的中文注释为准。循环里的`x/y`是坐标，`dx/dy`是偏移；`key/e`是事件键和内容；`cell/tile`是格子与记忆；`state_tick/state`是感知Tick与历史快照；不同作用域的同名变量互不共享。
 
