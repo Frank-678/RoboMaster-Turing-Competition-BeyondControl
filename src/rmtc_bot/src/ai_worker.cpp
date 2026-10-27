@@ -35,10 +35,15 @@ struct Cancellation {
 
 AiWorker::AiWorker(AiConfig config) : config_(std::move(config)) {
   enabled_ = !config_.url.empty() && !config_.token.empty();
-  if (!enabled_) return;
+  if (!enabled_) {
+    status_ = config_.url.empty() ? (config_.token.empty() ? "disabled_missing_url_and_token" : "disabled_missing_url")
+                                : "disabled_missing_token";
+    return;
+  }
   if ((config_.url.rfind("http://", 0) != 0 && config_.url.rfind("https://", 0) != 0) ||
       config_.token.find_first_of("\r\n") != std::string::npos)
     throw std::runtime_error("invalid AI URL or token format");
+  if (config_.model.empty()) throw std::runtime_error("AI model must be configured explicitly");
   if (config_.timeout_ms < 100 || config_.timeout_ms > 30000 ||
       config_.max_tokens < 1 || config_.max_tokens > 8192)
     throw std::runtime_error("AI timeout/max_tokens must be configured explicitly");
@@ -62,8 +67,10 @@ void AiWorker::reset(const std::string &session) {
   announcements_.clear(); seen_.clear(); understood_source_.clear();
   disabled_ = false; http_success_ = false; understood_ = false;
   failures_ = invalid_replies_ = 0;
+  started_ = finished_ = successes_ = 0;
+  last_http_ = last_curl_ = 0; known_mock_ = false;
   retry_after_ = {};
-  status_ = enabled_ ? "ready" : "disabled";
+  if (enabled_) status_ = "ready";
 }
 
 void AiWorker::observe(const Json &p, const Json &known_events) {
@@ -89,8 +96,7 @@ void AiWorker::observe(const Json &p, const Json &known_events) {
                   {"announcements", source}, {"known_events", known_events}};
   Json body = {{"messages", Json::array({{{"role", "system"}, {"content", event_system_prompt()}},
                                           {{"role", "user"}, {"content", context.dump()}}})},
-               {"max_tokens", config_.max_tokens}, {"stream", false}};
-  if (!config_.model.empty()) body["model"] = config_.model;
+               {"model", config_.model}, {"max_tokens", config_.max_tokens}, {"stream", false}};
   const auto serialized = body.dump();
   if (serialized.size() > 2097152) { status_ = "request_too_large"; return; }
   pending_ = Job{session_, source, serialized, generation_.load()};
@@ -111,6 +117,7 @@ void AiWorker::acknowledge(const Result &r, bool understood, bool partial) {
   http_success_ = http_success_ || r.http_success;
   disabled_ = r.stop;
   status_ = r.status;
+  if (r.mock_response) { status_ = "mock_gateway"; return; }
   if (understood && !partial) {
     understood_ = true; understood_source_ = r.source;
     failures_ = invalid_replies_ = 0;
@@ -132,6 +139,11 @@ std::string AiWorker::status() const {
 bool AiWorker::observed_http_success() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return http_success_;
+}
+Json AiWorker::diagnostics() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return {{"started", started_}, {"finished", finished_}, {"http_successes", successes_},
+          {"last_http", last_http_}, {"last_curl", last_curl_}, {"known_mock", known_mock_}};
 }
 
 AiWorker::Result AiWorker::perform(const Job &job) {
@@ -161,15 +173,25 @@ AiWorker::Result AiWorker::perform(const Job &job) {
   curl_easy_setopt(curl.get(), CURLOPT_XFERINFOFUNCTION, &Cancellation::progress);
   curl_easy_setopt(curl.get(), CURLOPT_XFERINFODATA, &cancel);
   const auto code = curl_easy_perform(curl.get());
-  if (code != CURLE_OK) return result;
+  result.curl_code = static_cast<int>(code);
   long status = 0;
   curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &status);
+  result.http_status = status;
+  if (code != CURLE_OK) {
+    result.status = code == CURLE_OPERATION_TIMEDOUT ? "timeout" : "curl_" + std::to_string(result.curl_code);
+    return result;
+  }
   result.http_success = status >= 200 && status < 300;
   result.status = "http_" + std::to_string(status);
   if (status == 401 || status == 403 || status == 400 || status == 404) result.stop = true;
   try {
     const auto root = Json::parse(response.body);
-    if (result.http_success) result.reply = root.at("choices").at(0).at("message").at("content").get<std::string>();
+    if (result.http_success) {
+      // 公开练习包明确标记的固定模拟响应。HTTP成功不等于LLM被调用。
+      result.mock_response = root.value("model", std::string()) == "practice-mock";
+      if (result.mock_response) { result.stop = true; result.status = "mock_gateway"; }
+      else result.reply = root.at("choices").at(0).at("message").at("content").get<std::string>();
+    }
     else if (status == 429 && root.at("error").value("code", std::string()) == "quota_exceeded") {
       result.stop = true; result.status = "quota_exceeded";
     }
@@ -184,7 +206,7 @@ void AiWorker::run() {
       std::unique_lock<std::mutex> lock(mutex_);
       wake_.wait(lock, [&] { return stopping_ || pending_.has_value(); });
       if (stopping_) return;
-      job = std::move(*pending_); pending_.reset(); busy_ = true;
+      job = std::move(*pending_); pending_.reset(); busy_ = true; ++started_;
     }
     Result result;
     try { result = perform(job); }
@@ -195,7 +217,13 @@ void AiWorker::run() {
     {
       std::lock_guard<std::mutex> lock(mutex_);
       busy_ = false;
-      if (job.generation == generation_.load() && job.session == session_) ready_ = std::move(result);
+      if (job.generation == generation_.load() && job.session == session_) {
+        ++finished_;
+        successes_ += result.http_success;
+        last_http_ = result.http_status; last_curl_ = result.curl_code;
+        known_mock_ = known_mock_ || result.mock_response;
+        ready_ = std::move(result);
+      }
     }
   }
 }

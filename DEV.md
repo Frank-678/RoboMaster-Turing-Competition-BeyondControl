@@ -81,6 +81,8 @@ bash run.sh
 
 日志含 sent、reason、ai、http_success 和后续 last_action。http_success 只表示本程序收到本场一次 2xx 转发响应；模型结果还须通过校验，正式资格仍以裁判记录为准。令牌不写日志或命令行参数。
 
+`ai_calls`直接显示本场开始请求数`started`、完成数`finished`、完整HTTP成功数`http_successes`、最近HTTP状态`last_http`、curl错误码`last_curl`和是否识别到练习模拟响应`known_mock`。`started=0`说明本客户端还未开始请求；`last_curl=28`是超时。明确的`practice-mock`响应标为`mock_gateway`，停止本场无意义重试，不采纳其中的事件。HTTP成功、事件校验通过、真实模型调用和正式资格是不同证据；没有模拟标记也不能单凭客户端证明资格。
+
 模型的 unknown 字段必须是字符串数组。存在未知项时只合并已校验的事件，标记 events_incomplete，按原退避和尝试次数上限重试；不能因为 JSON 有效或 HTTP 成功就标记整批公告已理解。后续补齐未知项后才标记 events_validated。
 
 程序仅订阅自己的 /team_X/perception，其中已经含任务和近期公告；使用其公开字段和自己保存的历史，不读取观赛全图、练习配置、内部话题或对手专属输入。

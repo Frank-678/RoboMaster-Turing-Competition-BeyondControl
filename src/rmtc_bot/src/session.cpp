@@ -20,7 +20,7 @@ std::optional<Json> Session::act(const Json &p) {
   if (const auto result = ai_.poll()) {
     bool understood = false, partial = false;
     try {
-      if (result->http_success && result->session == session_) {
+      if (result->http_success && !result->mock_response && result->session == session_) {
         const auto proposal = decode_event_proposal(result->reply, session_, result->source,
                                           p.at("map").at("width").get<int>(),
                                           p.at("map").at("height").get<int>());

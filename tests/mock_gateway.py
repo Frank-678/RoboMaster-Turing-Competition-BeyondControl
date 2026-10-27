@@ -58,6 +58,8 @@ class Handler(BaseHTTPRequestHandler):
                 events = []
             answer = {"session_id": context["session_id"], "events": events, "unknown": unknown}
             body = {"choices": [{"message": {"content": json.dumps(answer)}}]}
+            if self.path == "/practice-mock":
+                body["model"] = "practice-mock"
         raw = json.dumps(body).encode() if body is not None else b"temporary upstream failure"
         try:
             self.send_response(status)
@@ -84,6 +86,7 @@ def main():
             assert counts["/rate"] == 2, counts
             assert counts["/auth"] == 1 and counts["/garbage"] == 1, counts
             assert counts["/bad-response"] == 1, counts
+            assert counts["/practice-mock"] == 1, counts
         print("mock gateway request-count and authorization assertions passed")
     finally:
         server.shutdown()

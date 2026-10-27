@@ -303,6 +303,30 @@ void gateway_scenarios(const std::string &base) {
   const auto config = [&](const std::string &path, long timeout = 1800) {
     return rmtc::AiConfig{base + path, "fixture-token", "fixture-model", timeout, 2200};
   };
+  rmtc::AiWorker missing({});
+  missing.reset("missing-config");
+  check(missing.status() == "disabled_missing_url_and_token" && missing.diagnostics()["started"] == 0,
+        "zero requests did not show missing AI configuration");
+  auto no_model = config("/ok"); no_model.model.clear();
+  bool rejected_model = false;
+  try { rmtc::AiWorker incomplete(no_model); }
+  catch (const std::exception &) { rejected_model = true; }
+  check(rejected_model, "empty model name silently used a gateway default");
+  rmtc::Session mock(2, config("/practice-mock"));
+  auto mocked = fresh(); mocked["event_text"] = "fixture announcement";
+  bool detected_mock = false;
+  for (int t = 0; t < 50; ++t) {
+    mocked["tick"] = t; mock.act(mocked);
+    if (mock.ai_status() == "mock_gateway") {
+      check(mock.ai_http_success() && mock.ai_diagnostics()["http_successes"] == 1,
+            "mock HTTP completion was not recorded as transport success");
+      check(mock.reason() != "capture_fortress", "known mock events were adopted as model understanding");
+      detected_mock = true; break;
+    }
+    std::this_thread::sleep_for(milliseconds(10));
+  }
+  check(detected_mock, "practice mock was confused with a real model response");
+  for (int t = 50; t < 60; ++t) { mocked["tick"] = t; mock.act(mocked); }
   rmtc::Session session(2, config("/ok"));
   auto p = fresh();
   p["event_text"] = "fixture: fortress area [6,6,7,7], tick 0 to 1000, capture 2.";
@@ -405,6 +429,8 @@ void gateway_scenarios(const std::string &base) {
   }
   // /slow 新旧场次都故意超过超时，不能出现伪造的成功标志。
   check(!new_success, "timed-out or old-session response qualified the new match");
+  check(slow.ai_diagnostics()["last_curl"] == 28 && slow.ai_status() == "timeout",
+        "request timeout had no transport diagnostic");
   rmtc::Session stage1(1, config("/stage1-must-not-call"));
   stage1.act(fresh());
   std::cout << "mock HTTP: async event pipeline, quota, timeout, session cancellation, stage1 isolation passed\n";

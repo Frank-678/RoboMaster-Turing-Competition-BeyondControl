@@ -48,6 +48,8 @@ public:
     registration_.data = Json{{"team", team}, {"name", name}}.dump();
     registration_pub_->publish(registration_);
     RCLCPP_INFO(get_logger(), "Ready: seat=%s name=%s", team.c_str(), name.c_str());
+    RCLCPP_INFO(get_logger(), "AI configured: status=%s model=%s timeout_ms=%ld max_tokens=%d",
+                session_->ai_status().c_str(), cfg::ai_model, cfg::ai_timeout_ms, cfg::ai_max_tokens);
   }
 
 private:
@@ -60,10 +62,11 @@ private:
       out.data = action->dump();
       action_pub_->publish(out);
       const auto receipt = p["self"].value("last_action", Json()).dump();
-      RCLCPP_INFO(get_logger(), "tick=%lld sent=%s reason=%s ai=%s http_success=%d last_action=%s",
+      const auto ai = session_->ai_diagnostics().dump();
+      RCLCPP_INFO(get_logger(), "tick=%lld sent=%s reason=%s ai=%s http_success=%d ai_calls=%s last_action=%s",
                   static_cast<long long>(rmtc::frame_tick(p)),
                   action->at("action").get<std::string>().c_str(), session_->reason().c_str(),
-                  session_->ai_status().c_str(), session_->ai_http_success(), receipt.c_str());
+                  session_->ai_status().c_str(), session_->ai_http_success(), ai.c_str(), receipt.c_str());
     } catch (const std::exception &e) {
       RCLCPP_WARN(get_logger(), "Skipping invalid perception: %s", e.what());
     }

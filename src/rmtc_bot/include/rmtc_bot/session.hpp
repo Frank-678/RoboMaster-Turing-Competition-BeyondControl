@@ -14,6 +14,7 @@ public:
   const std::string &reason() const { return reason_; }
   std::string ai_status() const { return ai_.status(); }
   bool ai_http_success() const { return ai_.observed_http_success(); }
+  nlohmann::json ai_diagnostics() const { return ai_.diagnostics(); }
 private:
   int stage_;
   Strategy strategy_;

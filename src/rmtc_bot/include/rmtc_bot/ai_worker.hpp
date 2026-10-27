@@ -23,7 +23,9 @@ public:
   struct Result {
     std::string session, source, reply, status;
     std::uint64_t generation = 0;
-    bool http_success = false, stop = false;
+    long http_status = 0;
+    int curl_code = 0;
+    bool http_success = false, stop = false, mock_response = false;
   };
   explicit AiWorker(AiConfig config);
   ~AiWorker();
@@ -36,6 +38,7 @@ public:
   std::string status() const;
   bool enabled() const { return enabled_; }
   bool observed_http_success() const;
+  nlohmann::json diagnostics() const;
 
 private:
   struct Job {
@@ -48,6 +51,10 @@ private:
   bool enabled_ = false, stopping_ = false, busy_ = false, disabled_ = false;
   bool http_success_ = false, understood_ = false;
   unsigned failures_ = 0, invalid_replies_ = 0;
+  unsigned started_ = 0, finished_ = 0, successes_ = 0;
+  long last_http_ = 0;
+  int last_curl_ = 0;
+  bool known_mock_ = false;
   std::string session_, understood_source_, status_ = "disabled";
   std::vector<std::string> announcements_;
   std::set<std::string> seen_;
