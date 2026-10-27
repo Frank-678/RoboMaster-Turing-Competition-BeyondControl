@@ -14,8 +14,8 @@
 namespace rmtc {
 struct AiConfig {
   std::string url, token, model;
-  long timeout_ms = 1800;
-  int max_tokens = 2200;
+  long timeout_ms = 0;
+  int max_tokens = 0;
 };
 
 class AiWorker {
