@@ -6,11 +6,13 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 #include "rmtc_bot/events.hpp"
+#include "rmtc_bot/strategy_parameters.hpp"
 
 class Strategy {
 public:
-  explicit Strategy(int stage = 2);
-  // Called once on the first frame of each new session.
+  explicit Strategy(int stage = 2); // stage：比赛阶段；实际入口明确传入配置中的1或2。
+  Strategy(int stage, rmtc::StrategyParameters parameters); // 仅离线评测注入；正式构造仍使用封存常量。
+  // 只在换场调用。普通死亡不会清掉地图和仍有效的增益。
   void reset();
 
   // Called once per new tick. Return action and, if needed, direction.
@@ -61,6 +63,7 @@ private:
   bool dangerous(Cell cell, Tick tick) const;
   void update_effects(Tick tick);
   int stage_, width_ = 0, height_ = 0; // 比赛阶段、本场地图宽高；0表示尚未收到地图。
+  rmtc::StrategyParameters parameters_; // 本对象固定取舍；一场中不修改。
   bool reversed_ = false, reverse_unknown_ = false, empowered_ = false; // 幻术反转、资格未知、已获无双。
   // 不知道幻术激活时的位置时，reverse_unknown_=true，避免猜反方向。
   double vulnerability_ = 1, attack_damage_ = 20, defended_damage_ = 10; // 本车易伤倍率、攻击/对防御者伤害。
