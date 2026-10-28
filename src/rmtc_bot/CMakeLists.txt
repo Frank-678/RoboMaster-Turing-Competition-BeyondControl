@@ -8,7 +8,8 @@ find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(Threads REQUIRED)
 
-add_library(rmtc_strategy STATIC src/strategy.cpp src/events.cpp src/ai_worker.cpp src/session.cpp)
+# 独立核心库不依赖ROS，可直接在离线测试中复用同一套逻辑。
+add_library(rmtc_strategy STATIC src/strategy.cpp src/tactics.cpp src/events.cpp src/ai_worker.cpp src/session.cpp)
 target_compile_features(rmtc_strategy PUBLIC cxx_std_17)
 target_include_directories(rmtc_strategy PUBLIC include)
 target_link_libraries(rmtc_strategy PUBLIC nlohmann_json::nlohmann_json CURL::libcurl Threads::Threads)

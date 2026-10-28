@@ -20,8 +20,9 @@ std::optional<Json> Session::act(const Json &p) {
   if (const auto result = ai_.poll()) {
     bool understood = false;
     try {
-      if (result->http_success && result->session == session_) {
-        const auto events = decode_events(result->reply, session_, result->source,
+      if (result->http_success && !result->mock_response && result->session == session_) {
+        if (result->status == "model_reply_received") strategy_.note_model_reply();
+        const auto proposal = decode_event_proposal(result->reply, session_, result->source, // 校验后的模型提案。
                                           p.at("map").at("width").get<int>(),
                                           p.at("map").at("height").get<int>());
         strategy_.merge_events(events); understood = true;

@@ -1,6 +1,7 @@
 #include "rmtc_bot/strategy.hpp"
 #include "rmtc_bot/scoring.hpp"
 #include "rmtc_bot/match_config.hpp"
+#include "rmtc_bot/tactics.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -77,9 +78,11 @@ void Strategy::reset() {
   tiles_.clear(); probe_attempts_.clear(); history_.clear(); events_.clear(); capture_progress_.clear(); spawn_.reset();
   opponents_.clear(); // 不把上一场或旧席位的轨迹带入新场。
   goal_.reset(); // 新场没有上一目标，也没有必须继续执行的旧路线。
+  model_reply_seen_ = resource_counts_known_ = false;
+  observed_normal_ = observed_high_ = 0; previous_score_tick_ = -1; previous_resource_total_ = 0;
   width_ = height_ = 0; reversed_ = reverse_unknown_ = empowered_ = false;
   vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
-  reason_ = "new_session";
+  healing_amount_ = 0; reason_ = "new_session";
 }
 std::optional<Strategy::Cell> Strategy::predict_opponent(const std::string &identity, Cell position, Tick tick) {
   if (identity.empty()) return std::nullopt;
@@ -282,7 +285,7 @@ std::vector<Strategy::ResourcePlan> Strategy::resource_plans(Cell start, Tick ti
 
 void Strategy::update_effects(Tick tick) {
   reversed_ = reverse_unknown_ = empowered_ = false;
-  vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
+  vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1; healing_amount_ = 0;
   capture_progress_.clear();
   for (const auto &[key, e] : events_) {
     if (e.kind == Kind::illusion && e.active(tick)) {
@@ -299,8 +302,9 @@ void Strategy::update_effects(Tick tick) {
       if (executed < e.start || executed >= e.end) continue;
       if (e.kind == Kind::vulnerability && e.active(tick) && state.moved && executed < e.trigger_end)
         vulnerability_ = std::max(vulnerability_, e.multiplier);
-      if (e.kind == Kind::heal && state.moved && !state.respawn && e.contains(state.position))
-        healing_until_ = std::max(healing_until_, executed + e.effect_ticks);
+      if (e.kind == Kind::heal && state.moved && !state.respawn && e.contains(state.position) && executed + e.effect_ticks > healing_until_) {
+        healing_until_ = executed + e.effect_ticks; healing_amount_ = e.amount;
+      }
       if (e.kind == Kind::fortress && e.active(tick)) {
         if (executed != previous + 1) consecutive = 0;
         consecutive = state.alive && !state.respawn && e.contains(state.position) ? consecutive + 1 : 0;
@@ -455,10 +459,13 @@ Json Strategy::decide(const Json &p) {
   double incoming = 0, defended_incoming = 0;
   for (const auto &enemy : enemies) {
     if (enemy.protected_spawn || protected_spawn) continue;
-    const bool area = potential_area_enemy && std::abs(enemy.position.first - start.first) <= 2 &&
-                      std::abs(enemy.position.second - start.second) <= 2;
-    if (area || ray(enemy.position, start) != -1) {
-      incoming += (area ? std::max(20.0, potential_area_damage) : 20) * vulnerability_;
+    bool nearest = ray(enemy.position, start) != -1;
+    if (nearest) for (const auto &other : enemies)
+      if (other.position != enemy.position && ray(enemy.position, other.position) == ray(enemy.position, start) &&
+          manhattan(enemy.position, other.position) < manhattan(enemy.position, start)) nearest = false;
+    if (nearest) {
+      // 未观测确认的敌方无双只进入后面的不确定情景，不能把所有敌车一律当50伤害强制原地防御。
+      incoming += 20 * vulnerability_;
       defended_incoming += reflection ? 0 : 10 * vulnerability_;
     }
   }
@@ -526,11 +533,18 @@ Json Strategy::decide(const Json &p) {
       return move(escape, "escape_announced_hazard");
   }
 
-  std::set<std::string> completed;
-  const auto score = p.value("score", Json::object());
-  const double resource_value = score.value("resource_value", 0.0);
-  const double effective_damage = score.value("effective_damage", 0.0);
-  // Tiny, bounded denial/tie-break value is a heuristic, not additional awarded score.
+  // 5. 给采集、任务、回血、堡垒和踩辣椒机会算收益，统一比较第一步。
+  std::set<std::string> completed; // 裁判已经确认完成的任务ID集合。
+  const auto score = p.value("score", Json::object()); // 最新官方计分状态。
+  const double resource_value = score.value("resource_value", 0.0); // 官方当前资源累计R。
+  const double effective_damage = score.value("effective_damage", 0.0); // 官方当前D，可下降，也可超过500。
+  if (previous_score_tick_ < 0) resource_counts_known_ = tick == 0 && resource_value == 0;
+  else if (previous_score_tick_ == tick - 1 && resource_value >= previous_resource_total_) {
+    const double collected = resource_value - previous_resource_total_; // 每Tick每车至多拾取当前格一份资源。
+    if (collected > 0) { if (collected >= 20) ++observed_high_; else ++observed_normal_; }
+  } else resource_counts_known_ = false; // 漏帧/晚加入后不把多份累计值猜成一次拾取。
+  previous_score_tick_ = tick; previous_resource_total_ = resource_value;
+  // 封顶后的直接分差接近0；再给很小的争夺权重，不把它算成官方额外加分。
   const auto combat_value = [&](double contribution) {
     return rmtc::score_delta(effective_damage, contribution, 500, 15) +
            std::min(contribution, 60.0) * 0.001;
@@ -562,6 +576,8 @@ Json Strategy::decide(const Json &p) {
   std::optional<Goal> best_goal; // 只有最终提交MOVE时才续签这一目标。
   double best_benefit = 0; // 同类资源的单位耗时收益打平时，优先兑现总收益更多的串。
   std::vector<std::pair<double, Cell>> resource_options; // 单目标基线排序，供有界资源搜索挑候选。
+  std::array<double, 5> direction_value; direction_value.fill(-1);
+  std::array<std::optional<Goal>, 5> direction_goal; // 战术改选另一首步时，保留那个方向真实对应的目标。
   const auto consider = [&](int step, double utility, const char *reason, std::optional<Cell> target = std::nullopt, double benefit = 0) {
     // step=-1代表留在当前格；安全检查也必须允许这一Tick继续原地驻留。
     if (!safe_steps[step < 0 ? 4 : step]) return;
@@ -579,6 +595,11 @@ Json Strategy::decide(const Json &p) {
     const std::string kind = std::string(reason) == "collect_resource_chain" ? "collect_resource" : reason;
     if (keep_goal && target && previous_goal->kind == kind && previous_goal->position == *target)
       utility *= 1.0 + parameters_.goal_retention_bonus; // 只影响排序，危险守卫已在前面执行。
+    const int index = step < 0 ? 4 : step;
+    if (utility > direction_value[index]) {
+      direction_value[index] = utility;
+      direction_goal[index] = target ? std::optional<Goal>(Goal{*target, kind, tick}) : std::nullopt;
+    }
     if (utility > best_utility + 1e-9 || (std::abs(utility - best_utility) <= 1e-9 &&
         kind == "collect_resource" && best_goal && best_goal->kind == kind && benefit > best_benefit + 1e-9)) {
       best_utility = utility; best_step = step; best_reason = reason;
@@ -718,8 +739,49 @@ Json Strategy::decide(const Json &p) {
       if (utility > attack_utility) { attack_utility = utility; attack_direction = direction; }
     }
   }
-  // 留在堡垒仍可攻击/防御；不能把上一帧 defending 当成对手本 Tick 的承诺。
-  if (attack_direction >= 0 && attack_utility > 0 &&
+  // 7. 选本Tick动作。驻留时仍可攻击/防御；上一帧defending不是对手这一Tick的承诺。
+  bool split_activation = false;
+  for (const auto &[key, event] : events_) {
+    (void)key;
+    split_activation = split_activation || (event.kind == Kind::split && event.start >= tick && event.start <= tick + 2);
+  }
+  if (stage_ == 2 && parameters_.tactical_search && !enemies.empty() && enemies.size() <= 3 &&
+      !reverse_unknown_ && !split_activation && remaining_ticks >= 2) {
+    rmtc::TacticalInput input{};
+    input.tick=tick; input.remaining_ticks=remaining_ticks; input.width=width; input.height=height;
+    for (auto &car : input.fighters) car.alive=false;
+    input.fighters[0]={start,hp,attack_damage_,defended_damage_,vulnerability_,true,protected_spawn,empowered_};
+    for (std::size_t i=0;i<enemies.size();++i) {
+      const auto &enemy=enemies[i];
+      input.fighters[i+1]={enemy.position,enemy.hp,20,10,1,true,enemy.protected_spawn,false};
+      input.forecast[i+1]=enemy.forecast;
+    }
+    for (const auto &[cell,tile] : tiles_) if (tile.seen && !tile.wall) {
+      input.walkable.insert(cell);
+      if (tile.value > 0 && tile.last_seen == tick) input.resources[cell]=tile.value; // 两步精确拾取只用本帧资源，旧记忆仍走目标估值。
+    }
+    for (const auto &[key,event] : events_) { (void)key;input.events.push_back(event); }
+    for (const auto &mission : missions) if (!completed.count(mission.at("id").get<std::string>())) {
+      rmtc::TacticalMission task{mission.at("type"),mission.value("target",1.0),{0,0}};
+      if (task.type == "reach") task.position=absolute_position(mission.at("position"));
+      input.missions.push_back(task);
+    }
+    input.goal_value=direction_value; input.safe_first=safe_steps;
+    for (int direction=0;direction<5;++direction) if (direction_goal[direction]) input.goal_position[direction]=direction_goal[direction]->position;
+    input.resource_total=resource_value;input.damage_total=effective_damage;
+    input.normal_count=observed_normal_;input.high_count=observed_high_;input.counts_known=resource_counts_known_;
+    input.model_reply_seen=model_reply_seen_;input.possible_enemy_area=potential_area_enemy;input.possible_area_damage=potential_area_damage;
+    input.healing_until=healing_until_;input.healing_amount=healing_amount_;input.spawn=spawn_;input.capture_progress=capture_progress_;
+    const auto choice=rmtc::tactical_choice(input,parameters_);
+    if (choice.action.kind == rmtc::rules::ActionKind::move) {
+      goal_=direction_goal[choice.action.direction];return move(choice.action.direction,"tactical_reposition");
+    }
+    if (choice.action.kind == rmtc::rules::ActionKind::attack) {
+      reason_="tactical_attack";return {{"action","attack"},{"direction",directions[choice.action.direction]}};
+    }
+    if (choice.action.kind == rmtc::rules::ActionKind::defend) return fallback("tactical_defend");
+  }
+  if (safe_steps[4] && attack_direction >= 0 && attack_utility > 0 &&
       (attack_utility > best_utility || std::string(best_reason) == "hold_fortress")) {
     reason_ = "attack_opportunity";
     return {{"action", "attack"}, {"direction", directions[attack_direction]}};
