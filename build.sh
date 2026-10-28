@@ -10,4 +10,7 @@ colcon build --symlink-install --base-paths src --packages-select rmtc_bot \
   --cmake-args -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 ln -sfn build/rmtc_bot/compile_commands.json compile_commands.json
 printf '%s\n' "$rmtc_config_digest" > build/rmtc_bot/match_config.sha256
+# 新诊断入口必须配套新启动器；旧启动器会忽略--check-ai，不能让它误启动裁判。
+sha256sum src/rmtc_bot/src/practice_launcher.cpp scripts/check_ai.py check_ai.sh \
+  install/rmtc_bot/lib/rmtc_bot/practice_launcher > build/rmtc_bot/ai_check.sha256
 echo "构建完成：$PWD/install/rmtc_bot/lib/rmtc_bot/bot"

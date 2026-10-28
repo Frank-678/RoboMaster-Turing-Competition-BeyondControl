@@ -5,12 +5,16 @@
 #include <unistd.h>
 
 // 只给原版practice设置启动环境再执行它；不改practice中的任何文件。
-int main() {
+int main(int argc, char **argv) {
   namespace cfg = rmtc::match_config; // 与机器人共用的唯一配置。
+  const bool check_ai = argc == 2 && std::string(argv[1]) == "--check-ai"; // 只由check_ai.sh选择；不是比赛运行开关。
+  if (argc != 1 && !check_ai) {
+    std::cerr << "Use bash practice.sh or bash check_ai.sh; settings stay in match_config.hpp\n"; return 2;
+  }
   if (cfg::stage != 1 && cfg::stage != 2) {
     std::cerr << "stage must be 1 or 2 in match_config.hpp\n"; return 2;
   }
-  const bool real = cfg::stage == 2; // 第二阶段必须真实模型；第一阶段没有AI任务。
+  const bool real = check_ai || cfg::stage == 2; // 出网检查要真实上游；正常第一阶段没有AI任务。
   if (cfg::practice_port < 1 || cfg::practice_port > 65535) {
     std::cerr << "practice_port must be 1-65535\n"; return 2;
   }
@@ -36,6 +40,14 @@ int main() {
     if (!set(key, cfg::practice_llm_proxy)) return 1;
   // 只让代理→上游出网走网络代理。陪练→本机8080必须直连，否则也会被送到出网代理。
   if (!set("NO_PROXY", "localhost,127.0.0.1,::1") || !set("no_proxy", "localhost,127.0.0.1,::1")) return 1;
+  if (check_ai) {
+    // 用同一份已编译模型/密钥/代理，只请求一次最小JSON；不启动裁判、不读练习地图。
+    if (!set("RMTC_CHECK_THINKING", cfg::ai_thinking) ||
+        !set("RMTC_CHECK_JSON_OUTPUT", cfg::ai_json_output ? "1" : "0") ||
+        !set("RMTC_CHECK_MAX_TOKENS", std::to_string(cfg::ai_max_tokens).c_str())) return 1;
+    ::execlp("python3", "python3", "scripts/check_ai.py", static_cast<char *>(nullptr));
+    std::cerr << "Cannot run scripts/check_ai.py; install the Python requests dependency\n"; return 1;
+  }
   std::cout << "Practice: stage=" << cfg::stage << " port=" << cfg::practice_port << " mode=" << (real ? "real" : "mock")
             << " model=" << cfg::ai_model << " upstream_proxy=" << (*cfg::practice_llm_proxy ? "configured" : "direct")
             << " local_gateway=direct built=" << __DATE__ << ' ' << __TIME__ << '\n' << std::flush;

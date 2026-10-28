@@ -34,10 +34,20 @@ def main():
             binary.chmod(0o755)
         marker = work / "build/rmtc_bot/match_config.sha256"  # 同build.sh格式的配置摘要。
         digest = hashlib.sha256(header.read_bytes()).hexdigest()
-        for script in ("run.sh", "practice.sh"):
+        for script in ("run.sh", "practice.sh", "check_ai.sh"):
             marker.unlink(missing_ok=True)
             assert run_guard(work, script).returncode == 2  # 无构建记录时不能偷偷运行已有二进制。
             marker.write_text(digest + "  src/rmtc_bot/include/rmtc_bot/match_config.hpp\n")
+            if script == "check_ai.sh":
+                check_marker = work / "build/rmtc_bot/ai_check.sha256"
+                assert run_guard(work, script).returncode == 2  # 旧构建没有新入口记录，不能传未知参数误启动裁判。
+                binary = work / "install/rmtc_bot/lib/rmtc_bot/practice_launcher"
+                check_marker.write_text(hashlib.sha256(binary.read_bytes()).hexdigest() +
+                                        "  install/rmtc_bot/lib/rmtc_bot/practice_launcher\n")
+                original_binary = binary.read_text()
+                binary.write_text("#!/bin/sh\necho stale-launcher\n")
+                assert run_guard(work, script).returncode == 2
+                binary.write_text(original_binary)
             result = run_guard(work, script)
             assert result.returncode == 0 and "fixture-binary" in result.stdout
             header.write_text("changed after compilation\n")
@@ -56,6 +66,7 @@ def main():
 #include <cstdarg>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 #include <vector>
 #include <string>
 // exec占位只检查环境和参数，绝不启动替代裁判或连接模型。
@@ -74,12 +85,31 @@ extern "C" int execl(const char *path, const char *arg, ...) noexcept {
   if (args != std::vector<std::string>{"practice/start_referee.sh", "--stage", "2", "--port", "8080", "--ai-mode", "real"}) std::exit(4);
   std::exit(0);
 }
+// 出网检查复用同一份已编译配置；密钥仍只经进程环境交接，不放命令行。
+extern "C" int execlp(const char *path, const char *arg, ...) noexcept {
+  const auto matches = [](const char *key, const char *expected) {
+    const char *value = std::getenv(key); return value && std::strcmp(value, expected) == 0;
+  };
+  if (std::strcmp(path, "python3") || std::strcmp(arg, "python3") ||
+      !matches("PRACTICE_MODEL", "fixture-model") || !matches("PRACTICE_LLM_KEY", "fixture-key") ||
+      !matches("https_proxy", "http://proxy.invalid:7890") ||
+      !matches("RMTC_CHECK_THINKING", "disabled") || !matches("RMTC_CHECK_JSON_OUTPUT", "1") ||
+      !matches("RMTC_CHECK_MAX_TOKENS", "2200")) std::exit(5);
+  va_list values; va_start(values, arg);
+  const char *script = va_arg(values, const char *);
+  if (!script || std::strcmp(script, "scripts/check_ai.py") || va_arg(values, const char *)) std::exit(6);
+  va_end(values);
+  std::puts("fixture-upstream-check");
+  std::exit(0);
+}
 ''')
         launcher = work / "launcher"  # 只运行夹具编译产物；系统环境不改动。
         subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-I", str(header.parents[1]),
                         str(ROOT / "src/rmtc_bot/src/practice_launcher.cpp"), str(stub), "-o", str(launcher)], check=True)
         env = dict(os.environ, NO_PROXY="bad-inherited-value", no_proxy="bad-inherited-value")
         subprocess.run([str(launcher)], env=env, check=True)
+        result = subprocess.run([str(launcher), "--check-ai"], env=env, capture_output=True, text=True, check=True)
+        assert "fixture-upstream-check" in result.stdout  # 不能误启动裁判，也不能漏掉检查分支。
         print("startup guards and original-practice launcher environment passed; no ROS process launched")
 
 
