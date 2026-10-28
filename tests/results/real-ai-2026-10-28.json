@@ -1,0 +1,76 @@
+{
+  "cpp_exit": 0,
+  "client": [
+    {
+      "case": "opening_empty",
+      "curl": 0,
+      "elapsed_ms": 4652,
+      "events": [],
+      "http": 200,
+      "reply_bytes": 52,
+      "status": "model_reply_received",
+      "unknown": [],
+      "validated": true
+    },
+    {
+      "case": "explosion_notice",
+      "curl": 0,
+      "elapsed_ms": 5977,
+      "events": [
+        {
+          "amount": 35.0,
+          "area": [
+            3,
+            3,
+            7,
+            7
+          ],
+          "capture_ticks": 0,
+          "defended_damage": 0.0,
+          "effect_ticks": 0,
+          "end": 16,
+          "kind": "explosion",
+          "multiplier": 1.0,
+          "points": [],
+          "source": "第 10 Tick：随机事件预告：5 Tick 后（Tick 15），左上角 [3,3]、右下角 [7,7] 的矩形区域将发生爆炸，范围内所有存活战车扣除 35 HP；出生保护免疫。",
+          "start": 15,
+          "trigger_end": 0
+        }
+      ],
+      "http": 200,
+      "reply_bytes": 324,
+      "status": "model_reply_received",
+      "unknown": [],
+      "validated": true
+    }
+  ],
+  "audit": [
+    {
+      "seat": "A",
+      "session_id": "real-probe",
+      "mode": "real",
+      "success": true,
+      "status": 200,
+      "success_count": 1,
+      "attempt_count": 1
+    },
+    {
+      "seat": "A",
+      "session_id": "real-probe",
+      "mode": "real",
+      "success": true,
+      "status": 200,
+      "success_count": 2,
+      "attempt_count": 2
+    }
+  ],
+  "stderr": "",
+  "real_model": true,
+  "ros_or_match": false,
+  "tested_code_commit": "57b331207f9ac1bcef059dd0707ae1696e8f4542",
+  "model": "deepseek-flash",
+  "thinking": "disabled",
+  "max_tokens": 2200,
+  "practice_py_git_blob": "abd400db06ade29c548e4a7b34dfc0bc1acc013f",
+  "date": "2026-10-28"
+}

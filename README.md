@@ -1,6 +1,8 @@
 # RoboMaster-Turing-Competition-BeyondControl
 RMTC 机甲大师图灵对决赛 C++17 / ROS 2 Humble 选手工程。
 
+[2026-10-28实测](REAL_TEST.md)：真实DeepSeek经原版转发两次成功，发现短预告时延问题；已修复累积公告重复膨胀。完整裁判尝试因当前环境DDS权限失败，尚无对标准车的有效对局结果。
+
 赛前只改 [match_config.hpp](src/rmtc_bot/include/rmtc_bot/match_config.hpp)，改完重新编译。启动不需要输入参数或手工设置环境变量。
 
 逐文件、函数、类型和变量说明见[源码导读](CODE_GUIDE.md)，代码声明与关键判断旁也有中文注释。
@@ -88,3 +90,4 @@ bash run.sh
 如果网页上A看起来没动，先看自己日志：同一`session`的`pos`是否变化，下一帧`last_action.moved`是否为`true`。`sent=move`只代表发布意图，`moved=true`才是裁判确认移动；`direction`是提交方向，`effective_direction`是实际方向。你提供的日志已有连续`moved=true`，不能把那段记录解释为整场没有执行移动。再核对浏览器的场次、Tick及是否打开了另一个练习进程；这些网页数据只用于人工排查，不输入机器人策略。
 
 材料与修复对应关系见[MATERIALS_CHECK.md](MATERIALS_CHECK.md)。
+
