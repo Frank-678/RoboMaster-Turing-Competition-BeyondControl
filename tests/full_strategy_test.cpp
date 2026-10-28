@@ -510,6 +510,28 @@ void uncertain_fire_escape() {
         prompt.find("another triggered point can still hit it")!=std::string::npos,
         "event prompt lost original notice time or overlapping-fire semantics");
 }
+// 已校验的未来堡垒可以提前赶路/驻留；不会在生效前授予无双，也不追比赛结束后的增益。
+void announced_fortress() {
+  auto fortress=specification("fortress",5,18);fortress["area"]={8,4,8,4};
+  fortress["capture_ticks"]=4;fortress["amount"]=35;fortress["defended_damage"]=7;
+  Strategy bot(2);bot.merge_events(events(fortress));
+  for(int tick=0;tick<=9;++tick) {
+    const int x=std::min(8,4+tick);auto p=fresh(tick,x,4); // 四次成功右移后站住；位置/回执均由夹具明确给出。
+    if(tick>0) p["self"]["last_action"]={{"tick",tick-1},{"action",tick<=4 ? "move" : "defend"},{"moved",tick<=4}};
+    const auto action=bot.decide(p);
+    if(tick==0) check(action["action"]=="move" && action["direction"]=="right" && bot.reason()=="prepare_fortress",
+                      "future fortress did not influence the pre-activation route");
+    if(tick==4) check(action["action"]=="defend" && bot.reason()=="hold_fortress",
+                      "early arrival wandered away before fortress activation");
+    check(bot.event_diagnostics(tick)["empowered"]==(tick>=9),"fortress buff was awarded before actual capture settlement");
+  }
+  auto terminal=fortress;terminal["start"]=500;terminal["end"]=520;
+  Strategy late(2);late.merge_events(events(terminal));late.decide(fresh(498));
+  check(late.reason()!="prepare_fortress" && late.reason()!="hold_fortress","fortress after the game consumed remaining actions");
+  Strategy threatened(2);threatened.merge_events(events(fortress));auto p=fresh();p["self"]["hp"]=15;
+  p["visible_entities"]={robot(1,0)};
+  check(threatened.decide(p)["action"]=="defend","future reward bypassed current lethal attack guard");
+}
 // 验证新Tick、同Tick、旧Tick、换场和坏输入回退。
 void session_contract() {
   rmtc::Session s(2); // 本场景主被测策略/场次。
@@ -532,7 +554,7 @@ void session_contract() {
 void full_scenarios() {
   turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences(); blocked_replanning(); navigation_recovery(); frontier_exploration(); tactical_scenarios();
   combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
-  future_escape_route(); fortress_and_effects(); uncertain_fire_escape(); session_contract();
+  future_escape_route(); fortress_and_effects(); uncertain_fire_escape(); announced_fortress(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
 }
 
@@ -579,6 +601,12 @@ void gateway_scenarios(const std::string &base) {
     std::this_thread::sleep_for(milliseconds(20));
   }
   check(applied, "mock gateway event never reached strategy");
+  const auto flow=session.event_diagnostics(); // 回包成功、校验合并、生效后到达三个事实各有独立计数。
+  check(flow["validated"]==1 && flow["imported"]==1 && flow["known"]==1 && flow["rejected"]==0,
+        "valid HTTP event had no adoption diagnostics");
+  check(flow["request_tick"]==0 && flow["received_tick"].get<int>()>=0 && !flow["last_events"][0].contains("source"),
+        "event timing or evidence-free log summary was lost");
+  session.act(p);check(session.event_diagnostics()==flow,"same tick counted an AI reply twice");
   rmtc::Session fenced(2, config("/fenced")); // 经HTTP收到围栏JSON时，也须进入正式校验及真实策略。
   bool adopted_fenced = false; // 防止只单测解析器而实际HTTP链路仍拒绝包装输出。
   for (int t = 0; t < 50; ++t) {
@@ -589,6 +617,25 @@ void gateway_scenarios(const std::string &base) {
     std::this_thread::sleep_for(milliseconds(10));
   }
   check(adopted_fenced, "fenced HTTP model output never reached strategy");
+  for(const std::string path:{"/expired-event","/invalid-event"}) {
+    rmtc::Session checked(2,config(path));bool consumed=false;
+    for(int t=20;t<60;++t) {
+      auto current=fresh(t);current["event_text"]="fixture announcement";checked.act(current);
+      const auto audit=checked.event_diagnostics();
+      if(audit["replies"].get<unsigned>()>0) {
+        if(path=="/expired-event") check(audit["validated"]==1 && audit["arrived_expired"]==1 && audit["active"]==0,
+                                         "expired response was not distinguished from an active benefit");
+        else check(audit["rejected"]==1 && audit["known"]==0 && audit["last_error"]=="event_contract_rejected",
+                   "HTTP success concealed invalid event fields");
+        current["session_id"]="next-event-session";current["tick"]=0;checked.act(current);
+        check(checked.event_diagnostics()["replies"]==0 && checked.event_diagnostics()["known"]==0,
+              "new session inherited event adoption diagnostics");
+        consumed=true;break;
+      }
+      std::this_thread::sleep_for(milliseconds(10));
+    }
+    check(consumed,"event audit HTTP fixture never completed");
+  }
   rmtc::Session partial(2, config("/partial")); // 含未知项的提案或对应被测场次。
   bool saw_incomplete = false, resolved = false; // 是否观察到unknown尚未补齐的状态。
   for (int t = 0; t < 120; ++t) {

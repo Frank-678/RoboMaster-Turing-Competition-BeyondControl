@@ -120,7 +120,7 @@ void AiWorker::observe(const Json &p, const Json &known_events) {
   if (config_.json_output) body["response_format"] = {{"type", "json_object"}};
   const auto serialized = body.dump(); // 真正发出的JSON文本；发送前检查2MiB上限。
   if (serialized.size() > 2097152) { status_ = "request_too_large"; return; }
-  pending_ = Job{session_, source, serialized, generation_.load()};
+  pending_ = Job{session_, source, serialized, generation_.load(), p.at("tick").get<std::int64_t>()};
   status_ = "queued";
   wake_.notify_one();
 }
@@ -177,6 +177,7 @@ Json AiWorker::diagnostics() const {
 AiWorker::Result AiWorker::perform(const Job &job) {
   Result result; // 结果始终带上来源，任何失败也能回到正确场次判断。
   result.session = job.session; result.source = job.source; result.generation = job.generation;
+  result.request_tick = job.request_tick;
   result.status = "network_error";
   std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), curl_easy_cleanup); // 自动释放本次curl句柄。
   if (!curl) return result;

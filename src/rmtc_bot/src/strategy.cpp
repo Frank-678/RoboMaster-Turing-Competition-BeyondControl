@@ -168,6 +168,15 @@ Json Strategy::known_events() const {
   for (const auto &[key, event] : events_) { (void)key; result.push_back(rmtc::event_summary(event)); }
   return result;
 }
+Json Strategy::event_diagnostics(Tick tick) const {
+  unsigned pending=0,active=0,expired=0; // 是已校验解释的状态，不是假装裁判公开了事件真值。
+  for(const auto &[key,event]:events_) {
+    (void)key;
+    if(tick<event.start) ++pending;else if(tick<event.end) ++active;else ++expired;
+  }
+  return {{"known",events_.size()},{"pending",pending},{"active",active},{"expired",expired},
+    {"empowered",empowered_},{"inverted",reversed_},{"illusion_unknown",reverse_unknown_}};
+}
 bool Strategy::split_wall(Cell cell, Tick tick) const {
   // 规则排除初始出生点。只豁免自己确实知道的出生点，不猜地图对称性。
   if (spawn_ && cell == *spawn_) return false;
@@ -798,13 +807,26 @@ Json Strategy::decide(const Json &p) {
       }
     }
     for (const auto &[key, e] : events_) {
+      if (stage_ == 2 && e.kind == Kind::fortress && !empowered_ && e.start > tick && e.start < tick_limit && e.contains(cell)) {
+        // 路程用已知格BFS。到达后从事件激活/入区两者较晚的Tick开始驻留，不能提前累计进度。
+        const Tick arrival=tick+std::max(0,node.distance-1); // 本TickMOVE在结算后到达，站在原地则是当前Tick。
+        const Tick first_capture=std::max(e.start,arrival);
+        const int needed=e.capture_ticks; // 还未激活，当前不能已有这次堡垒的占领进度。
+        const Tick finish=first_capture+std::max(0,needed-1); // 增益在这一Tick结算后授予，不能补打本Tick。
+        // 只在出发后至多多等一段占领时间时提前抢点；不为遥远预告放弃整局采集。
+        if(finish<std::min(e.end,tick_limit) && e.start-tick<=node.distance+e.capture_ticks) {
+          const Tick wait=std::max<Tick>(0,e.start-arrival); // 早到的等待成本，不修改事件绝对期限。
+          if(cell==start) consider(-1,parameters_.fortress_hold_value/(wait+1),"hold_fortress",cell);
+          else consider(node.first,parameters_.fortress_capture_value/(node.distance+needed+wait),"prepare_fortress",cell);
+        }
+      }
       if (!e.active(tick)) continue;
       if (e.kind == Kind::heal && hp < parameters_.healing_below_hp && healing_until_ <= tick + 2 && e.contains(cell) && cell != start &&
           tick + node.distance - 1 < e.end)
         consider(node.first, std::min(100.0 - hp, e.amount * e.effect_ticks) * 0.2 / (node.distance + 1), "seek_healing", cell);
       if (e.kind == Kind::fortress && !empowered_ && e.contains(cell) &&
           e.end - tick >= node.distance + e.capture_ticks - capture_progress_[key] - (node.distance > 0 ? 1 : 0)) {
-        // 路程太远、事件剩余时间不足就不追；已在堡垒内则重视保住进度。
+        // 生效后的既有策略保持：当前驻留重视进度，外部目标按路程/占领时间比较。
         if (cell == start) consider(-1, parameters_.fortress_hold_value, "hold_fortress");
         else consider(node.first, parameters_.fortress_capture_value / (node.distance + e.capture_ticks), "capture_fortress", cell);
       }
