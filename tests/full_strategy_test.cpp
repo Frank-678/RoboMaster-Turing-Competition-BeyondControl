@@ -74,6 +74,54 @@ void combat_and_missions() {
   p["missions"] = {{{"id", "reach2"}, {"type", "reach"}, {"position", {4, 5}}, {"target", 1}}};
   check(choose(p)["direction"] == "down", "resource cap prevented reach task selection");
 }
+// 四种动作权限状态与裁判观测同步；本地不预测复活倒计时。
+void turn_state_transitions() {
+  auto p = fresh(); // 同一车辆依次收到阵亡、保护、解除保护的公开状态。
+  check(rmtc::turn_mode(p, 1) == rmtc::TurnMode::collecting, "stage1 state was not collecting");
+  p["self"]["alive"] = false;
+  check(rmtc::turn_mode(p, 2) == rmtc::TurnMode::dead && rmtc::action_for(p, {{"action", "defend"}}, 2).is_null(),
+        "dead state allowed an active action");
+  p["self"]["alive"] = true; p["self"]["protected"] = true;
+  check(rmtc::turn_mode(p, 2) == rmtc::TurnMode::guarded, "respawn protection did not enter guarded state");
+  check(rmtc::action_for(p, {{"action", "attack"}, {"direction", "right"}}, 2)["action"] == "defend",
+        "guarded state allowed an attack");
+  check(rmtc::action_for(p, {{"action", "move"}, {"direction", "right"}}, 2)["action"] == "move",
+        "guarded state blocked a legal move");
+  p["self"]["protected"] = false;
+  check(rmtc::turn_mode(p, 2) == rmtc::TurnMode::combat_ready, "protection expiry did not allow combat");
+  p["self"].erase("protected");
+  check(rmtc::turn_mode(p, 2) == rmtc::TurnMode::guarded, "missing protection was treated as attack permission");
+}
+// 同席位连续三帧形成两次相同位移：提前折扣争格/下Tick射线；断帧、无ID、墙前放弃猜测。
+void opponent_prediction() {
+  const auto traffic = [](int tick, int enemy_x, int enemy_y, bool identified = true) {
+    auto p = fresh(tick); // 我方始终在[4,4]；两份资源价值相同，原顺序优先向上。
+    auto enemy = robot(enemy_x - 4, enemy_y - 4); // 夹具只给本队可见的敌车状态。
+    if (identified) enemy["team"] = "B";
+    p["visible_entities"] = {entity("resource_normal", 0, -1), entity("resource_normal", 1, 0), enemy};
+    return p;
+  };
+  auto last = traffic(2, 3, 3); // 敌车若继续向右，将与我方争[4,3]。
+  check(choose(last)["direction"] == "up", "single observation fabricated an opponent trajectory");
+  Strategy contested(2); contested.decide(traffic(0, 1, 3)); contested.decide(traffic(1, 2, 3));
+  check(contested.decide(last)["direction"] == "right", "stable opponent trajectory did not affect a contested resource");
+  Strategy pressure(2); pressure.decide(traffic(0, 1, 2)); pressure.decide(traffic(1, 2, 2));
+  check(pressure.decide(traffic(2, 3, 2))["direction"] == "right", "next-tick firing line was ignored");
+  Strategy blocked(2); blocked.decide(traffic(0, 1, 2)); blocked.decide(traffic(1, 2, 2));
+  auto wall = traffic(2, 3, 2); // 敌车预测落点[4,2]实际是已知墙，不能继续外推。
+  wall["visible_entities"].push_back(entity("obstacle", 0, -2));
+  check(blocked.decide(wall)["direction"] == "up", "opponent prediction moved through a known wall");
+  Strategy gap(2); gap.decide(traffic(0, 1, 3)); gap.decide(traffic(1, 2, 3));
+  check(gap.decide(traffic(5, 3, 3))["direction"] == "up", "stale observations were treated as consecutive movement");
+  Strategy anonymous(2); anonymous.decide(traffic(0, 1, 3, false)); anonymous.decide(traffic(1, 2, 3, false));
+  check(anonymous.decide(traffic(2, 3, 3, false))["direction"] == "up", "anonymous opponents were matched by position");
+  contested.reset();
+  check(contested.decide(last)["direction"] == "up", "new match inherited old opponent motion");
+  Strategy lethal(2); lethal.decide(traffic(0, 1, 4)); lethal.decide(traffic(1, 2, 4));
+  auto hurt = traffic(2, 3, 4); hurt["self"]["hp"] = 15; // 本Tick已经在射程，预测不应允许MOVE逃掉当前攻击。
+  check(lethal.decide(hurt)["action"] == "defend", "future prediction overrode current lethal combat");
+}
+// 验证封顶跨线、小数D、死亡扣除及官方D下降后的重新决策。
 void capped_score_decisions() {
   check(std::abs(rmtc::score_delta(119, 20, 120, 30) - 0.25) < 1e-9, "resource cap crossing arithmetic");
   check(rmtc::score_delta(120, 20, 120, 30) == 0, "resource cap arithmetic");
@@ -237,8 +285,9 @@ void session_contract() {
 }  // namespace
 
 void full_scenarios() {
-  combat_and_missions(); capped_score_decisions(); event_validation(); hazard_and_illusion();
-  fortress_and_effects(); session_contract();
+  turn_state_transitions(); opponent_prediction();
+  combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
+  future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
 }
 

@@ -53,18 +53,26 @@ public:
 private:
   void on_perception(const Message &msg) {
     try {
-      const auto p = Json::parse(msg.data);
-      const auto action = session_->act(p);
-      if (!action) return;
-      Message out;
-      out.data = action->dump();
-      action_pub_->publish(out);
-      const auto receipt = p["self"].value("last_action", Json()).dump();
-      RCLCPP_INFO(get_logger(), "tick=%lld sent=%s reason=%s ai=%s http_success=%d last_action=%s",
+      const auto p = Json::parse(msg.data); // 当前完整公开感知。
+      const auto action = session_->act(p); // 可选完整动作；为空时本回调不发布。
+      if (action) {
+        Message out; // 待发布的ROS消息外壳。
+        out.data = action->dump();
+        action_pub_->publish(out);
+      }
+      const auto receipt = p["self"].value("last_action", Json()).dump(); // 上Tick真实执行结果，供人工核对。
+      const auto position = p["self"].value("position", Json()).dump(); // 裁判给出的当前绝对坐标，不按指令累加。
+      const auto session = p.at("session_id").get<std::string>(); // 用它确认终端和网页在看同一场。
+      const auto sent = action ? action->at("action").get<std::string>() : "none"; // none表示本回调未发布。
+      const auto direction = action ? action->value("direction", std::string("-")) : "-"; // 计划方向，区别于回执的实际方向。
+      const auto ai = session_->ai_diagnostics().dump(); // 本场HTTP统计和最近传输状态。
+      const auto mode = rmtc::turn_mode_name(rmtc::turn_mode(p, cfg::stage)); // 本帧动作权限状态，与状态机图一致。
+      RCLCPP_INFO(get_logger(), "session=%s tick=%lld pos=%s mode=%s sent=%s direction=%s reason=%s ai=%s http_success=%d ai_calls=%s last_action=%s",
+                  session.c_str(),
                   static_cast<long long>(rmtc::frame_tick(p)),
-                  action->at("action").get<std::string>().c_str(), session_->reason().c_str(),
-                  session_->ai_status().c_str(), session_->ai_http_success(), receipt.c_str());
-    } catch (const std::exception &e) {
+                  position.c_str(), mode, sent.c_str(), direction.c_str(), session_->reason().c_str(),
+                  session_->ai_status().c_str(), session_->ai_http_success(), ai.c_str(), receipt.c_str());
+    } catch (const std::exception &e) { // e只输出错误原因，不输出感知全文、令牌或请求头。
       RCLCPP_WARN(get_logger(), "Skipping invalid perception: %s", e.what());
     }
   }
@@ -95,3 +103,4 @@ int main(int argc, char **argv) {
   rclcpp::shutdown();
   return status;
 }
+

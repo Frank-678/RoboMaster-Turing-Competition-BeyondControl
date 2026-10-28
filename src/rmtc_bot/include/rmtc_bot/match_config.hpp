@@ -28,4 +28,7 @@ inline constexpr double healing_below_hp = 70.0;     // 低于此血量才主动
 inline constexpr double fortress_hold_value = 20.0;  // 保住尚未完成的驻留进度。
 inline constexpr double fortress_capture_value = 12.0; // 前往堡垒的收益分子。
 inline constexpr int hazard_lead_ticks = 2;          // 比最短退出时间再提前几Tick。
+inline constexpr double opponent_contest_cost = 1.0; // 稳定轨迹预计争同格时，给路线增加一份等待成本；启发式，非概率。
+inline constexpr double opponent_pressure_cost = 0.25; // 下一Tick可能进入稳定轨迹敌车射线时的软成本，不改变攻击时序。
 }  // namespace rmtc::match_config
+
