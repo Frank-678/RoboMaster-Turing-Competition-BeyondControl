@@ -37,20 +37,24 @@ inline constexpr const char *practice_llm_proxy = ""; // 上游出网代理；�
 
 // 下面只调策略取舍。攻击距离、伤害、计分公式和结算顺序按规则实现，不在这里调。
 inline constexpr double stale_resource_decay = 0.01; // 资源记忆每Tick衰减系数。
-inline constexpr double resource_mission_bonus = 4.0; // 未完成采集任务时的额外权重。
-inline constexpr double reach_mission_value = 4.0;    // 到点任务权重，还会除以距离+1。
+inline constexpr double resource_mission_bonus = 5.0; // 未完成采集任务时的额外权重。
+inline constexpr double reach_mission_value = 8.0;    // 到点任务权重，还会除以距离+1。
 inline constexpr double healing_below_hp = 40.0;     // 低于此血量才主动找治疗点。
 inline constexpr double fortress_hold_value = 20.0;  // 保住尚未完成的驻留进度。
 inline constexpr double fortress_capture_value = 12.0; // 前往堡垒的收益分子。
 inline constexpr int hazard_lead_ticks = 2;          // 比最短退出时间再提前几Tick。
-inline constexpr double goal_retention_bonus = 0.1; // 同一有效目标给10%排序余量，抑制小波动；不是官方加分。
+inline constexpr double goal_retention_bonus = 0.0; // 同一有效目标的排序余量；调参未发现正向作用，关闭。
 inline constexpr int resource_plan_depth = 4;       // 资源串最多扩展4个目标，不是完整战斗树或3Tick。
 inline constexpr int resource_beam_width = 5;       // 每层最多保留5条未执行计划，优先保留不同首方向。
 inline constexpr int resource_candidate_limit = 8;  // 先按现有收益/距离挑8个资源；地图资源数不写死。
 inline constexpr int resource_plan_budget_ms = 10;  // 额外搜索软预算；耗尽时交回已算好的合法基线。
-inline constexpr double frontier_value = 0.02;      // 每份潜在新视野的信息权重；不是资源分或必然有资源的概率。
+inline constexpr double frontier_value = 0.02;      // 每份潜在新视野的信息权重；不是资源分或必然有资源的概率。第二阶段扫图与任务/交战公平竞争。
+inline constexpr double explore_toward_resource_value = 0.5; // 已知资源绕行过远/未连通时，向它试探边界格的机会权重。只影响排序，不把未知格当空地；gate-frontier调参在组合中验证为正。
+inline constexpr double mission_explore_value = 0.0; // 沿到点任务方向探路的权重（除以距离+1）；到点任务没有截止时间，拉拽会在资源比赛早期拖离采集线，关闭。
+inline constexpr double explore_tour_value = 0.03; // 第一阶段空档期，把散布的边界观察点排成小巡回的机会权重；0为关闭。
 inline constexpr double opponent_contest_cost = 1.0; // 稳定轨迹预计争同格时，给路线增加一份等待成本；启发式，非概率。
 inline constexpr double opponent_pressure_cost = 0.25; // 下一Tick可能进入稳定轨迹敌车射线时的软成本，不改变攻击时序。
+inline constexpr double opponent_claim_discount = 0.5; // 敌车直线距离不比自己绕障距离长时的资源估值乘数；小于1.0则避开会被先拿走的资源。
 inline constexpr bool loop_recovery = true; // 真实位置在小区域反复、且没有实际进展时脱离循环。
 inline constexpr int loop_window_ticks = 12; // 至少12份连续可信回执；能识别周期1至6及四格内徘徊。
 inline constexpr int recovery_ticks = 12; // 脱困目标最多坚持12Tick，每帧仍检查道路和危险。
@@ -61,7 +65,7 @@ inline constexpr int resource_refinement_trials = 12; // 每帧最多12次局部
 inline constexpr bool tactical_search = false;       // 保留三Tick搜索供赛前试验；本轮训练选中关闭，不假定更复杂必然更强。
 inline constexpr double tactical_risk = 0.6;        // 最差情景的权重；不是经训练的概率。
 inline constexpr double tactical_hp_value = 0.015;   // 每HP的未来机会估值，不写入官方分数。
-inline constexpr double tactical_death_cost = 0.25;   // 除规则D扣除外，死亡丢失位置/行动窗口的估值。
+inline constexpr double tactical_death_cost = 0.0;   // 除规则D扣除外，死亡丢失位置/行动窗口的估值；调参未发现正向作用。
 inline constexpr double tactical_future_discount = 0.65; // 第二Tick相对第一Tick的收益权重。
 inline constexpr double tactical_goal_weight = 0.65; // 原目标评价在战术比较中的尾部价值。
 }  // namespace rmtc::match_config
