@@ -130,3 +130,12 @@ opponent_claim_discount（敌车直线距离不比自己绕障距离长时的资
 结果：全程变体ring1/2 R 166.7→164.2、ring4→165.0——rooms-401 +10、lanes-448(ring4) +10，但open-307 −10、crossroads-336 −10、crossroads-542 −20（其未收格正是近出生点）、rooms-195不变。开场限定t<40变体更差（R 161.7，open-101开场巡回被重排后190→150崩40）。阶段二比特级隔离确认（tour块stage==1限定）。
 
 结论：巡回路点重排会扰动整条采集链排序；冠军的巡回/frontier顺序是经验局部最优，近出生点偏置两个变体全负。不晋升，参数默认0.0关闭，冠军不变，封存heldout复用0.8437。不宣称留出更差的结果是提升。
+
+## 本轮验证边界（2026-10-29 任务时机与路径避让轮）
+
+参数空间最后两组未测权重的合批扫描（arena-mission-avoid-2026-10-29.json），24训练场景：
+
+- 任务时机族：miss+（reach 12/bonus 8/fortress 30/20）与miss-（reach 4/bonus 2/fortress 10/6）阶段二与s04比特级相同（M=2.58纹丝不动）——任务完成度是R竞速的下游（此前结论第三次确认），权重上下沿完全惰性；阶段一同样比特级相同（无任务无对手，权重不触发）。
+- 路径避让族：avoid+（contest 2.0/pressure 0.5）R不变、D略降、win+1局噪音；avoid-（contest 0.5/pressure 0.0）R 58.3（open-307 100→80）、score 40.83。冠军1.0/0.25处于边界：降低会丢抢饼，提高无实质变化。
+
+至此全部可写参数双向测尽：探索（frontier/tour/flood/toward）、战斗（assassin/discount/race gate）、claim、记忆衰减、治疗阈值、规划预算（depth/beam/candidates/budget）、ring轴、任务权重、路径避让——冠军在每个轴上都是经验局部最优，无一晋升。均不晋升；冠军参数不变；封存heldout复用0.8437（阶段一32.67、阶段二43.89）。不宣称留出更差的结果是提升。
