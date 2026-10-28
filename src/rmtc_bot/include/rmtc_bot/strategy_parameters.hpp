@@ -10,7 +10,7 @@ struct StrategyParameters {
   double fortress_hold_value, fortress_capture_value, goal_retention_bonus, frontier_value;
   double opponent_contest_cost, opponent_pressure_cost;
   int hazard_lead_ticks, resource_plan_depth, resource_beam_width, resource_candidate_limit, resource_plan_budget_ms;
-  bool resource_refinement;
+  bool collision_replan, resource_refinement;
   int resource_refinement_trials;
   bool tactical_search;
   double tactical_risk, tactical_hp_value, tactical_death_cost, tactical_future_discount, tactical_goal_weight;
@@ -20,7 +20,7 @@ struct StrategyParameters {
       c::fortress_hold_value,c::fortress_capture_value,c::goal_retention_bonus,c::frontier_value,
       c::opponent_contest_cost,c::opponent_pressure_cost,c::hazard_lead_ticks,c::resource_plan_depth,
       c::resource_beam_width,c::resource_candidate_limit,c::resource_plan_budget_ms,
-      c::resource_refinement,c::resource_refinement_trials,c::tactical_search,
+      c::collision_replan,c::resource_refinement,c::resource_refinement_trials,c::tactical_search,
       c::tactical_risk,c::tactical_hp_value,c::tactical_death_cost,c::tactical_future_discount,c::tactical_goal_weight};
   }
   void validate() const {

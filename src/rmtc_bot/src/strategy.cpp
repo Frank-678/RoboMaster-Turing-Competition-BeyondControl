@@ -81,7 +81,7 @@ Strategy::Strategy(int stage, rmtc::StrategyParameters parameters) : stage_(stag
 void Strategy::reset() {
   tiles_.clear(); probe_attempts_.clear(); history_.clear(); events_.clear(); capture_progress_.clear(); spawn_.reset();
   opponents_.clear(); // 不把上一场或旧席位的轨迹带入新场。
-  planned_resources_.clear();
+  planned_resources_.clear();move_attempt_.reset();failed_destination_.reset();failed_moves_=0;
   goal_.reset(); // 新场没有上一目标，也没有必须继续执行的旧路线。
   model_reply_seen_ = resource_counts_known_ = false;
   observed_normal_ = observed_high_ = 0; previous_score_tick_ = -1; previous_resource_total_ = 0;
@@ -372,6 +372,7 @@ void Strategy::update_effects(Tick tick) {
 }
 
 Json Strategy::decide(const Json &p) {
+  const auto previous_attempt=std::exchange(move_attempt_,std::nullopt); // 只验证意图是否被真实回执执行。
   const auto previous_plan=std::exchange(planned_resources_,std::vector<Cell>()); // 旧串仅是待重评候选，提前返回即失效。
   const auto previous_goal = std::exchange(goal_, std::nullopt); // 先取出旧目标；异常、死亡和提前避险都不会续签它。
   const auto fallback = [&](const char *reason) {
@@ -408,6 +409,11 @@ Json Strategy::decide(const Json &p) {
       moved = receipt.value("moved", false) && receipt.value("action", std::string()) == "move";
     }
   }
+  if (previous_attempt && previous_attempt->tick==tick-1 && previous_attempt->from==start &&
+      receipt_tick==tick-1 && receipt.value("action",std::string())=="move" && !moved && !respawn) {
+    if (failed_destination_==previous_attempt->destination) ++failed_moves_;
+    else {failed_destination_=previous_attempt->destination;failed_moves_=1;}
+  } else {failed_destination_.reset();failed_moves_=0;}
   const bool keep_goal = previous_goal && previous_goal->tick == tick - 1 && !respawn &&
       !(receipt_tick >= 0 && receipt.value("action", std::string()) == "move" && !moved);
   // 上次MOVE失败时不发迟滞奖励，让重算路线及时换路；目标是否还存在仍由本帧候选决定。
@@ -489,7 +495,7 @@ Json Strategy::decide(const Json &p) {
   // 规划始终用世界方向。只有最后发MOVE时补偿幻术，ATTACK方向保持不变。
   const auto move = [&](int step, const char *reason) {
     // step是世界方向索引；reason记录为什么选它，返回前才补偿幻术。
-    reason_ = reason;
+    reason_ = reason;move_attempt_=MoveAttempt{start,{start.first+steps[step].first,start.second+steps[step].second},tick};
     return Json{{"action", "move"}, {"direction", directions[reversed_ ? (step + 2) % 4 : step]}};
   };
   // 3. 先算移动前的危险。先挨打、存活后才移动，当前MOVE救不了已命中的攻击。
@@ -547,7 +553,21 @@ Json Strategy::decide(const Json &p) {
   };
 
   // 4. 在已知地图上BFS。每格只保存第一步和距离，每帧都会重算。
-  const auto safe_steps = safe_first_steps(start, tick, occupied); // 五个第一步的安全接续标志。
+  auto safe_steps = safe_first_steps(start, tick, occupied); // 五个第一步的安全接续标志。
+  if (parameters_.collision_replan && failed_moves_>=2 && failed_destination_) {
+    int alternative=-1;
+    for (int direction=0;direction<4;++direction) {
+      const Cell next{start.first+steps[direction].first,start.second+steps[direction].second};
+      const auto tile=tiles_.find(next);
+      if (next!=*failed_destination_ && safe_steps[direction] && tile!=tiles_.end() && tile->second.seen &&
+          !tile->second.wall && !occupied.count(next) && !split_wall(next,tick) && !dangerous(next,tick+1) &&
+          possible_fire(next)<hp-pre_damage) alternative=direction;
+    }
+    if (alternative>=0) {
+      const int repeated=ray(start,*failed_destination_);
+      if (repeated>=0) safe_steps[repeated]=false; // 只避开本Tick首步；目标和后续路段仍重新BFS。
+    }
+  }
   struct Node { int first, distance; }; // first是起点第一步方向，-1表示起点；distance是最少步数。
   std::map<Cell, Node> paths; // 每个已到达格子的最短路径摘要。
   std::vector<Cell> order; // BFS弹出顺序，后续按这个稳定顺序评估目标。
