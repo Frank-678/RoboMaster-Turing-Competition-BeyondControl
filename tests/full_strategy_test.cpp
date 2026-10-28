@@ -187,6 +187,43 @@ void blocked_replanning() {
   check(strategy.decide(p)["direction"]!="right","two repeated blocked moves did not choose a legal alternate first step");
   strategy.reset();check(strategy.decide(p)["direction"]=="right","new match inherited collision history");
 }
+// 两点真实往返也算卡住；正常前进、真实收益、堡垒驻留和缺回执不应误报。
+void navigation_recovery() {
+  auto parameters=rmtc::StrategyParameters::competition();parameters.loop_recovery=true;
+  Strategy cycling(2,parameters),rewarded(2,parameters),untrusted(2,parameters),walking(2,parameters);
+  const std::vector<rmtc::Cell> forward={{4,4},{5,4},{6,4},{7,4},{8,4},{8,5},{7,5},{6,5},{5,5},{4,5},{3,5},{2,5},{1,5},{0,5},{0,6},{1,6},{2,6},{3,6},{4,6},{5,6}};
+  for(int tick=0;tick<20;++tick) {
+    auto p=fresh(tick,4,tick%2); // 所有MOVE回执成功，但车始终只在上沿两格之间。
+    if(tick>0) p["self"]["last_action"]={{"tick",tick-1},{"action","move"},{"moved",true}};
+    cycling.decide(p);
+    p["score"]["effective_damage"]=tick*10;rewarded.decide(p); // 官方D确实增加，不能因原地/往返就放弃有效战斗。
+    p["score"]["effective_damage"]=0;p["self"]["last_action"]=nullptr;untrusted.decide(p);
+    p=fresh(tick,forward[tick].first,forward[tick].second);
+    if(tick>0) p["self"]["last_action"]={{"tick",tick-1},{"action","move"},{"moved",true}};
+    walking.decide(p); // 已知9×9内持续前进，没得分不等于卡住。
+  }
+  check(cycling.navigation_diagnostics()["recoveries"].get<int>()>0,"successful two-cell oscillation was not detected");
+  check(rewarded.navigation_diagnostics()["recoveries"]==0,"real damage progress was mistaken for stagnation");
+  check(untrusted.navigation_diagnostics()["recoveries"]==0,"missing receipts created a fake continuous loop");
+  check(walking.navigation_diagnostics()["recoveries"]==0,"forward traversal of known terrain was mistaken for a loop");
+  auto gap=fresh(40,4,0);cycling.decide(gap);
+  check(!cycling.navigation_diagnostics()["recovering"].get<bool>(),"gap retained an unverified escape plan");
+  cycling.reset();check(cycling.navigation_diagnostics()["recoveries"]==0,"new session retained loop counters");
+  Strategy holding(2,parameters);rmtc::Event fortress;fortress.kind=rmtc::EventKind::fortress;
+  fortress.key="long-capture";fortress.start=0;fortress.end=100;fortress.area={4,4,4,4};fortress.capture_ticks=30;fortress.amount=50;fortress.defended_damage=10;
+  holding.merge_events({fortress});
+  for(int tick=0;tick<20;++tick) {
+    auto p=fresh(tick);if(tick>0)p["self"]["last_action"]={{"tick",tick-1},{"action","defend"},{"moved",false}};
+    check(holding.decide(p)["action"]=="defend","loop recovery interrupted fortress progress");
+  }
+  check(holding.navigation_diagnostics()["recoveries"]==0,"confirmed fortress progress was mistaken for stagnation");
+  Strategy lethal(2,parameters);
+  for(int tick=0;tick<20;++tick) {
+    auto p=fresh(tick);p["self"]["hp"]=15;p["visible_entities"]={robot(1,0)};
+    if(tick>0)p["self"]["last_action"]={{"tick",tick-1},{"action","defend"},{"moved",false}};
+    check(lethal.decide(p)["action"]=="defend","loop recovery bypassed current lethal combat guard");
+  }
+}
 // 靠上边界时继续向上没有信息增益；用当前实际视野半径选能揭开未知格的方向。
 void frontier_exploration() {
   auto p = fresh(0, 4, 1); p["vision_radius"] = 1;
@@ -474,7 +511,7 @@ void session_contract() {
 
 // 汇总运行全部第二阶段核心场景；不需要网络或ROS。
 void full_scenarios() {
-  turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences(); blocked_replanning(); frontier_exploration(); tactical_scenarios();
+  turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences(); blocked_replanning(); navigation_recovery(); frontier_exploration(); tactical_scenarios();
   combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
   future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";

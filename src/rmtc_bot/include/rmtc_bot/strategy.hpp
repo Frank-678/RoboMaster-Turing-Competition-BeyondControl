@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <deque>
 #include <map>
 #include <optional>
 #include <set>
@@ -26,6 +27,7 @@ public:
   // 把已校验事件交给下一次LLM请求，避免模型反复“重新发现”同一个事件。
   nlohmann::json known_events() const;
   const std::string &reason() const { return reason_; } // 最近动作的原因，供日志解释。
+  nlohmann::json navigation_diagnostics() const; // 日志：无进展多久、循环次数、脱困目标；不暴露真值。
   void note_model_reply() { model_reply_seen_ = true; } // 本场已见非mock模型正文；仅影响收益假设，不冒充裁判资格。
 
 private:
@@ -56,6 +58,12 @@ private:
     std::string kind; // 资源、任务、治疗等目标类别，避免同坐标不同用途被误认。
     Tick tick; // 做出这次选择的Tick；断帧、复活和换场后不沿用迟滞。
   };
+  struct NavigationSample {
+    Tick tick; Cell position; // 连续可信感知中的真实回合与位置，发MOVE不会改变它。
+    std::optional<Goal> goal; // 上一Tick试图追的目标，只用于暂缓失败吸引点。
+  };
+  void observe_navigation(const nlohmann::json &perception, Cell position, Tick tick, Tick receipt_tick,
+      bool respawn, const std::optional<Goal> &previous_goal); // 进展来自官方成绩、回执、实际视野与效果。
   struct ResourcePlan {
     int first; // 本Tick世界方向，最后发送时才处理幻术反转。
     Cell first_resource; // 路上最先拿到的资源，也是目标迟滞使用的坐标。
@@ -94,6 +102,16 @@ private:
   std::optional<MoveAttempt> move_attempt_;
   std::optional<Cell> failed_destination_; // 连续失败的同一落点。
   unsigned failed_moves_ = 0; // 当前落点被回执连续拒绝的次数。
+  std::deque<NavigationSample> recent_navigation_; // 至多一个检测窗口，不按意图预测轨迹。
+  std::set<Cell> loop_cells_; // 触发时反复经过的格子；脱困目的地选到这个集合以外。
+  std::optional<Cell> recovery_goal_; // 有效期间坚持的安全目的地，不是一串必须执行的动作。
+  Tick recovery_until_ = -1, navigation_tick_ = -1, progress_tick_ = -1; // 脱困截止、最近观测、最近真实进展。
+  double navigation_r_ = 0, navigation_d_ = 0, navigation_hp_ = 0; // 上次R/D/HP，用于识别实际收益和回血。
+  std::size_t navigation_known_ = 0, navigation_missions_ = 0; // 已观测格数、完成任务数。
+  int navigation_capture_ = 0; // 已确认堡垒驻留进度之和。
+  bool recovery_blocked_ = false; // 已验证当前循环区无安全出口时持续守住，每帧重查，不再反复启动空跑。
+  unsigned recovery_count_ = 0; // 本场触发次数，换场清零。
+  std::map<std::pair<std::string,Cell>,Tick> deferred_goals_; // 目标类别/坐标→暂缓截止，不改地图可走性。
   std::vector<Cell> planned_resources_; // 仅供下一帧重评的资源串；换场、断帧、失败和改目标后清空。
   bool model_reply_seen_ = false, resource_counts_known_ = false;
   int observed_normal_ = 0, observed_high_ = 0; // 连续完整历史下，从官方R增量确认的拾取次数。

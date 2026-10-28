@@ -82,12 +82,65 @@ void Strategy::reset() {
   tiles_.clear(); probe_attempts_.clear(); history_.clear(); events_.clear(); capture_progress_.clear(); spawn_.reset();
   opponents_.clear(); // 不把上一场或旧席位的轨迹带入新场。
   planned_resources_.clear();move_attempt_.reset();failed_destination_.reset();failed_moves_=0;
+  recent_navigation_.clear();loop_cells_.clear();recovery_goal_.reset();deferred_goals_.clear();
+  recovery_until_=navigation_tick_=progress_tick_=-1;recovery_count_=0;recovery_blocked_=false;
+  navigation_r_=navigation_d_=navigation_hp_=0;navigation_known_=navigation_missions_=0;navigation_capture_=0;
   goal_.reset(); // 新场没有上一目标，也没有必须继续执行的旧路线。
   model_reply_seen_ = resource_counts_known_ = false;
   observed_normal_ = observed_high_ = 0; previous_score_tick_ = -1; previous_resource_total_ = 0;
   width_ = height_ = 0; reversed_ = reverse_unknown_ = empowered_ = false;
   vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
   healing_amount_ = 0; reason_ = "new_session";
+}
+// 只用已执行的连续观测识别“动了但没进展”；没有可信回执就重新积累窗口。
+void Strategy::observe_navigation(const Json &p, Cell position, Tick tick, Tick receipt_tick,
+    bool respawn, const std::optional<Goal> &previous_goal) {
+  if (!parameters_.loop_recovery) return;
+  const auto score=p.value("score",Json::object());
+  const double resource=score.value("resource_value",0.0),damage=score.value("effective_damage",0.0);
+  const double hp=p.at("self").value("hp",0.0);
+  const auto missions=score.value("mission_completed_ids",Json::array()).size();
+  int capture=0;for(const auto &[key,count]:capture_progress_) { (void)key;capture+=count; }
+  const bool discontinuous=navigation_tick_!=tick-1 || (tick>0 && receipt_tick!=tick-1) || respawn;
+  for(auto it=deferred_goals_.begin();it!=deferred_goals_.end();) {
+    if(it->second<=tick) it=deferred_goals_.erase(it);else ++it;
+  }
+  if(discontinuous) {
+    recent_navigation_.clear();loop_cells_.clear();recovery_goal_.reset();deferred_goals_.clear();
+    recovery_until_=-1;progress_tick_=tick;recovery_blocked_=false;
+  }
+  const bool progress=discontinuous || resource>navigation_r_ || damage>navigation_d_ || hp>navigation_hp_ ||
+    tiles_.size()>navigation_known_ || missions>navigation_missions_ || capture>navigation_capture_;
+  if(progress) {
+    recent_navigation_.clear();progress_tick_=tick;
+    if(recovery_blocked_) {recovery_blocked_=false;loop_cells_.clear();recovery_goal_.reset();recovery_until_=-1;}
+  }
+  navigation_tick_=tick;navigation_r_=resource;navigation_d_=damage;navigation_hp_=hp;
+  navigation_known_=tiles_.size();navigation_missions_=missions;navigation_capture_=capture;
+  // 新视野本身不会打断尚有效的脱困目标，防止刚挪一步又被旧吸引点拉回。
+  recent_navigation_.push_back({tick,position,previous_goal});
+  while(recent_navigation_.size()>static_cast<std::size_t>(parameters_.loop_window_ticks)) recent_navigation_.pop_front();
+  if(recent_navigation_.size()<static_cast<std::size_t>(parameters_.loop_window_ticks)) return;
+  std::set<Cell> cells;for(const auto &sample:recent_navigation_) cells.insert(sample.position);
+  bool periodic=false;
+  for(std::size_t period=1;period*2<=recent_navigation_.size();++period) {
+    bool matches=true;
+    for(std::size_t i=period;i<recent_navigation_.size();++i)
+      matches=matches && recent_navigation_[i].position==recent_navigation_[i-period].position;
+    periodic=periodic || matches;
+  }
+  if(!periodic && cells.size()>4) return; // 长走廊前进、扩大探索等不会仅因低分就被判卡住。
+  for(const auto &sample:recent_navigation_) if(sample.goal && sample.goal->kind!="unstuck")
+    deferred_goals_[{sample.goal->kind,sample.goal->position}]=tick+parameters_.stalled_goal_cooldown_ticks;
+  if(recovery_blocked_) loop_cells_.insert(cells.begin(),cells.end());else loop_cells_=std::move(cells);
+  recovery_goal_.reset();recovery_until_=tick+parameters_.recovery_ticks;
+  recent_navigation_.clear();if(!recovery_blocked_) ++recovery_count_;
+}
+Json Strategy::navigation_diagnostics() const {
+  return {{"stagnant_ticks",navigation_tick_<0 || progress_tick_<0 ? 0 : navigation_tick_-progress_tick_},
+    {"recoveries",recovery_count_},{"recovering",navigation_tick_>=0 && navigation_tick_<recovery_until_},
+    {"target",recovery_goal_ ? Json{recovery_goal_->first,recovery_goal_->second} : Json()},
+    {"deferred_goals",deferred_goals_.size()},{"no_safe_exit",recovery_blocked_}};
 }
 std::optional<Strategy::Cell> Strategy::predict_opponent(const std::string &identity, Cell position, Tick tick) {
   if (identity.empty()) return std::nullopt;
@@ -421,7 +474,10 @@ Json Strategy::decide(const Json &p) {
   history_[tick] = Snapshot{start, alive, protected_spawn, respawn, moved, receipt_tick};
   if (alive && (tick == 0 || self.value("position_reason", std::string()) == "initial")) spawn_ = start;
   update_effects(tick);
-  if (!alive) return skip("dead");
+  if (!alive) {
+    recent_navigation_.clear();loop_cells_.clear();recovery_goal_.reset();deferred_goals_.clear();
+    recovery_until_=navigation_tick_=-1;recovery_blocked_=false;return skip("dead");
+  }
 
   // 2. 把当前可见实体换成绝对坐标，覆盖当前视野；视野外保留旧记忆。
   std::vector<Entity> entities; // 当前帧的实体，先校验完再更新地图。
@@ -483,6 +539,7 @@ Json Strategy::decide(const Json &p) {
     }
   }
   ++tiles_.at(start).visits;
+  observe_navigation(p,start,tick,receipt_tick,respawn,previous_goal);
   for (auto &enemy : enemies) {
     enemy.forecast = predict_opponent(enemy.identity, enemy.position, tick);
     if (!enemy.forecast || *enemy.forecast == enemy.position) continue;
@@ -674,6 +731,10 @@ Json Strategy::decide(const Json &p) {
       utility /= 1.0 + parameters_.opponent_contest_cost * contests + parameters_.opponent_pressure_cost * pressures;
     }
     const std::string kind = std::string(reason) == "collect_resource_chain" ? "collect_resource" : reason;
+    if(target) {
+      const auto deferred=deferred_goals_.find({kind,*target});
+      if(deferred!=deferred_goals_.end() && tick<deferred->second) return false; // 只暂缓收益目标，不把道路封掉。
+    }
     if (keep_goal && target && previous_goal->kind == kind && previous_goal->position == *target)
       utility *= 1.0 + parameters_.goal_retention_bonus; // 只影响排序，危险守卫已在前面执行。
     const int index = step < 0 ? 4 : step;
@@ -751,11 +812,12 @@ Json Strategy::decide(const Json &p) {
       }
     }
     for (const auto &enemy : enemies) {
-      if (!enemy.protected_spawn && node.first >= 0 && ray(cell, enemy.position) >= 0) {
+      if (!enemy.protected_spawn && node.first >= 0 && ray(cell, enemy.position) >= 0 &&
+          !(reflection && enemy.defending)) { // 当前预测攻击只会反伤，就不奖励反复接近同一防御目标。
         const double damage = enemy.defending ? defended_damage_ : attack_damage_; // 接近后按当前可见状态估计伤害。
         const double contribution = std::min(damage, enemy.hp) + (enemy.hp <= damage ? 60.0 : 0.0); // 实际损血加可能击杀奖励。
         consider(node.first, (combat_value(contribution) + (need_damage ? 0.5 : 0.0)) /
-                 (node.distance + 2), "approach_enemy");
+                 (node.distance + 2), "approach_enemy", enemy.position);
       }
     }
   }
@@ -827,6 +889,40 @@ Json Strategy::decide(const Json &p) {
       utility -= reflected * 0.05;
       if (reflected + pre_damage >= hp) continue;
       if (utility > attack_utility) { attack_utility = utility; attack_direction = direction; }
+    }
+  }
+  // 脱困只覆盖无益循环；当前致命防御/公告避险已在前面处理，有实际攻击收益时仍允许攻击。
+  if(parameters_.loop_recovery && tick<recovery_until_ && !reverse_unknown_ && attack_utility<=0) {
+    if(recovery_goal_ && *recovery_goal_==start) {recovery_goal_.reset();recovery_until_=-1;}
+    else {
+      const auto available=[&](Cell cell) {
+        const auto path=paths.find(cell);
+        return path!=paths.end() && path->second.first>=0 && path->second.distance<=recovery_until_-tick;
+      };
+      if(recovery_goal_ && !available(*recovery_goal_)) recovery_goal_.reset(); // 动态占位或危险改变就重选安全目标。
+      if(!recovery_goal_) {
+        std::optional<std::tuple<bool,double,bool,int,int,int>> best_escape;
+        const std::string team=self.value("team",std::string("A"));
+        const int seat=team.size()==1 && team[0]>='A' && team[0]<='D' ? team[0]-'A' : 0;
+        for(const Cell &cell:order) {
+          const auto path=paths.at(cell);const auto &tile=tiles_.at(cell);
+          if(!available(cell) || loop_cells_.count(cell) || path.distance>6) continue;
+          int unknown=0;
+          for(int y=std::max(0,cell.second-radius);y<=std::min(height-1,cell.second+radius);++y)
+            for(int x=std::max(0,cell.first-radius);x<=std::min(width-1,cell.first+radius);++x) {
+              const auto at=tiles_.find({x,y});unknown+=at==tiles_.end() || !at->second.seen;
+            }
+          // 先争取新视野，再少访问格；相同条件按公开席位打破两车完全对称的选择。
+          const auto value=std::make_tuple(unknown>0,unknown/(path.distance+1.0),tile.visits==0,
+            -static_cast<int>(std::min(tile.visits,1000000U)),path.distance,-((path.first-seat+4)%4));
+          if(!best_escape || value>*best_escape) {best_escape=value;recovery_goal_=cell;}
+        }
+      }
+      if(recovery_goal_) {
+        recovery_blocked_=false;goal_=Goal{*recovery_goal_,"unstuck",tick};
+        return move(paths.at(*recovery_goal_).first,"unstuck_relocate");
+      }
+      recovery_blocked_=true;return fallback("stuck_no_safe_exit"); // 真没有安全出口就明确守住，不能靠随机撞墙制造“正在动”。
     }
   }
   // 7. 选本Tick动作。驻留时仍可攻击/防御；上一帧defending不是对手这一Tick的承诺。
