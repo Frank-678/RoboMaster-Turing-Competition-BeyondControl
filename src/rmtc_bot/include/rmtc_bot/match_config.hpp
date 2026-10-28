@@ -60,6 +60,7 @@ inline constexpr int stage2_explore_gate_tick = 0; // 第二阶段资源饼通�
 inline constexpr int stage2_mission_pull_stale_ticks = 0; // 第二阶段资源久未现身（前沿扫图空转）时向到点任务方向拉拽探索；0为关闭。
 inline constexpr double stage2_assassin_value = 0.0; // 第二阶段派窗口刺杀：攻击正在扫资源簇的对手，打断其扫掠（击杀/击退→重生移位）把簇剩余资源留给我们；0为关闭。
 inline constexpr double stage2_pie_attack_discount = 0.0; // 第二阶段饼窗口攻击估值折扣：竞速期攻击会把我们从抢饼线路吸走（clusters-495：t20-26攻击致死、错过中簇70R）；还手不折扣。0=关闭，1=饼窗内除还手外不主动攻击。与race gate不同：只压攻击估值，不动任务/接近行为。
+inline constexpr double stage2_shadow_value = 0.0; // 第二阶段饼窗口影子跟踪：对手连续同向穿过我们已知区朝未知区移动时，向其投影前端探路，与对手在饼簇两侧合流共享；0为关闭。不假设未知格里有资源，只利用对手行为蕴含的信息。
 inline constexpr double opponent_contest_cost = 1.0; // 稳定轨迹预计争同格时，给路线增加一份等待成本；启发式，非概率。
 inline constexpr double opponent_pressure_cost = 0.25; // 下一Tick可能进入稳定轨迹敌车射线时的软成本，不改变攻击时序。
 inline constexpr double opponent_claim_discount = 0.5; // 敌车直线距离不比自己绕障距离长时的资源估值乘数；小于1.0则避开会被先拿走的资源。

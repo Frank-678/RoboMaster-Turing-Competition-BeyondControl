@@ -1172,6 +1172,28 @@ Json Strategy::decide(const Json &p) {
       tick >= parameters_.stage2_explore_gate_tick && tick - last_resource_sighting_ >= 60;
   // 第二阶段到点任务没有截止时间、资源先到先得：扫近处边界必须与任务/交战公平竞争，不能只在空档期生效。
   if (stage_ == 2 && !reverse_unknown_ && remaining_ticks > 1 && !explore_suppressed) consider_frontier(true, parameters_.frontier_value);
+  // 影子跟踪：对手连续同向穿过我们已知区、朝未知区移动（forecast=两次连续相同位移的一步猜测），
+  // 其前方大概率还有资源簇；向投影前端的已知可走格探路，从我们一侧与对手在簇两侧合流共享。
+  // 只利用对手行为蕴含的信息，不把未知格假设成资源；近处对手交给攻击估值。
+  if (stage_ == 2 && !reverse_unknown_ && remaining_ticks > 1 && !explore_suppressed &&
+      parameters_.stage2_shadow_value > 0 && tick - last_resource_sighting_ < 60) {
+    for (const auto &enemy : enemies) {
+      if (!enemy.forecast || manhattan(enemy.position, start) < 4) continue;
+      const Cell delta{enemy.forecast->first - enemy.position.first, enemy.forecast->second - enemy.position.second};
+      Cell target{-1, -1};
+      for (int k = 2; k <= 6; ++k) { // k=1是对方本帧落点，不追；从第2格起只取我们已知可走的格。
+        const Cell next{enemy.position.first + delta.first * k, enemy.position.second + delta.second * k};
+        if (next.first < 0 || next.first >= width || next.second < 0 || next.second >= height) break;
+        const auto tile = tiles_.find(next);
+        if (tile == tiles_.end() || !tile->second.seen || tile->second.wall) break; // 到未知/墙为止。
+        target = next;
+      }
+      if (target.first < 0) continue;
+      const auto node = paths.find(target);
+      if (node == paths.end() || node->second.first < 0 || node->second.distance >= remaining_ticks) continue;
+      consider(node->second.first, parameters_.stage2_shadow_value * 8.0 / (node->second.distance + 1), "shadow_track", target);
+    }
+  }
   if (best_utility < 0 && exploration >= 0 && !explore_suppressed) consider(exploration, 0.01, "explore");
 
   // 6. 用移动前站位评估ATTACK。普通攻击只取最近一辆，无双才取整个5×5。
