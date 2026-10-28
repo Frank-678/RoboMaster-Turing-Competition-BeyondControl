@@ -153,6 +153,25 @@ void persistent_goal() {
   rmtc::Session stage1(1);
   check(!stage1.act(terminal), "terminal stage1 frame emitted an action");
 }
+// 资源串必须算顺路拾取、剩余Tick与封顶分差；当前攻击危险仍先于搜索。
+void resource_sequences() {
+  auto p = fresh(498); // 只剩两步：向上拿20；向右连续两步拿10+20。
+  p["visible_entities"] = {entity("resource_high", 0, -1), entity("resource_normal", 1, 0),
+                           entity("resource_high", 2, 0)};
+  check(choose(p)["direction"] == "right", "resource planner missed a two-stop collection chain");
+  auto stage1 = p; stage1["tick"] = 98;
+  check(choose(stage1, 1)["direction"] == "right", "stage1 did not use resource sequences");
+  p["score"]["resource_value"] = 110;
+  check(choose(p)["direction"] == "up", "resource sequence double-counted capped score");
+  p["score"]["resource_value"] = 0; p["tick"] = 499;
+  check(choose(p)["direction"] == "up", "planner chased a second resource after the final tick");
+  p["tick"] = 498;
+  p["visible_entities"].push_back(entity("obstacle", 1, 0));
+  check(choose(p)["direction"] == "up", "sequence planner moved through a known wall");
+  p["visible_entities"].erase(3); p["self"]["hp"] = 15;
+  p["visible_entities"].push_back(robot(-1, 0));
+  check(choose(p)["action"] == "defend", "collection search bypassed current lethal combat");
+}
 // 验证封顶跨线、小数D、死亡扣除及官方D下降后的重新决策。
 void capped_score_decisions() {
   check(std::abs(rmtc::score_delta(119, 20, 120, 30) - 0.25) < 1e-9, "resource cap crossing arithmetic");
@@ -402,7 +421,7 @@ void session_contract() {
 
 // 汇总运行全部第二阶段核心场景；不需要网络或ROS。
 void full_scenarios() {
-  turn_state_transitions(); opponent_prediction(); persistent_goal();
+  turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences();
   combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
   future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
