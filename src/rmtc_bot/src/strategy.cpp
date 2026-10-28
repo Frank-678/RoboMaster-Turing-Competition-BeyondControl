@@ -1197,6 +1197,20 @@ Json Strategy::decide(const Json &p) {
       utility -= reflected * 0.05;
       // D已封顶且没有伤害任务时，不主动开战；本Tick已被火力波及时的还手不受限（不白挨打）。
       if (effective_damage >= 500 && !need_damage && incoming == 0) utility = 0;
+      // 派窗口刺杀：攻击正在扫资源簇的对手。击杀/击退令其重生移位，把本簇剩余资源留给我们——
+      // 这是对lap先到先得结构的唯一信息内干预；D收益上面已计（封顶归零），此处按目标脚边未收集资源估值加归属收益。
+      if (parameters_.stage2_assassin_value > 0 && tick - last_resource_sighting_ < 60) {
+        double contested = 0;
+        for (const auto *enemy : targets) {
+          if (enemy->protected_spawn || enemy->hp > attack_damage_) continue; // 只补刀一击必杀目标，不为一击打不死的对手放弃近处采集。
+          for (int dy = -2; dy <= 2; ++dy)
+            for (int dx = -2; dx <= 2; ++dx) {
+              const auto tile = tiles_.find({enemy->position.first + dx, enemy->position.second + dy});
+              if (tile != tiles_.end() && tile->second.seen && tile->second.value > 0) contested += tile->second.value;
+            }
+        }
+        if (contested > 0) utility += parameters_.stage2_assassin_value * contested;
+      }
       if (reflected + pre_damage >= hp) continue;
       if (utility > attack_utility) { attack_utility = utility; attack_direction = direction; }
     }
