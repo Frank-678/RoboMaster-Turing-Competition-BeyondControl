@@ -42,6 +42,7 @@ inline constexpr double reach_mission_value = 8.0;    // 到点任务权重，�
 inline constexpr double healing_below_hp = 40.0;     // 低于此血量才主动找治疗点。
 inline constexpr double fortress_hold_value = 20.0;  // 保住尚未完成的驻留进度。
 inline constexpr double fortress_capture_value = 12.0; // 前往堡垒的收益分子。
+inline constexpr double prepare_fortress_value = 0.0; // 堡垒预告提前占点（自visible-resource-bfs采纳的行为杠杆，默认关，待竞技场评估）。
 inline constexpr int hazard_lead_ticks = 2;          // 比最短退出时间再提前几Tick。
 inline constexpr double goal_retention_bonus = 0.0; // 同一有效目标的排序余量；调参未发现正向作用，关闭。
 inline constexpr int resource_plan_depth = 4;       // 资源串最多扩展4个目标，不是完整战斗树或3Tick。

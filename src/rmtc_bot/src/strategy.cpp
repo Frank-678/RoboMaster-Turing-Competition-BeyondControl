@@ -981,10 +981,11 @@ Json Strategy::decide(const Json &p) {
         const int needed=e.capture_ticks; // 还未激活，当前不能已有这次堡垒的占领进度。
         const Tick finish=first_capture+std::max(0,needed-1); // 增益在这一Tick结算后授予，不能补打本Tick。
         // 只在出发后至多多等一段占领时间时提前抢点；不为遥远预告放弃整局采集。
-        if(finish<std::min(e.end,tick_limit) && e.start-tick<=node.distance+e.capture_ticks) {
+        // prepare_fortress_value 默认0关闭（冠军行为不变），竞技场评估通过后再给值。
+        if(finish<std::min(e.end,tick_limit) && e.start-tick<=node.distance+e.capture_ticks && parameters_.prepare_fortress_value>0) {
           const Tick wait=std::max<Tick>(0,e.start-arrival); // 早到的等待成本，不修改事件绝对期限。
           if(cell==start) consider(-1,parameters_.fortress_hold_value/(wait+1),"hold_fortress",cell);
-          else consider(node.first,parameters_.fortress_capture_value/(node.distance+needed+wait),"prepare_fortress",cell);
+          else consider(node.first,parameters_.prepare_fortress_value/(node.distance+needed+wait),"prepare_fortress",cell);
         }
       }
       if (!e.active(tick)) continue;
