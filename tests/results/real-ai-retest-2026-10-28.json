@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-28",
+  "timezone": "Asia/Shanghai",
+  "code_commit": "1682964a8a24dc348ce6fad223bbb6380a89516d",
+  "model": "deepseek-flash",
+  "thinking": "disabled",
+  "max_tokens": 2200,
+  "requests_version": "2.34.2",
+  "urllib3_version": "2.8.0",
+  "upstream_route": "environment_proxy",
+  "certificate_source": "system CA",
+  "ros_or_match": false,
+  "credential_persisted": false,
+  "minimal": {
+    "kind": "invalid_completion",
+    "http_status": 200,
+    "elapsed_ms": 6802
+  },
+  "pipeline": {
+    "cpp_exit": 0,
+    "client": [
+      {
+        "case": "opening_empty",
+        "curl": 0,
+        "elapsed_ms": 4169,
+        "events": [],
+        "http": 200,
+        "reply_bytes": 52,
+        "status": "model_reply_received",
+        "unknown": [],
+        "validated": true
+      },
+      {
+        "case": "explosion_notice",
+        "curl": 0,
+        "elapsed_ms": 3772,
+        "events": [
+          {
+            "amount": 35.0,
+            "area": [
+              3,
+              3,
+              7,
+              7
+            ],
+            "capture_ticks": 0,
+            "defended_damage": 0.0,
+            "effect_ticks": 0,
+            "end": 16,
+            "kind": "explosion",
+            "multiplier": 1.0,
+            "points": [],
+            "source": "第 10 Tick：随机事件预告：5 Tick 后（Tick 15），左上角 [3,3]、右下角 [7,7] 的矩形区域将发生爆炸，范围内所有存活战车扣除 35 HP；出生保护免疫。",
+            "start": 15,
+            "trigger_end": 0
+          }
+        ],
+        "http": 200,
+        "reply_bytes": 324,
+        "status": "model_reply_received",
+        "unknown": [],
+        "validated": true
+      }
+    ],
+    "audit": [
+      {
+        "seat": "A",
+        "session_id": "real-probe",
+        "mode": "real",
+        "success": true,
+        "status": 200,
+        "success_count": 1,
+        "attempt_count": 1
+      },
+      {
+        "seat": "A",
+        "session_id": "real-probe",
+        "mode": "real",
+        "success": true,
+        "status": 200,
+        "success_count": 2,
+        "attempt_count": 2
+      }
+    ]
+  },
+  "minimal_followup": {
+    "source": "one additional live minimal probe; no ROS/referee match",
+    "result": {
+      "kind": "invalid_completion",
+      "http_status": 200,
+      "elapsed_ms": 5113
+    },
+    "response_metadata": {
+      "http": 200,
+      "body_bytes": 466,
+      "content_type": "application/json",
+      "outer_json_valid": true,
+      "content_type_name": "str",
+      "finish_reason": "stop",
+      "content_chars": 12,
+      "markdown_fence": false,
+      "final_json_valid": false
+    }
+  },
+  "environment": {
+    "distribution": "Ubuntu 24.04.3 LTS",
+    "kernel": "6.18.55",
+    "wsl": false,
+    "user_wsl_connected": false,
+    "getifaddrs_result": -1,
+    "getifaddrs_errno": 1
+  },
+  "scope": "Current C++ AiWorker and event validator through original practice HTTP Handler, ROS imports stubbed; no referee match; upstream uses existing tool environment proxy rather than user direct route.",
+  "total_upstream_requests": 4,
+  "qualification": "Original HTTP Handler audit recorded two real upstream successes for synthetic A session; not formal match AI qualification."
+}

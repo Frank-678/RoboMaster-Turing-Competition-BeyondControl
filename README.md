@@ -109,12 +109,23 @@ bash check_ai.sh
 | `connect_timeout` / `connection_error` | 检查WSL出网、DNS和连接；若确实需要代理，只改`practice_llm_proxy`，不要改机器人访问本机8080的代理 |
 | `proxy_error` | 检查所填代理是否在WSL可达、端口是否监听；程序不会自动猜7890 |
 | `tls_error` | 检查证书与代理TLS链路，不能仅靠增加模型等待时间解决 |
-| `read_timeout` | 等待上游数据超时；可能包含排队、生成或网络停顿，需要再测，不能当作模型思考时长 |
+| `read_timeout` | 库报告等待数据超时；TLS握手阶段也可能出现此标签，不能据此认定已进入模型推理，更不能当作模型思考时长 |
 | `http_error` + 400/401/402/429/5xx | 分别核对请求参数、密钥、余额、限流和上游服务；此状态来自直测上游 |
 | `redirect` | 填最终完整端点；不自动追随重定向 |
 | `invalid_completion` / `empty_content` / `output_truncated` | 网络已取得回复，但JSON外壳、最终正文或输出上限不合要求 |
 
 两段代理不同：启动日志里的`AI configured ... proxy=direct`只描述机器人→本机网关。练习代理→DeepSeek看`Practice ... upstream_proxy=...`，或本检查的`upstream_proxy`。**当`practice_llm_proxy`为空时，启动器会明确清空继承的HTTP代理设置**；终端其他程序能通过环境代理上网，不证明练习代理也在走它。修正配置后须重新构建，并停止、重启旧裁判与机器人。
+
+检查返回`http_status=0`时，表示本脚本没有拿到可用完整响应，不是服务器返回了状态码0。先在同一WSL做不带Key、不调用模型的HTTPS检查，记录错误与DNS/TCP/TLS/首字节计时：
+
+```bash
+curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS \
+  -o /dev/null \
+  -w '\nHTTP=%{http_code} DNS=%{time_namelookup}s TCP=%{time_connect}s TLS=%{time_appconnect}s FIRST=%{time_starttransfer}s TOTAL=%{time_total}s\n' \
+  https://api.deepseek.com/models
+```
+
+收到401等HTTP回复至少证明取得了HTTPS响应，未带Key的401不代表真实Key失效；`HTTP=000`且TLS时间为0则HTTPS尚未完成。curl与Python仍可能在地址选择、证书或实现上不同，此检查只是缩小范围。其他机器通过代理调用成功，也不能替代本机直连验证。[最新真实复测及环境差别](REAL_TEST.md#临时key再次实测明确代理路径与wsl边界)已单独记录。
 
 动作没有合适机会时，第二阶段存活车辆回退`DEFEND`；视野不足时可试探未知邻格。第一阶段或阵亡时不发送违法的防御动作。详细策略、源码注释和离线回归见[DEV.md](DEV.md)。
 
