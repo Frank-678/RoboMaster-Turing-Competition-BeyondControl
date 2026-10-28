@@ -68,6 +68,11 @@ private:
       const std::vector<Cell> &targets, const std::set<Cell> &occupied,
       const std::array<bool, 4> &first_allowed, double current_r,
       bool need_normal, bool need_high, double value_target, const std::vector<Cell> &previous_plan) const;
+  // 第一阶段巡回：对已知可达资源做近邻+有界2-opt顺序，只估值并执行首步；不跨未知格、不缓存未来动作。
+  // values非空时用它替代地图资源价值（边界观察点巡回）；不写回tiles_。
+  std::optional<ResourcePlan> resource_tour(Cell start, Tick remaining_ticks,
+      const std::vector<Cell> &targets, const std::set<Cell> &occupied,
+      const std::map<Cell, double> *values = nullptr, Cell first_hint = {-1, -1}) const;
   std::optional<Cell> predict_opponent(const std::string &identity, Cell position, Tick tick);
   // 预测仅用同一敌车连续观测；断帧/瞬移重置，预测只降低候选收益，不当成必然占位。
   bool split_wall(Cell cell, Tick tick) const;

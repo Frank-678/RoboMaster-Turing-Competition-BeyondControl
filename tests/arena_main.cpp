@@ -15,6 +15,8 @@ void configure(rmtc::StrategyParameters &p,const Json &values) {
   PARAMETER(stale_resource_decay) PARAMETER(resource_mission_bonus) PARAMETER(reach_mission_value)
   PARAMETER(healing_below_hp) PARAMETER(fortress_hold_value) PARAMETER(fortress_capture_value)
   PARAMETER(goal_retention_bonus) PARAMETER(frontier_value) PARAMETER(opponent_contest_cost) PARAMETER(opponent_pressure_cost)
+  PARAMETER(opponent_claim_discount)
+  PARAMETER(explore_toward_resource_value) PARAMETER(explore_tour_value) PARAMETER(mission_explore_value)
   PARAMETER(hazard_lead_ticks) PARAMETER(resource_plan_depth) PARAMETER(resource_beam_width)
   PARAMETER(resource_candidate_limit) PARAMETER(resource_plan_budget_ms)
   PARAMETER(collision_replan) PARAMETER(resource_refinement) PARAMETER(resource_refinement_trials)
@@ -24,7 +26,8 @@ void configure(rmtc::StrategyParameters &p,const Json &values) {
   for (const auto &entry:values.items()) if (!recognized.count(entry.key())) throw std::runtime_error("unknown arena parameter: "+entry.key());
   p.validate(); // 规则伤害、距离、D扣除等根本不在可写参数名单。
 }
-Json play(const Json &spec,const rmtc::StrategyParameters &parameters,const rmtc::StrategyParameters &baseline,bool trace) {
+Json play(const Json &spec,const rmtc::StrategyParameters &parameters,const rmtc::StrategyParameters &baseline,bool trace,
+          const std::map<std::string,rmtc::StrategyParameters> &named) {
   using namespace rmtc;
   const int stage=spec.at("stage"),seat=spec.at("seat");
   if (seat<0 || seat>3 || (stage==1 && seat!=0)) throw std::runtime_error("invalid focal seat");
@@ -36,6 +39,11 @@ Json play(const Json &spec,const rmtc::StrategyParameters &parameters,const rmtc
   if (styles.size()!=4) throw std::runtime_error("four explicit opponent entries required");
   for (int i=0;i<4;++i) {
     if (i==seat || styles[i]=="baseline") players[i]=std::make_unique<Strategy>(stage,i==seat ? parameters : baseline);
+    else if (styles[i].rfind("profile:",0)==0) { // 自己打自己：指定本文件外的具名候选参数。
+      const auto found=named.find(styles[i].substr(8));
+      if (found==named.end()) throw std::runtime_error("unknown profile opponent: "+styles[i]);
+      players[i]=std::make_unique<Strategy>(stage,found->second);
+    }
     else opponents[i]=std::make_unique<arena::Opponent>(styles[i],scenario.seed+101*i,stage);
   }
   std::vector<double> durations;
@@ -87,6 +95,12 @@ Json play(const Json &spec,const rmtc::StrategyParameters &parameters,const rmtc
   Json output={{"scenario",spec},{"result",results},{"focal",seat},{"rank",rank},{"win_share",stage==2 ? Json(win) : Json()},
     {"score_margin",margin},{"decide_p95_ms",durations.at((durations.size()*95+99)/100-1)},
     {"decide_max_ms",durations.back()},{"frames",frames}};
+  if (trace) { // 单局轨迹附带初态地图真值，仅离线诊断用；不传给策略。
+    Json walls=Json::array();for (const auto &wall:scenario.walls) walls.push_back({wall.first,wall.second});
+    Json res=Json::array();for (const auto &entry:scenario.resources) res.push_back({{"x",entry.first.first},{"y",entry.first.second},{"v",entry.second}});
+    Json spawns=Json::array();for (const auto &spawn:scenario.spawns) spawns.push_back({spawn.first,spawn.second});
+    output["trace_map"]={{"walls",walls},{"resources",res},{"spawns",spawns},{"missions",scenario.missions},{"width",scenario.width},{"height",scenario.height}};
+  }
   return output;
 }
 }
@@ -94,11 +108,15 @@ int main() {
   try {
     const Json input=Json::parse(std::cin);
     auto baseline=rmtc::StrategyParameters::competition();configure(baseline,input.at("baseline_parameters"));
+    std::map<std::string,rmtc::StrategyParameters> named; // profile: 对手按名字解析到同一份已校验参数。
     for (const auto &profile:input.at("profiles")) {
       auto parameters=rmtc::StrategyParameters::competition();configure(parameters,profile.at("parameters"));
+      named[profile.at("name").get<std::string>()]=parameters;
+    }
+    for (const auto &profile:input.at("profiles")) {
       int index=0;
       for (const auto &scene:input.at("scenes")) {
-        auto result=play(scene,parameters,baseline,input.at("trace_first").get<bool>() && index++==0);
+        auto result=play(scene,named.at(profile.at("name").get<std::string>()),baseline,input.at("trace_first").get<bool>() && index++==0,named);
         result["profile"]=profile.at("name");
         std::cout<<result.dump()<<std::endl;
       }
