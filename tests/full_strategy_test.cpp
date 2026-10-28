@@ -206,6 +206,7 @@ void tactical_scenarios() {
   for (int y=0;y<9;++y) for (int x=0;x<9;++x) input.walkable.insert({x,y});
   input.safe_first.fill(true);input.goal_value.fill(0);
   auto parameters=rmtc::StrategyParameters::competition();parameters.tactical_search=true;
+  parameters.tactical_risk=0.35;parameters.tactical_hp_value=0.015;parameters.tactical_death_cost=1;parameters.tactical_goal_weight=0.35; // 固定启用模块的夹具，不依赖已关闭该模块的比赛参数。
   auto choice=rmtc::tactical_choice(input,parameters);
   check(choice.action.kind==rmtc::rules::ActionKind::move,"short search kept defending until unavoidable third-tick death");
   input.safe_first={false,false,false,false,true};input.walkable={{4,4},{5,4}};
@@ -569,6 +570,10 @@ void gateway_scenarios(const std::string &base) {
     }
     throw std::runtime_error("mock gateway result missing");
   };
+  // 新公告的正式字段：thinking在HTTP JSON顶层，512只是这个测试的预算，不改变生产多事件预算。
+  auto formal_config=config("/formal-options");formal_config.model="deepseek-flash";formal_config.max_tokens=512;
+  rmtc::AiWorker formal(formal_config);formal.reset("formal-options");q["session_id"]="formal-options";
+  formal.observe(q,Json::array());check(receive(formal).http_success,"formal gateway fields were not serialized as announced");
   // 感知可重复携带整段近期公告。逐渐增长的100批输入不能被拼成100份历史。
   rmtc::AiWorker cumulative(config("/cumulative")); // 使用正式工作线程和HTTP请求体。
   cumulative.reset("cumulative"); q["session_id"] = "cumulative";

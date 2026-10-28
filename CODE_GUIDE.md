@@ -21,6 +21,8 @@
 | 文件 | 职责 |
 | --- | --- |
 | `README.md` | 先看这里：地址、令牌、模型分别填哪，两个终端如何启动，零次调用如何查 |
+| `ARENA.md` | 自建对手池、六类地图、规则模型、参数搜索和留出边界 |
+| `arena.sh` | 一键离线对战与调参；不改正式参数 |
 | `DEV.md` | 依赖、策略机制、事件表、测试方法和当前验证范围 |
 | `CODE_GUIDE.md` | 本文件：主线、文件、类型和函数索引 |
 | `STATE_MACHINE.md` | 全部编号规则对应、状态图、策略路径与预测边界 |
@@ -39,6 +41,9 @@
 | `include/rmtc_bot/strategy_tuning.hpp` | 旧include路径的兼容入口，只包含`match_config.hpp`，没有第二份参数 |
 | `include/rmtc_bot/strategy.hpp` | 策略接口、地图格/历史快照和跨Tick记忆 |
 | `src/strategy.cpp` | 实际决策：地图、路径、任务、攻防、八类事件和未知格试探 |
+| `include/rmtc_bot/strategy_parameters.hpp` | 参数值对象；正式从编译配置构造，只有离线程序可注入不同取舍 |
+| `include/rmtc_bot/rules.hpp` | 规则常量、同时战斗、移动和复活落点；不参与参数搜索 |
+| `include/rmtc_bot/tactics.hpp`、`src/tactics.cpp` | 可选三Tick局部对手情景搜索，返回首动作 |
 | `include/rmtc_bot/events.hpp` | Tick/Cell、八种事件、模型提案和校验接口 |
 | `src/events.cpp` | 校验模型JSON、生成稳定事件键、构造公告解释Prompt |
 | `include/rmtc_bot/scoring.hpp` | 官方封顶计分前后的预计分差 |
@@ -55,6 +60,16 @@
 | `tests/practice_gateway.py` | 只读加载原版HTTP处理器，验证模型名优先级、令牌替换、代理和A席位记录；上游仍是夹具 |
 | `tests/startup_test.py` | 在临时工作空间检查旧配置启动拦截、固定二进制路径和练习启动环境 |
 | `tests/ai_check_test.py` | 本机HTTP及注入异常检查诊断分类、正文读取超时和敏感文本不回显 |
+| `tests/arena.hpp` | 测试裁判与陪练的数据类型和接口，不被参赛程序包含 |
+| `tests/arena.cpp` | 局部观测、整Tick结算、八事件、任务与结果输出 |
+| `tests/arena_scenarios.cpp` | 六类地图及不同种子的公开任务/自然语言公告场景 |
+| `tests/arena_opponents.cpp` | 六种只用本队公开观测的手写陪练 |
+| `tests/arena_main.cpp` | 仅离线JSON入口，组装新鲜策略、裁判和逐局指标 |
+| `tests/arena_test.cpp` | 人工可算规则边界与输入隔离检查 |
+| `tests/arena_settings.json` | 冻结对照参数、训练/留出种子和风格列表 |
+| `tests/run_arena.py` | 编译、逐轮训练筛选、留出与模块消融；保存结果 |
+| `tests/results/arena-2026-10-28*.json` | 逐局R/D/M、耗时、训练候选和留出结果；含失败试验 |
+| `tests/results/selected-parameters.json` | 训练选中候选，不自动生效、不由机器人读取 |
 | `tests/run.sh` | 用g++构建离线测试，启动HTTP夹具，退出时清理临时文件 |
 
 表中的`include/`和`src/`短路径均相对`src/rmtc_bot/`。
@@ -145,7 +160,7 @@
 | 类型或函数 | 用途 |
 | --- | --- |
 | `Goal` | `position`目标坐标、`kind`类别、`tick`选择时刻；`goal_`仅在选择MOVE时续签 |
-| `ResourcePlan` | `first`世界首方向，`first_resource`首次拾取点，`utility`收益/耗时，`benefit`整串收益 |
+| `ResourcePlan` | `first`世界首方向，`first_resource`首次拾取点，`utility`收益/耗时，`benefit`整串收益，`stops`未执行目标串 |
 | `resource_plans` | 只在已知格比较有界资源串，不写回真实位置、地图或score |
 | `resource_plans`的参数 | `start/tick`本帧真值，`remaining_ticks`剩余动作数，`targets`少量资源候选，`occupied`当前敌车占位，`first_allowed`原BFS批准的首步，`current_r`官方R，`need_normal/high`任务机会，`value_target`资源任务门槛 |
 | 局部`State` | `position/elapsed`预计落点与耗时，`first/first_resource`首动作与首份资源，`virtual_r/benefit`预计资源与估值，`collected`防重复拾取，`mission_bonus`防重复支付同类任务机会 |
@@ -173,3 +188,47 @@
 Python的`probe`只发一次POST：`url/key/model/thinking/json_output/max_tokens`均由编译配置传入；`payload`是最小JSON请求，`started`是单调计时起点，`response/body/choice/content`是本地临时结果，`result`仅含错误分类、HTTP码和耗时。`ReadTimeoutError`处理requests把正文读取超时包装成连接错误的情况；其余连接错误不靠异常文本猜原因。
 
 `main`检查启动器交接变量，调用`probe`，再输出`upstream_proxy`是否明确配置、`upstream_host`主机及模型名；没有打印Key、URL查询参数、模型思考或响应正文。退出0只代表这个最小请求返回预期JSON，不代表完整公告或比赛资格。
+
+## 战术、规则和离线对战符号
+
+| 类型/命名空间 | 成员与职责 |
+| --- | --- |
+| `StrategyParameters` | 固定的一组权重/预算；`competition`从唯一配置复制，`validate`拒绝坏值；不含可调规则伤害 |
+| `rmtc::rules` | 确定规则函数的命名空间，`ActionKind/Action`表示动作及方向，none只表示不提交 |
+| `Fighter` | `position/hp`位置血量；`attack/defended`对普通/防御目标伤害；`vulnerability`受击倍率；`alive/protected_spawn/area_attack`三种权限/效果 |
+| `CombatResult` | `fighters`统一扣血后状态，`earned`本批普通D及击杀奖，`deaths`各车死亡次数；死亡扣除最后统一做 |
+| `TacticalMission` | 类型、门槛、到点坐标；只包含未完成任务 |
+| `TacticalInput` | 0号本车、1至3号可见敌车；地图/资源/事件、目标价值和目标坐标、首步安全、当前R/D、可信拾取次数及效果记录；字段旁逐项注释 |
+| `TacticalChoice` | 首动作、估值、情景数与模拟步数，不暴露必须执行的后续队列 |
+| 战术局部`State` | 四车副本、剩余资源、虚拟R/D、拾取次数、死亡数、任务标记/估值、堡垒进度、各车回血截止和数量 |
+| 战术局部`Branch` | 一个公共动作前缀在多个情景下的状态数组、各情景折扣收益与合计估值 |
+| `GoalDistance` | 战略目标、权重、起点距离和已知格反向BFS距离；末位置真实接近目标才有尾部估值 |
+| `MoveAttempt` | 已提交的起点、落点、Tick；`move_attempt_`等回执，`failed_destination_/failed_moves_`只计连续失败 |
+| 资源局部`State::stops` | 本分支显式资源目标；`planned_resources_`只保存最终选中方向的目标串 |
+| `route_cache` | 本帧`(起点,目标,已用Tick)`到路径的缓存，不跨帧保留 |
+| `direction_value/goal/benefit/plan` | 每个世界首方向的最好收益、目标、总收益和资源串，战术改选首步时保持对应 |
+| `rmtc::arena` | 仅离线测试裁判；`Scenario/Announcement`持有测试真值，`Car`持有实际结算；`Game`推进，`Opponent`只用局部输入 |
+
+| 函数/局部函数 | 直观用途 |
+| --- | --- |
+| `rules::decode_action/encode_action` | JSON和测试动作之间转换；不提交编码为null |
+| `rules::ray/manhattan` | 判断1–2格攻击方向、四向距离 |
+| `rules::combat/adjusted_damage` | 同时伤害与分奖；全部奖励后扣死亡60，最低0、不封顶累计D |
+| `rules::move/respawn` | 按存活起始占位统一移动；曼哈顿层/上右下左找合法复活落点 |
+| `tactical_choice` | 展开三Tick、按不同首动作保留束，输出首动作 |
+| `can_move/choices` | 已知地图内生成可移动和有实际目标的攻击，以及合法防御 |
+| `opponent_action` | 某个手写对手情景在该状态下的合法候选，不访问未来真值 |
+| `advance` | 复制状态推进一Tick；`fire`按受害者/来源积累辣椒贡献 |
+| `value/aggregate/tail_value` | 官方边际分+机会成本；情景均值/最差值；真正接近战略目标的尾部价值 |
+| 资源`extend/evaluate_stops/record` | 接一个资源目标、从真实起点重评一串、保存各首方向最好串 |
+| `Strategy::note_model_reply` | 本场见到非mock模型正文，仅作任务收益假设，换场清除 |
+| `Game::observe/interpreted_events` | 本队局部感知、公告后延迟交付的正确解释夹具；不是生产事件解析器 |
+| `Game::step/refresh_effects/resurrect/current_walls` | 整Tick结算、重建效果、按位复活、合成基础和临时墙 |
+| `Game::score/result` | 规则原始分及逐车R/D/M、死亡和动作统计 |
+| `relative_entity/make_scenario` | 生成89字符相对图、不同地图任务事件 |
+| `Opponent::act/grid_offset` | 只用本队感知作风格决策、解析自己的相对实体位置 |
+| `arena_main::configure/play/main` | 只改白名单策略权重、运行一局、读取离线JSON并逐局输出；无ROS参数入口 |
+| Python`scenes/build/evaluate/summarize` | 组场、编译/规则测试、跑指定参数与场景、汇总指标 |
+| Python`candidates/main` | 固定种子生成搜索候选、训练筛选并一次留出对照，保存源码哈希和结果 |
+
+循环索引约定：`player/seat/i`是车，0–3；战术0总是本车。`mode`是手写情景，`depth`是本地推演Tick，`trial`是路线修改次数，`direction/d`是上右下左。`source/target`在伤害矩阵中是贡献者/受害者；`state/child/branch`均是推演副本，不是裁判感知。`normal/high`为计划拾取次数，`r/d`为计划R/D；配置含义在`match_config.hpp`逐项注释。

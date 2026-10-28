@@ -28,7 +28,10 @@ class Handler(BaseHTTPRequestHandler):
             raise AssertionError("unexpected chunked request")
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))  # 客户端完整请求体。
         assert request["stream"] is False and request["max_tokens"] > 0
-        assert request["model"] == "fixture-model"
+        assert request["model"] == ("deepseek-flash" if self.path == "/formal-options" else "fixture-model")
+        if self.path == "/formal-options":
+            assert request["max_tokens"] == 512 and "extra_body" not in request
+            assert "JSON" in request["messages"][0]["content"]
         if self.path == "/standard-only":
             assert "thinking" not in request and "response_format" not in request
         else:
@@ -112,7 +115,7 @@ def main():
             assert counts["/auth"] == 1 and counts["/garbage"] == 1, counts
             assert counts["/bad-response"] == 1, counts
             assert counts["/practice-mock"] == 1, counts
-            assert all(counts[p] == 1 for p in ("/fenced", "/reasoning-only", "/truncated", "/standard-only")), counts
+            assert all(counts[p] == 1 for p in ("/fenced", "/reasoning-only", "/truncated", "/standard-only", "/formal-options")), counts
             assert counts["http://upstream.invalid/proxy-target"] == 1, counts
         print("mock gateway request-count and authorization assertions passed")
     finally:

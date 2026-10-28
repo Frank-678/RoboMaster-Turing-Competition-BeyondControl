@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-28",
+  "timezone": "Asia/Shanghai",
+  "rules": "v1.2",
+  "core_and_http": "ASan/UBSan pass; LeakSanitizer disabled in this host",
+  "arena_rule_boundaries": "ASan/UBSan pass, eight event kinds plus 18 generated maps",
+  "fixed_http": "actual C++ request fields, async/error/retry/session contracts passed",
+  "original_http": "original practice Handler; ROS imports stubbed; canned upstream; new top-level fields forwarded",
+  "upstream_checker": "8 local HTTP and 6 injected failures passed; no new live model calls this milestone",
+  "actual_ros_build": "actual Humble headers and shared libraries manually linked; not a colcon or DDS match",
+  "mermaid": "7 blocks parsed; not rendered here",
+  "practice_original_files": 18,
+  "practice_git_tree": "3c352b3f29be4a008f46642063ce527c4fb4756f",
+  "practice_changed_files": [],
+  "full_referee_match": "not completed: current host DDS interface enumeration restriction remains; previous attempts archived",
+  "evaluation": "910 local synthetic games total across pilot, training and heldout/ablation; not official standard opponents",
+  "limits": [
+    "Small correlated map/seat sample",
+    "Delayed event oracle, not NLP understanding",
+    "Partial rule sharing, no independent referee differential",
+    "No user WSL terminal connection",
+    "Competition credentials left blank, not committed"
+  ]
+}

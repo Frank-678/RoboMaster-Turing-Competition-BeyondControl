@@ -1,6 +1,8 @@
 # RoboMaster-Turing-Competition-BeyondControl
 
-[目标持续性、资源串搜索与探索](PLANNING.md)：已加入阶段结束守卫、目标迟滞、最多3目标/5候选的资源规划和信息增益探索；7个采集夹具已有同条件比较，完整对局仍待验收。
+[目标持续性、资源串搜索与探索](PLANNING.md)：已加入阶段结束守卫、目标迟滞、最多4目标/5候选的资源规划和信息增益探索；7个采集夹具已有同条件比较，完整对局仍待验收。
+[赛前多风格对战与调参](ARENA.md)：六类地图、六种陪练、轮换席位、延迟解释及独立留出；连续受阻改道已启用。三Tick战术已实现，本轮训练选择关闭。自建测试不等于官方标准车结果。
+
 RMTC 机甲大师图灵对决赛 C++17 / ROS 2 Humble 选手工程。
 
 [2026-10-28实测](REAL_TEST.md)：真实DeepSeek经原版转发两次成功，发现短预告时延问题；已修复累积公告重复膨胀。完整裁判尝试因当前环境DDS权限失败，尚无对标准车的有效对局结果。
@@ -19,18 +21,41 @@ RMTC 机甲大师图灵对决赛 C++17 / ROS 2 Humble 选手工程。
 | `ros_domain_id` / `ros_localhost_only` / `rmw_implementation` | 按现场网络要求填 | 与本机练习裁判一致 |
 | `ai_url` | 官方完整网关地址 | `http://127.0.0.1:8080/v1/chat/completions` |
 | `ai_token` | 本场席位令牌 | A席位填`practice-A`，其他席位相应修改 |
-| `ai_model` | 主办方指定的模型名 | 真实模型服务支持的模型名，必须填 |
+| `ai_model` | 新公告统一`deepseek-flash` | 真实模型服务支持的模型名，必须填 |
 | `ai_timeout_ms` / `ai_connect_timeout_ms` / `ai_max_tokens` | 本场超时和输出限制 | 当前明确为35000ms/5000ms/2200；HTTP在后台等待 |
-| `ai_thinking` / `ai_json_output` | 按官方模型/网关支持填写 | 当前DeepSeek练习：`"disabled"` / `true`；不支持时明确填`""` / `false` |
+| `ai_thinking` / `ai_json_output` | 新公告允许直接转发，明确`"disabled"` / `true` | 同样填写；不省略thinking以免默认开启 |
 | `ai_http_proxy` | 机器人访问网关的网络代理；空串为直连 | 通常空串，机器人直连本机代理 |
 | `practice_llm_url` | 不使用 | 真实模型服务的完整`/chat/completions`地址 |
 | `practice_port` | 不使用 | 本机练习监听端口，须与`ai_url`中的端口一致 |
 | `practice_llm_key` | 不使用 | 模型服务API Key，与`practice-A`不同 |
 | `practice_llm_proxy` | 不使用 | 练习代理访问真实模型的网络代理；空串为直连 |
 
-所有配置都在同一个头文件。当前写明了同机练习地址、`practice-A`、`deepseek-flash`及DeepSeek上游地址；上游Key留空，由你在本机填新密钥。正式赛按现场通知更换地址、令牌、模型和扩展选项。第二阶段缺必要值就拒绝启动，没有隐式补值。
+所有配置都在同一个头文件。当前写明了同机练习地址、`practice-A`、`deepseek-flash`及DeepSeek上游地址；上游Key留空，由你在本机填新密钥。正式赛按现场通知更换地址和令牌，模型保持新公告指定的`deepseek-flash`，明确关闭思考并请求JSON。第二阶段缺必要值就拒绝启动，没有隐式补值。
 
 **模型名不放在URL中。** 机器人把`ai_model`放进POST正文，原版practice将它转给上游；请求带`model`时优先于`PRACTICE_MODEL`，没带时才用后者。我们的启动器也把同一个`ai_model`交给`PRACTICE_MODEL`，只需维护一处模型名。教程中的SDK `base_url`会自动补请求路径；这里使用curl，必须填写完整`/chat/completions`端点。
+
+## 2026-10-28网关公告：关闭思考写在请求正文
+
+按用户转来的新公告，正式网关除`model`外直接转发请求字段，不主动关闭思考；DeepSeek官方也说明思考默认开启。当前`AiWorker::observe`已经按下面形式序列化，`practice_launcher`和上游诊断共用同一配置，无需新增环境变量：
+
+```json
+{
+  "model": "deepseek-flash",
+  "thinking": {"type": "disabled"},
+  "response_format": {"type": "json_object"},
+  "messages": [{"role": "user", "content": "请只输出JSON，解析公告中的事件。"}],
+  "max_tokens": 2200,
+  "stream": false
+}
+```
+
+`thinking`在HTTP JSON顶层。SDK中的`extra_body`是SDK传参方式，我们直接发HTTP，不能把它作为额外嵌套层。地址仍是本场完整`POST /v1/chat/completions`，请求头仍带本场`Authorization: Bearer ...`。模型名属于正文，和本机地址或练习上游地址分开。
+
+公告的512是示例预算。当前保留2200用于多事件、证据原文和`unknown`，不把最大预算当作必然输出长度，也不认为调小它就保证低时延；实际请求仍受本场配额、并发和大小限制。降低前先检查多事件是否截断。JSON模式还要求Prompt明确要求JSON，完成后仍须本地校验场次、字段、证据与期限。
+
+只读原版转发器的测试新增了512预算、thinking、response_format和temperature透传检查；C++客户端另检查新公告字段确实在顶层。上游是固定夹具，不代表正式网关或真实模型验收。关闭思考也不保证半秒完成，模型仍在后台解释，动作继续逐Tick生成。
+
+依据：[DeepSeek思考模式](https://api-docs.deepseek.com/guides/thinking_mode/)与[Chat Completions字段](https://api-docs.deepseek.com/api/create-chat-completion/)，核对日期2026-10-28；赛事转发行为依据用户本次粘贴公告，尚未独立抓取正式网关。
 
 ## 两条通信链路
 

@@ -54,6 +54,11 @@ class ModelProxy(BaseHTTPRequestHandler):
             assert context["session_id"] == "test-match" and "fixture" in context["announcements"]
             events = [{"kind": "fortress", "start": 0, "end": 1000, "area": [6, 6, 7, 7],
                        "capture_ticks": 2, "amount": 50, "defended_damage": 10, "source": "fixture"}]
+        elif body["model"] == "deepseek-flash":
+            assert body["thinking"] == {"type": "disabled"} and "extra_body" not in body
+            assert body["response_format"] == {"type": "json_object"}
+            assert body["max_tokens"] == 512 and body["temperature"] == 0
+            assert "JSON" in body["messages"][0]["content"]
         else:
             assert body["model"] == "fallback-model"  # 只在请求缺model时使用PRACTICE_MODEL。
         answer = {"session_id": "test-match", "events": events, "unknown": []}
@@ -92,10 +97,16 @@ def main():
             response = requests.post(base, json={"messages": [{"role": "user", "content": "fixture"}], "stream": False},
                 headers={"Authorization": "Bearer practice-A"}, timeout=3)
             assert response.status_code == 200
-            assert ModelProxy.models == ["fixture-model", "fallback-model"], ModelProxy.models
+            # 只读原版转发器也必须保留新公告字段；此请求不是DeepSeek实测或比赛资格。
+            announced = requests.post(base, json={"model": "deepseek-flash", "thinking": {"type": "disabled"},
+                "response_format": {"type": "json_object"}, "max_tokens": 512, "temperature": 0,
+                "messages": [{"role": "user", "content": "请只输出JSON"}], "stream": False},
+                headers={"Authorization": "Bearer practice-A"}, timeout=3)
+            assert announced.status_code == 200
+            assert ModelProxy.models == ["fixture-model", "fallback-model", "deepseek-flash"], ModelProxy.models
             records = [json.loads(line) for line in (Path(data) / "ai.jsonl").read_text().splitlines()]
-            assert len(records) == 2 and records[-1]["seat"] == "A" and records[-1]["success_count"] == 2
-            print("original practice HTTP relay passed: model priority, token replacement, proxy routing, A audit; canned upstream only")
+            assert len(records) == 3 and records[-1]["seat"] == "A" and records[-1]["success_count"] == 3
+            print("original practice HTTP relay passed: model priority, token replacement, proxy routing, A audit and announced top-level options; canned upstream only")
         finally:
             for server in (gateway, upstream):
                 server.shutdown()
