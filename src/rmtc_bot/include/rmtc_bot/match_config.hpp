@@ -54,6 +54,7 @@ inline constexpr double explore_toward_resource_value = 0.5; // 已知资源绕�
 inline constexpr double mission_explore_value = 0.0; // 沿到点任务方向探路的权重（除以距离+1）；到点任务没有截止时间，拉拽会在资源比赛早期拖离采集线，关闭。
 inline constexpr double explore_tour_value = 0.03; // 第一阶段空档期，把散布的边界观察点排成小巡回的机会权重；0为关闭。
 inline constexpr double stage1_flood_value = 0.0; // 第一阶段空档探索的最近边界洪泛权重（距离优先、同距离取更大新视野）；与巡回/frontier同场竞争，0为关闭。
+inline constexpr double stage1_ring_value = 0.0; // 第一阶段“近出生点完成覆盖”权重：巡回观察点按增益+近出生点加成排序，优先揭示距出生点近的未探索格（rooms-195左侧列30R口袋滞留t91-99的修复轴）；0为关闭。
 inline constexpr bool stage2_race_gate = false; // 第二阶段竞速闸门：两轮实验均显示早期主动交火有压制对手扫资源的价值，关闭。
 inline constexpr int stage2_explore_gate_tick = 0; // 第二阶段资源饼通常在150Tick内被抢光：Tick≥此值且已知资源已清空时关闭扫图，让位给交火/据点；0为关闭。
 inline constexpr int stage2_mission_pull_stale_ticks = 0; // 第二阶段资源久未现身（前沿扫图空转）时向到点任务方向拉拽探索；0为关闭。

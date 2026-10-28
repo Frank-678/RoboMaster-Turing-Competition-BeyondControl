@@ -1,0 +1,291 @@
+{
+  "date": "2026-10-29",
+  "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+  "settings": {
+    "version": 1,
+    "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+    "map_styles": [
+      "open",
+      "maze",
+      "rooms",
+      "lanes",
+      "clusters",
+      "crossroads"
+    ],
+    "opponent_styles": [
+      "collector",
+      "aggressive",
+      "defender",
+      "fortress",
+      "opportunist",
+      "wanderer"
+    ],
+    "train_seeds": [
+      101,
+      307
+    ],
+    "heldout_seeds": [
+      29003
+    ],
+    "baseline_parameters": {
+      "stale_resource_decay": 0.01,
+      "resource_mission_bonus": 5.0,
+      "reach_mission_value": 8.0,
+      "healing_below_hp": 70.0,
+      "fortress_hold_value": 20.0,
+      "fortress_capture_value": 12.0,
+      "hazard_lead_ticks": 2,
+      "goal_retention_bonus": 0.1,
+      "resource_plan_depth": 3,
+      "resource_beam_width": 5,
+      "resource_candidate_limit": 8,
+      "resource_plan_budget_ms": 10,
+      "frontier_value": 0.02,
+      "opponent_contest_cost": 1.0,
+      "opponent_pressure_cost": 0.25,
+      "opponent_claim_discount": 1.0,
+      "explore_toward_resource_value": 0.0,
+      "explore_tour_value": 0.0,
+      "mission_explore_value": 2.0,
+      "stage1_flood_value": 0.0,
+      "stage2_race_gate": false,
+      "stage2_explore_gate_tick": 0,
+      "stage2_mission_pull_stale_ticks": 0,
+      "tactical_search": false,
+      "tactical_risk": 0.35,
+      "tactical_hp_value": 0.015,
+      "tactical_death_cost": 1.0,
+      "tactical_future_discount": 0.65,
+      "tactical_goal_weight": 0.35,
+      "resource_refinement": false,
+      "resource_refinement_trials": 12,
+      "collision_replan": false,
+      "loop_recovery": false,
+      "loop_window_ticks": 12,
+      "recovery_ticks": 12,
+      "stalled_goal_cooldown_ticks": 24
+    },
+    "pilot_heldout_seeds": [
+      19001
+    ]
+  },
+  "selection": "stage1_ring_value（近出生点完成覆盖轴）两变体全负，未晋升，默认0.0关闭，冠军参数不变。",
+  "note": "新策略轴：阶段一巡回观察点按增益+近出生点加成排序（ring_bonus = ring*10/(spawn_dist+1)），优先揭示距出生点近的未探索格。机理来源：rooms-195左侧列30R口袋（dist 11-15）滞留t91-99；rooms-401/crossroads-542未收格同样近出生点。结果：(1)全程变体 ring1/2 R 166.7→164.2、ring4→165.0——rooms-401 +10、lanes-448(ring4) +10，但open-307 −10、crossroads-336 −10、crossroads-542 −20（其未收格正是近出生点！），rooms-195不变。(2)开场限定t<40变体更差 R 161.7——open-101开场巡回被重排后190→150崩40。开场比后期更敏感。巡回路点重排会扰动整条采集链排序，冠军0.03巡回+0.02 frontier的顺序是经验局部最优。阶段二比特级隔离确认（tour块stage==1限定）。家族闭合，代码保留默认关闭。",
+  "rounds": {
+    "ring_full": {
+      "profiles": [
+        "s04",
+        "ring1",
+        "ring2",
+        "ring4"
+      ],
+      "stage1_R_per_scene": {
+        "open-101": [
+          190,
+          190,
+          190,
+          190
+        ],
+        "open-307": [
+          170,
+          160,
+          160,
+          160
+        ],
+        "maze-148": [
+          120,
+          120,
+          120,
+          120
+        ],
+        "maze-354": [
+          130,
+          130,
+          130,
+          130
+        ],
+        "rooms-195": [
+          170,
+          170,
+          170,
+          170
+        ],
+        "rooms-401": [
+          170,
+          180,
+          180,
+          180
+        ],
+        "lanes-242": [
+          130,
+          130,
+          130,
+          130
+        ],
+        "lanes-448": [
+          170,
+          170,
+          170,
+          180
+        ],
+        "clusters-289": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "clusters-495": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "crossroads-336": [
+          190,
+          180,
+          180,
+          180
+        ],
+        "crossroads-542": [
+          160,
+          140,
+          140,
+          140
+        ]
+      },
+      "summary": {
+        "s04": {
+          "R_mean": 166.7,
+          "score_mean": 33.33
+        },
+        "ring1": {
+          "R_mean": 164.2,
+          "score_mean": 32.83
+        },
+        "ring2": {
+          "R_mean": 164.2,
+          "score_mean": 32.83
+        },
+        "ring4": {
+          "R_mean": 165.0,
+          "score_mean": 33.0
+        }
+      },
+      "stage2": "bit-identical (R/D/score/win/deaths per scene)"
+    },
+    "ring_gated40": {
+      "profiles": [
+        "s04",
+        "ring1",
+        "ring2",
+        "ring4"
+      ],
+      "stage1_R_per_scene": {
+        "open-101": [
+          190,
+          150,
+          150,
+          150
+        ],
+        "open-307": [
+          170,
+          160,
+          160,
+          160
+        ],
+        "maze-148": [
+          120,
+          120,
+          120,
+          120
+        ],
+        "maze-354": [
+          130,
+          130,
+          130,
+          130
+        ],
+        "rooms-195": [
+          170,
+          170,
+          170,
+          170
+        ],
+        "rooms-401": [
+          170,
+          180,
+          180,
+          180
+        ],
+        "lanes-242": [
+          130,
+          130,
+          130,
+          130
+        ],
+        "lanes-448": [
+          170,
+          170,
+          170,
+          180
+        ],
+        "clusters-289": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "clusters-495": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "crossroads-336": [
+          190,
+          190,
+          190,
+          190
+        ],
+        "crossroads-542": [
+          160,
+          140,
+          140,
+          140
+        ]
+      },
+      "summary": {
+        "s04": {
+          "R_mean": 166.7,
+          "score_mean": 33.33
+        },
+        "ring1": {
+          "R_mean": 161.7,
+          "score_mean": 32.33
+        },
+        "ring2": {
+          "R_mean": 161.7,
+          "score_mean": 32.33
+        },
+        "ring4": {
+          "R_mean": 162.5,
+          "score_mean": 32.5
+        }
+      },
+      "stage2": "bit-identical (R/D/score/win/deaths per scene)"
+    }
+  },
+  "selection_guard": "selection未变（s04），不重跑heldout；封存heldout复用：obj 0.8437（stage1 32.67/40, stage2 43.89/60）。",
+  "selected": "selected-parameters-ring-2026-10-29.json（s04, ring默认0.0关闭）",
+  "heldout_scenes": "29003（封存复用，未重评）",
+  "heldout_results": "sealed reuse: obj 0.8437",
+  "heldout_summaries": {
+    "stage1_score_mean": 32.666666666666664,
+    "stage2_score_mean": 43.8875,
+    "R_mean": 69.58333333333333,
+    "D_mean": 590.1041666666666,
+    "M_mean": 2.8333333333333335,
+    "deaths_mean": 4.708333333333333,
+    "win_share": 0.5416666666666666
+  }
+}

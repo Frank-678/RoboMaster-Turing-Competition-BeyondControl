@@ -1103,7 +1103,15 @@ Json Strategy::decide(const Json &p) {
           }
         if (newly_visible > 0) waypoints.push_back({newly_visible, cell});
       }
-      std::sort(waypoints.begin(), waypoints.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+      // 近出生点完成覆盖：观察点增益加上距出生点越近越高的加成，优先揭示出生点附近的未探索格
+      // （rooms-195：左侧列30R口袋距出生点仅11-15，却因巡回先扫远侧直到t91-99才被揭示）。
+      const auto ring_bonus = [&](const Cell &cell) {
+        if (parameters_.stage1_ring_value <= 0 || !spawn_) return 0.0;
+        return parameters_.stage1_ring_value * 10.0 / (manhattan(cell, *spawn_) + 1); // 增益单位换算；1.0≈近出生点格+1~2增益。
+      };
+      std::sort(waypoints.begin(), waypoints.end(), [&](const auto &a, const auto &b) {
+        return a.first + ring_bonus(a.second) > b.first + ring_bonus(b.second);
+      });
       // 上一帧巡回首停点仍在边界上就固定为本周起点，避免对称边界上首停点每帧来回翻转（原地抖动）。
       const Cell hint = (previous_goal && previous_goal->kind == "explore_tour") ? previous_goal->position : Cell{-1, -1};
       std::vector<Cell> picked; // 少而分散的观察点；只排序并执行首步，每帧重排。
@@ -1111,13 +1119,13 @@ Json Strategy::decide(const Json &p) {
       if (hint.first >= 0) {
         const auto found = std::find_if(waypoints.begin(), waypoints.end(),
             [&](const auto &entry) { return entry.second == hint; });
-        if (found != waypoints.end()) { picked.push_back(hint); values[hint] = static_cast<double>(found->first); }
+        if (found != waypoints.end()) { picked.push_back(hint); values[hint] = static_cast<double>(found->first) + ring_bonus(hint); }
       }
       for (const auto &[gain, cell] : waypoints) {
         if (picked.size() >= 8) break;
         if (std::any_of(picked.begin(), picked.end(), [&](const Cell &other) { return manhattan(other, cell) <= 2; })) continue;
         picked.push_back(cell);
-        values[cell] = static_cast<double>(gain);
+        values[cell] = static_cast<double>(gain) + ring_bonus(cell);
       }
       if (picked.size() >= 2) {
         if (const auto tour = resource_tour(start, remaining_ticks, picked, occupied, &values, hint)) {
