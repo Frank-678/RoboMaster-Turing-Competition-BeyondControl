@@ -62,7 +62,7 @@ private:
     double utility, benefit; // 整串收益/耗时、整串收益；均为估值，不回写官方成绩。
     std::vector<Cell> stops; // 尚未执行的资源目标串，每帧重新验证，不是待发送动作队列。
   };
-  // 在已知格上比较最多三个资源目标；每步核对公告期限和剩余Tick，只返回各首方向的最好资源串。
+  // 在已知格上按配置深度比较资源目标；每步核对公告期限和剩余Tick，只返回各首方向的最好资源串。
   std::vector<ResourcePlan> resource_plans(Cell start, Tick tick, Tick remaining_ticks,
       const std::vector<Cell> &targets, const std::set<Cell> &occupied,
       const std::array<bool, 4> &first_allowed, double current_r,

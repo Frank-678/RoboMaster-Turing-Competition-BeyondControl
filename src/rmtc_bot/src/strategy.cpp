@@ -848,7 +848,7 @@ Json Strategy::decide(const Json &p) {
     }
     for (const auto &[cell,tile] : tiles_) if (tile.seen && !tile.wall) {
       input.walkable.insert(cell);
-      if (tile.value > 0 && tile.last_seen == tick) input.resources[cell]=tile.value; // 两步精确拾取只用本帧资源，旧记忆仍走目标估值。
+      if (tile.value > 0 && tile.last_seen == tick) input.resources[cell]=tile.value; // 短期精确拾取只用本帧资源，旧记忆仍走目标估值。
     }
     for (const auto &[key,event] : events_) { (void)key;input.events.push_back(event); }
     for (const auto &mission : missions) if (!completed.count(mission.at("id").get<std::string>())) {
