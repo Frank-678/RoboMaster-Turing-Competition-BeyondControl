@@ -81,6 +81,7 @@ Strategy::Strategy(int stage, rmtc::StrategyParameters parameters) : stage_(stag
 void Strategy::reset() {
   tiles_.clear(); probe_attempts_.clear(); history_.clear(); events_.clear(); capture_progress_.clear(); spawn_.reset();
   opponents_.clear(); // 不把上一场或旧席位的轨迹带入新场。
+  planned_resources_.clear();
   goal_.reset(); // 新场没有上一目标，也没有必须继续执行的旧路线。
   model_reply_seen_ = resource_counts_known_ = false;
   observed_normal_ = observed_high_ = 0; previous_score_tick_ = -1; previous_resource_total_ = 0;
@@ -184,108 +185,144 @@ std::array<bool, 5> Strategy::safe_first_steps(Cell start, Tick tick, const std:
 std::vector<Strategy::ResourcePlan> Strategy::resource_plans(Cell start, Tick tick, Tick remaining_ticks,
     const std::vector<Cell> &targets, const std::set<Cell> &occupied,
     const std::array<bool, 4> &first_allowed, double current_r,
-    bool need_normal, bool need_high, double value_target) const {
-  using Clock = std::chrono::steady_clock; // 搜索墙钟只管计算预算，事件生效仍使用逻辑Tick。
+    bool need_normal, bool need_high, double value_target, const std::vector<Cell> &previous_plan) const {
+  using Clock = std::chrono::steady_clock; // 墙钟只管计算预算，事件仍用逻辑Tick。
   const auto deadline = Clock::now() + std::chrono::milliseconds(parameters_.resource_plan_budget_ms);
   const auto time_up = [&] { return Clock::now() >= deadline; };
   struct State {
-    Cell position{}, first_resource{}; // 预计当前落点、途中第一份资源；不改本车真实位置。
-    int first = -1, elapsed = 0; // 整条路线首方向、已经花掉的MOVE数。
-    double virtual_r = 0, benefit = 0; // 计划内R与启发式收益，和官方score严格分开。
-    unsigned mission_bonus = 0; // 普通/高价值任务机会各付一次，避免每个资源重复领同一任务奖励。
-    std::set<Cell> collected; // 此计划已经拾取的坐标；包括路过的资源，后面不能再算。
+    Cell position{}, first_resource{}; // 计划末位置、路上首次拾取格；不是本车定位。
+    int first = -1, elapsed = 0; // 首方向、总MOVE数。
+    double virtual_r = 0, benefit = 0; // 计划R和收益，绝不回写官方成绩。
+    unsigned mission_bonus = 0; // 普通/高价值任务机会各估一次。
+    std::set<Cell> collected; // 包括顺路拾取，防止同一资源计两遍。
+    std::vector<Cell> stops; // 显式目标顺序，不包含已执行动作。
     double utility() const { return benefit / (elapsed + 1); }
   };
-  // 只在当前记忆确认可走的格子上找路；未知格由独立探索处理，不伪装成精确距离。
+  // 一帧内地图、占位和事件固定；同起点/终点/到达时刻的BFS可复用。下一帧全部丢弃。
+  std::map<std::tuple<Cell,Cell,int>,std::vector<Cell>> route_cache;
   const auto route = [&](const State &state, Cell target) {
-    std::map<Cell, std::pair<Cell, int>> parent; // 格子→前驱和本段最少步数，用于恢复实际经过的格子。
-    std::queue<Cell> pending; // 本段BFS队列。
-    parent[state.position] = {state.position, 0}; pending.push(state.position);
+    const auto key=std::make_tuple(state.position,target,state.elapsed);
+    const auto cached=route_cache.find(key);
+    if (cached!=route_cache.end()) return cached->second;
+    std::map<Cell,std::pair<Cell,int>> parent; // 前驱及本段距离，用来恢复实际经过格子。
+    std::queue<Cell> pending;
+    parent[state.position]={state.position,0};pending.push(state.position);
+    std::vector<Cell> path;
     while (!pending.empty() && !time_up()) {
-      const Cell cell = pending.front(); pending.pop();
-      const int distance = parent.at(cell).second; // 本段已走步数，不含之前各段。
-      if (cell == target) {
-        std::vector<Cell> path; // 恢复的路径不含起点，按实际MOVE顺序排列。
-        for (Cell at = target; at != state.position; at = parent.at(at).first) path.push_back(at);
-        std::reverse(path.begin(), path.end()); return path;
+      const Cell cell=pending.front();pending.pop();
+      const int distance=parent.at(cell).second;
+      if (cell==target) {
+        for (Cell at=target;at!=state.position;at=parent.at(at).first) path.push_back(at);
+        std::reverse(path.begin(),path.end());break;
       }
-      if (state.elapsed + distance >= remaining_ticks) continue;
-      for (int step = 0; step < 4; ++step) {
-        if (state.elapsed == 0 && distance == 0 && !first_allowed[step]) continue;
-        const Cell next{cell.first + steps[step].first, cell.second + steps[step].second};
-        const auto tile = tiles_.find(next); // 只用合法感知记忆，不读取练习地图。
-        const Tick action_tick = tick + state.elapsed + distance; // 这一格移动实际预计发生的Tick。
-        if (tile == tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(next) ||
-            parent.count(next) || split_wall(next, action_tick) || dangerous(next, action_tick + 1)) continue;
-        parent[next] = {cell, distance + 1}; pending.push(next);
+      if (state.elapsed+distance>=remaining_ticks) continue;
+      for (int direction=0;direction<4;++direction) {
+        if (state.elapsed==0 && distance==0 && !first_allowed[direction]) continue;
+        const Cell next{cell.first+steps[direction].first,cell.second+steps[direction].second};
+        const auto tile=tiles_.find(next);
+        const Tick action_tick=tick+state.elapsed+distance;
+        if (tile==tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(next) ||
+            parent.count(next) || split_wall(next,action_tick) || dangerous(next,action_tick+1)) continue;
+        parent[next]={cell,distance+1};pending.push(next);
       }
     }
-    return std::vector<Cell>(); // 不可达或预算耗尽；调用者继续已有基线。
+    if (!time_up()) route_cache.emplace(key,path); // 不把预算中断误记成不可达。
+    return path;
   };
-  const auto ranked_before = [](const State &a, const State &b) {
-    // 排序使用严格顺序；同收益/耗时优先兑现更多资源，再优先短路与稳定方向顺序。
-    return std::make_tuple(-a.utility(), -a.benefit, a.elapsed, a.first, a.position) <
-           std::make_tuple(-b.utility(), -b.benefit, b.elapsed, b.first, b.position);
-  };
-  std::array<std::optional<State>, 4> best; // 每个真实首方向的最好资源串，避免只返回一条而漏掉争格替代路线。
-  State initial; initial.position = start; initial.virtual_r = current_r;
-  std::vector<State> beam{initial}; // 当前这一层保留的少量候选计划。
-  for (int depth = 0; depth < parameters_.resource_plan_depth && !time_up(); ++depth) {
-    std::vector<State> expanded; // 从本层各候选再接一个资源目标。
-    for (const auto &state : beam) {
-      for (const Cell &target : targets) {
-        if (time_up()) break;
-        if (state.collected.count(target) || target == state.position) continue;
-        const auto path = route(state, target);
-        if (path.empty()) continue;
-        State child = state; // 分支各自保存拾取集合，不污染其他计划或真实状态。
-        if (child.first < 0) child.first = ray(start, path.front());
-        for (const Cell &cell : path) {
-          ++child.elapsed; child.position = cell;
-          const auto &tile = tiles_.at(cell); // 路段已确认该格可通行。
-          if (tile.value <= 0 || !child.collected.insert(cell).second) continue;
-          if (child.collected.size() == 1) child.first_resource = cell;
-          const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * parameters_.stale_resource_decay);
-          double gain = tile.value; // 第一阶段最大化采集；第二阶段才用封顶分差和任务机会。
-          if (stage_ == 2) {
-            gain = rmtc::score_delta(child.virtual_r, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
-            const unsigned bonus_bit = tile.high ? 2U : 1U; // 两类资源任务各一个机会标记。
-            if ((tile.high ? need_high : need_normal) && !(child.mission_bonus & bonus_bit)) {
-              gain += parameters_.resource_mission_bonus; child.mission_bonus |= bonus_bit;
-            }
-            gain += 0.1 * std::min(tile.value, std::max(0.0, value_target - child.virtual_r));
-          }
-          child.virtual_r += tile.value; child.benefit += gain * freshness;
+  // 每条修改后的串都从真实位置完整重算路径、沿途拾取、期限和收益，不只交换一个距离数字。
+  const auto extend = [&](const State &state,Cell target) -> std::optional<State> {
+    const auto tile=tiles_.find(target);
+    if (target==state.position || state.collected.count(target) || tile==tiles_.end() || tile->second.value<=0) return std::nullopt;
+    const auto path=route(state,target);
+    if (path.empty()) return std::nullopt;
+    State child=state;child.stops.push_back(target);
+    if (child.first<0) child.first=ray(start,path.front());
+    for (Cell cell:path) {
+      ++child.elapsed;child.position=cell;
+      const auto &item=tiles_.at(cell);
+      if (item.value<=0 || !child.collected.insert(cell).second) continue;
+      if (child.collected.size()==1) child.first_resource=cell;
+      const double freshness=1.0/(1.0+std::max<Tick>(0,tick-item.last_seen)*parameters_.stale_resource_decay);
+      double gain=item.value;
+      if (stage_==2) {
+        gain=rmtc::score_delta(child.virtual_r,item.value,120,30)+std::min(item.value,20.0)*0.001;
+        const unsigned bit=item.high ? 2U : 1U;
+        if ((item.high ? need_high : need_normal) && !(child.mission_bonus&bit)) {
+          gain+=parameters_.resource_mission_bonus;child.mission_bonus|=bit;
         }
-        if (child.first < 0 || !std::isfinite(child.benefit) || !std::isfinite(child.virtual_r)) continue;
-        if (child.collected.size() >= 2) {
-          auto &previous = best[child.first]; // 浮点近似同分时选兑现更多的串，处理20/2与30/3的平局。
-          if (!previous || child.utility() > previous->utility() + 1e-9 ||
-              (std::abs(child.utility() - previous->utility()) <= 1e-9 && child.benefit > previous->benefit))
-            previous = child;
-        }
-        expanded.push_back(std::move(child));
+        gain+=0.1*std::min(item.value,std::max(0.0,value_target-child.virtual_r));
       }
+      child.virtual_r+=item.value;child.benefit+=gain*freshness;
+    }
+    if (child.first<0 || !std::isfinite(child.benefit) || !std::isfinite(child.virtual_r)) return std::nullopt;
+    return child;
+  };
+  const auto ranked_before=[](const State &a,const State &b) {
+    return std::make_tuple(-a.utility(),-a.benefit,a.elapsed,a.first,a.position)<
+           std::make_tuple(-b.utility(),-b.benefit,b.elapsed,b.first,b.position);
+  };
+  std::array<std::optional<State>,4> best; // 各首方向各留最好串，供争格或战术改选。
+  const auto record=[&](const State &state) {
+    if (state.first<0 || state.collected.size()<2) return;
+    auto &old=best[state.first];
+    if (!old || state.utility()>old->utility()+1e-9 ||
+        (std::abs(state.utility()-old->utility())<=1e-9 && state.benefit>old->benefit)) old=state;
+  };
+  State initial;initial.position=start;initial.virtual_r=current_r;
+  const auto evaluate_stops=[&](const std::vector<Cell> &stops) {
+    State state=initial;
+    for (Cell stop:stops) {
+      if (time_up()) break;
+      if (state.collected.count(stop) || stop==state.position) continue;
+      const auto child=extend(state,stop);
+      if (!child) break; // 留下仍可用前缀，绝不穿过已失效的一段。
+      state=*child;record(state);
+    }
+    return state;
+  };
+  if (parameters_.resource_refinement) evaluate_stops(previous_plan);
+  std::vector<State> beam{initial};
+  for (int depth=0;depth<parameters_.resource_plan_depth && !time_up();++depth) {
+    std::vector<State> expanded;
+    for (const auto &state:beam) for (Cell target:targets) {
+      if (time_up()) break;
+      const auto child=extend(state,target);
+      if (child) {record(*child);expanded.push_back(*child);}
     }
     if (expanded.empty()) break;
-    std::stable_sort(expanded.begin(), expanded.end(), ranked_before);
-    std::vector<State> selected; // 下一层先各取一个不同首方向，再填剩余名额。
-    std::vector<bool> used(expanded.size(), false);
-    std::array<bool, 4> used_direction = {};
-    std::set<std::tuple<int, Cell, std::set<Cell>, int>> unique; // 相同首步、落点、拾取集合和耗时不重复占束宽。
-    for (int pass = 0; pass < 2; ++pass) {
-      for (std::size_t i = 0; i < expanded.size() && selected.size() < static_cast<std::size_t>(parameters_.resource_beam_width); ++i) {
-        const auto &candidate = expanded[i];
-        if (used[i] || (pass == 0 && used_direction[candidate.first])) continue;
-        if (!unique.emplace(candidate.first, candidate.position, candidate.collected, candidate.elapsed).second) continue;
-        used[i] = true; used_direction[candidate.first] = true; selected.push_back(candidate);
-      }
+    std::stable_sort(expanded.begin(),expanded.end(),ranked_before);
+    std::vector<State> selected;
+    std::vector<bool> used(expanded.size(),false);std::array<bool,4> used_direction{};
+    std::set<std::tuple<int,Cell,std::set<Cell>,int>> unique;
+    for (int pass=0;pass<2;++pass) for (std::size_t i=0;i<expanded.size() && selected.size()<static_cast<std::size_t>(parameters_.resource_beam_width);++i) {
+      const auto &candidate=expanded[i];
+      if (used[i] || (pass==0 && used_direction[candidate.first]) ||
+          !unique.emplace(candidate.first,candidate.position,candidate.collected,candidate.elapsed).second) continue;
+      used[i]=true;used_direction[candidate.first]=true;selected.push_back(candidate);
     }
-    beam = std::move(selected);
+    beam=std::move(selected);
   }
-  std::vector<ResourcePlan> result; // 只是给本Tick增加候选，最终仍经过原来的危险、攻防和幻术处理。
-  for (const auto &state : best)
-    if (state) result.push_back({state->first, state->first_resource, state->utility(), state->benefit});
+  // 小范围局部改进：从当前最好串出发，轮流反转/插入/删除；每次都按相同规则重评。
+  for (int trial=0;parameters_.resource_refinement && trial<parameters_.resource_refinement_trials && !time_up();++trial) {
+    const State *seed=nullptr;
+    for (const auto &candidate:best) if (candidate && (!seed || ranked_before(*candidate,*seed))) seed=&*candidate;
+    if (!seed) break;
+    auto stops=seed->stops;
+    const std::size_t n=stops.size(),position=(trial/3)%n;
+    if (trial%3==0 && n>1) {
+      const std::size_t other=(position+1+(trial/9))%n;
+      std::reverse(stops.begin()+std::min(position,other),stops.begin()+std::max(position,other)+1);
+    } else if (trial%3==1 && !targets.empty()) {
+      const Cell target=targets[(trial/3)%targets.size()];
+      if (std::find(stops.begin(),stops.end(),target)!=stops.end()) continue;
+      stops.insert(stops.begin()+position,target);
+      if (stops.size()>static_cast<std::size_t>(parameters_.resource_plan_depth)) stops.pop_back();
+    } else if (n>1) stops.erase(stops.begin()+position);
+    evaluate_stops(stops);
+  }
+  std::vector<ResourcePlan> result;
+  for (const auto &state:best) if (state)
+    result.push_back({state->first,state->first_resource,state->utility(),state->benefit,state->stops});
   return result;
 }
 
@@ -335,6 +372,7 @@ void Strategy::update_effects(Tick tick) {
 }
 
 Json Strategy::decide(const Json &p) {
+  const auto previous_plan=std::exchange(planned_resources_,std::vector<Cell>()); // 旧串仅是待重评候选，提前返回即失效。
   const auto previous_goal = std::exchange(goal_, std::nullopt); // 先取出旧目标；异常、死亡和提前避险都不会续签它。
   const auto fallback = [&](const char *reason) {
     // reason是本次兜底原因；只在已知存活的第二阶段返回合法DEFEND。
@@ -598,10 +636,12 @@ Json Strategy::decide(const Json &p) {
   double best_benefit = 0; // 同类资源的单位耗时收益打平时，优先兑现总收益更多的串。
   std::vector<std::pair<double, Cell>> resource_options; // 单目标基线排序，供有界资源搜索挑候选。
   std::array<double, 5> direction_value; direction_value.fill(-1);
+  std::array<double,5> direction_benefit{};
+  std::array<std::vector<Cell>,5> direction_plan; // 只在该方向最终仍以资源串最优时保存。
   std::array<std::optional<Goal>, 5> direction_goal; // 战术改选另一首步时，保留那个方向真实对应的目标。
   const auto consider = [&](int step, double utility, const char *reason, std::optional<Cell> target = std::nullopt, double benefit = 0) {
     // step=-1代表留在当前格；安全检查也必须允许这一Tick继续原地驻留。
-    if (!safe_steps[step < 0 ? 4 : step]) return;
+    if (!safe_steps[step < 0 ? 4 : step]) return false;
     if (stage_ == 2 && step >= 0 && utility > 0) {
       const Cell next{start.first + steps[step].first, start.second + steps[step].second}; // 我方本Tick拟移动落点。
       unsigned contests = 0, pressures = 0; // 预计争同格、下一Tick可能入射线的稳定轨迹数；不是实测概率。
@@ -617,8 +657,11 @@ Json Strategy::decide(const Json &p) {
     if (keep_goal && target && previous_goal->kind == kind && previous_goal->position == *target)
       utility *= 1.0 + parameters_.goal_retention_bonus; // 只影响排序，危险守卫已在前面执行。
     const int index = step < 0 ? 4 : step;
-    if (utility > direction_value[index]) {
-      direction_value[index] = utility;
+    const bool improves_direction=utility>direction_value[index]+1e-9 ||
+      (std::abs(utility-direction_value[index])<=1e-9 && kind=="collect_resource" &&
+       direction_goal[index] && direction_goal[index]->kind==kind && benefit>direction_benefit[index]+1e-9);
+    if (improves_direction) {
+      direction_value[index] = utility;direction_benefit[index]=benefit;direction_plan[index].clear();
       direction_goal[index] = target ? std::optional<Goal>(Goal{*target, kind, tick}) : std::nullopt;
     }
     if (utility > best_utility + 1e-9 || (std::abs(utility - best_utility) <= 1e-9 &&
@@ -627,6 +670,7 @@ Json Strategy::decide(const Json &p) {
       best_benefit = benefit;
       best_goal = target ? std::optional<Goal>(Goal{*target, kind, tick}) : std::nullopt;
     }
+    return improves_direction;
   };
   unsigned least_visits = std::numeric_limits<unsigned>::max(); // 已知路线候选中最少访问次数。
   int exploration = -1; // 没有更高收益时采用的探索第一步。
@@ -710,8 +754,11 @@ Json Strategy::decide(const Json &p) {
       first_allowed[i] = route != paths.end() && route->second.distance == 1 && route->second.first == i;
     }
     for (const auto &plan : resource_plans(start, tick, remaining_ticks, targets, occupied,
-                                         first_allowed, resource_value, need_normal, need_high, value_target))
-      consider(plan.first, plan.utility, "collect_resource_chain", plan.first_resource, plan.benefit);
+                                         first_allowed, resource_value, need_normal, need_high, value_target,
+                                         keep_goal ? previous_plan : std::vector<Cell>())) {
+      if (consider(plan.first, plan.utility, "collect_resource_chain", plan.first_resource, plan.benefit))
+        direction_plan[plan.first]=plan.stops;
+    }
   }
   if (best_utility < 0 && remaining_ticks > 1) {
     // 没有资源/任务等更明确目标时，前往能增加可见范围的已知落点；不假设未知格里有什么。
@@ -797,7 +844,7 @@ Json Strategy::decide(const Json &p) {
     input.healing_until=healing_until_;input.healing_amount=healing_amount_;input.spawn=spawn_;input.capture_progress=capture_progress_;
     const auto choice=rmtc::tactical_choice(input,parameters_);
     if (choice.action.kind == rmtc::rules::ActionKind::move) {
-      goal_=direction_goal[choice.action.direction];return move(choice.action.direction,"tactical_reposition");
+      goal_=direction_goal[choice.action.direction];planned_resources_=direction_plan[choice.action.direction];return move(choice.action.direction,"tactical_reposition");
     }
     if (choice.action.kind == rmtc::rules::ActionKind::attack) {
       reason_="tactical_attack";return {{"action","attack"},{"direction",directions[choice.action.direction]}};
@@ -810,6 +857,7 @@ Json Strategy::decide(const Json &p) {
     return {{"action", "attack"}, {"direction", directions[attack_direction]}};
   }
   if (best_step >= 0 && !reverse_unknown_) {
+    planned_resources_=direction_plan[best_step];
     goal_ = std::move(best_goal); // 记的是当前目标；下一帧仍重新BFS、重读真实位置与回执。
     return move(best_step, best_reason);
   }
