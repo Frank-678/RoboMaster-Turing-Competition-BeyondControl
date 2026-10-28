@@ -1075,7 +1075,7 @@ Json Strategy::decide(const Json &p) {
   };
   if (best_utility < 0 && remaining_ticks > 1) {
     // 没有资源/任务等更明确目标时，前往能增加可见范围的已知落点；不假设未知格里有什么。
-    if (stage_ == 1 && !reverse_unknown_ && parameters_.explore_tour_value > 0 && !parameters_.stage1_flood_fill) {
+    if (stage_ == 1 && !reverse_unknown_ && parameters_.explore_tour_value > 0) {
       // 近邻边界单格只是局部最优；把散布的边界观察点排成小巡回，系统扫过多个方向，减少同区反复。
       std::vector<std::pair<int,Cell>> waypoints; // 观察收益与有未知邻格的已知格。
       for (const Cell &cell : order) {
@@ -1119,9 +1119,9 @@ Json Strategy::decide(const Json &p) {
         }
       }
     }
-    if (stage_ == 1 && parameters_.stage1_flood_fill) {
+    if (stage_ == 1 && parameters_.stage1_flood_value > 0) {
       // 第一阶段是单人采集竞速：空档期按“最近未知邻接格”做洪泛式扫图，距离优先、同距离取更大新视野。
-      // 散点巡回在迷宫/车道类地图会反复横穿已探明走廊（lanes-242实测浪费20+tick绕行远离60R），洪泛系统性逼近物理上限。
+      // 与散点巡回、frontier同场竞争：迷宫/车道里洪泛减少横穿走廊（maze-148 +20R），开阔图由巡回的系统覆盖取胜。
       int nearest_distance = std::numeric_limits<int>::max(), nearest_gain = 0, nearest_first = -1;
       Cell nearest_cell{-1, -1};
       for (const Cell &cell : order) { // order按BFS距离升序；最近一层已有候选就不再评估更远格。
@@ -1147,8 +1147,9 @@ Json Strategy::decide(const Json &p) {
         }
       }
       if (nearest_first >= 0)
-        consider(nearest_first, parameters_.frontier_value * nearest_gain / (nearest_distance + 1), "flood_fill", nearest_cell);
-    } else if (stage_ == 1) consider_frontier(false);
+        consider(nearest_first, parameters_.stage1_flood_value * nearest_gain / (nearest_distance + 1), "flood_fill", nearest_cell);
+    }
+    if (stage_ == 1) consider_frontier(false);
   }
   // 第二阶段到点任务没有截止时间、资源先到先得：扫近处边界必须与任务/交战公平竞争，不能只在空档期生效。
   if (stage_ == 2 && !reverse_unknown_ && remaining_ticks > 1) consider_frontier(true);

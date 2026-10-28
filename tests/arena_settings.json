@@ -44,7 +44,7 @@
     "explore_toward_resource_value": 0.0,
     "explore_tour_value": 0.0,
     "mission_explore_value": 2.0,
-    "stage1_flood_fill": false,
+    "stage1_flood_value": 0.0,
     "stage2_race_gate": false,
     "tactical_search": false,
     "tactical_risk": 0.35,
