@@ -2,6 +2,7 @@
 #include "rmtc_bot/session.hpp"
 #include "rmtc_bot/protocol.hpp"
 #include "rmtc_bot/scoring.hpp"
+#include "rmtc_bot/tactics.hpp"
 #include <algorithm>
 #include <cmath>
 #include <chrono>
@@ -103,6 +104,7 @@ void turn_state_transitions() {
 }
 // 同席位连续三帧形成两次相同位移：提前折扣争格/下Tick射线；断帧、无ID、墙前放弃猜测。
 void opponent_prediction() {
+  auto weights=rmtc::StrategyParameters::competition(); weights.tactical_search=false; // 单独检验轨迹推断，不让独立的多情景战术层改写断言。
   const auto traffic = [](int tick, int enemy_x, int enemy_y, bool identified = true) {
     auto p = fresh(tick); // 我方始终在[4,4]；两份资源价值相同，原顺序优先向上。
     auto enemy = robot(enemy_x - 4, enemy_y - 4); // 夹具只给本队可见的敌车状态。
@@ -111,22 +113,23 @@ void opponent_prediction() {
     return p;
   };
   auto last = traffic(2, 3, 3); // 敌车若继续向右，将与我方争[4,3]。
-  check(choose(last)["direction"] == "up", "single observation fabricated an opponent trajectory");
-  Strategy contested(2); contested.decide(traffic(0, 1, 3)); contested.decide(traffic(1, 2, 3));
+  Strategy single(2,weights);
+  check(single.decide(last)["direction"] == "up", "single observation fabricated an opponent trajectory");
+  Strategy contested(2,weights); contested.decide(traffic(0, 1, 3)); contested.decide(traffic(1, 2, 3));
   check(contested.decide(last)["direction"] == "right", "stable opponent trajectory did not affect a contested resource");
-  Strategy pressure(2); pressure.decide(traffic(0, 1, 2)); pressure.decide(traffic(1, 2, 2));
+  Strategy pressure(2,weights); pressure.decide(traffic(0, 1, 2)); pressure.decide(traffic(1, 2, 2));
   check(pressure.decide(traffic(2, 3, 2))["direction"] == "right", "next-tick firing line was ignored");
-  Strategy blocked(2); blocked.decide(traffic(0, 1, 2)); blocked.decide(traffic(1, 2, 2));
+  Strategy blocked(2,weights); blocked.decide(traffic(0, 1, 2)); blocked.decide(traffic(1, 2, 2));
   auto wall = traffic(2, 3, 2); // 敌车预测落点[4,2]实际是已知墙，不能继续外推。
   wall["visible_entities"].push_back(entity("obstacle", 0, -2));
   check(blocked.decide(wall)["direction"] == "up", "opponent prediction moved through a known wall");
-  Strategy gap(2); gap.decide(traffic(0, 1, 3)); gap.decide(traffic(1, 2, 3));
+  Strategy gap(2,weights); gap.decide(traffic(0, 1, 3)); gap.decide(traffic(1, 2, 3));
   check(gap.decide(traffic(5, 3, 3))["direction"] == "up", "stale observations were treated as consecutive movement");
-  Strategy anonymous(2); anonymous.decide(traffic(0, 1, 3, false)); anonymous.decide(traffic(1, 2, 3, false));
+  Strategy anonymous(2,weights); anonymous.decide(traffic(0, 1, 3, false)); anonymous.decide(traffic(1, 2, 3, false));
   check(anonymous.decide(traffic(2, 3, 3, false))["direction"] == "up", "anonymous opponents were matched by position");
   contested.reset();
   check(contested.decide(last)["direction"] == "up", "new match inherited old opponent motion");
-  Strategy lethal(2); lethal.decide(traffic(0, 1, 4)); lethal.decide(traffic(1, 2, 4));
+  Strategy lethal(2,weights); lethal.decide(traffic(0, 1, 4)); lethal.decide(traffic(1, 2, 4));
   auto hurt = traffic(2, 3, 4); hurt["self"]["hp"] = 15; // 本Tick已经在射程，预测不应允许MOVE逃掉当前攻击。
   check(lethal.decide(hurt)["action"] == "defend", "future prediction overrode current lethal combat");
 }
@@ -181,6 +184,32 @@ void frontier_exploration() {
   blast["area"] = {5, 0, 5, 2}; blast["amount"] = 80;
   Strategy guarded(2); guarded.merge_events(events(blast));
   check(guarded.decide(p)["direction"] != "right", "frontier utility bypassed announced danger");
+}
+// 单独检验三Tick战术：逃离未来火线、反伤最差情景、任务分资格假设和确定首步安全。
+void tactical_scenarios() {
+  rmtc::TacticalInput input{};input.tick=0;input.remaining_ticks=3;input.width=input.height=9;
+  for (auto &car:input.fighters) car.alive=false;
+  input.fighters[0]={{4,4},30,20,10,1,true,false,false};
+  input.fighters[1]={{5,4},100,20,10,1,true,false,false};
+  for (int y=0;y<9;++y) for (int x=0;x<9;++x) input.walkable.insert({x,y});
+  input.safe_first.fill(true);input.goal_value.fill(0);
+  auto parameters=rmtc::StrategyParameters::competition();parameters.tactical_search=true;
+  auto choice=rmtc::tactical_choice(input,parameters);
+  check(choice.action.kind==rmtc::rules::ActionKind::move,"short search kept defending until unavoidable third-tick death");
+  input.safe_first={false,false,false,false,true};input.walkable={{4,4},{5,4}};
+  rmtc::Event reflection;reflection.kind=rmtc::EventKind::reflect;reflection.start=0;reflection.end=5;reflection.amount=20;
+  input.events={reflection};parameters.tactical_risk=0.6;
+  choice=rmtc::tactical_choice(input,parameters);
+  check(choice.action.kind==rmtc::rules::ActionKind::defend,"reflection guard scenario was ignored in constrained duel");
+  input.events.clear();input.fighters[1].alive=false;input.fighters[0].hp=100;input.walkable.insert({4,3});
+  input.safe_first={true,false,false,false,true};input.resources={{{4,3},10}};
+  input.missions={{"resource_value",10,{0,0}}};
+  const auto without=rmtc::tactical_choice(input,parameters);
+  input.model_reply_seen=true;
+  const auto with=rmtc::tactical_choice(input,parameters);
+  check(with.action.kind==rmtc::rules::ActionKind::move && with.action.direction==0,"tactical search ignored known resource");
+  check(std::abs(with.value-without.value-5)<1e-8,"task score was invented before model reply or paid repeatedly");
+  check(with.simulated_steps<=600 && with.scenarios==5,"bounded tactical search exceeded declared work limit");
 }
 // 验证封顶跨线、小数D、死亡扣除及官方D下降后的重新决策。
 void capped_score_decisions() {
@@ -341,10 +370,11 @@ void future_escape_route() {
 }
 // 验证堡垒驻留、跨死亡保留、回血、反伤、辣椒和易伤时序。
 void fortress_and_effects() {
+  auto effect_parameters=rmtc::StrategyParameters::competition(); effect_parameters.tactical_search=false; // 隔离效果重建；三Tick战术另有回归与对战。
   auto fortress = specification("fortress", 0, 20); // 非固定中心范围的堡垒事件。
   fortress["area"] = {2, 2, 3, 3}; fortress["capture_ticks"] = 2;
   fortress["amount"] = 50; fortress["defended_damage"] = 10;
-  Strategy s; s.merge_events(events(fortress)); // 本场景主被测策略/场次。
+  Strategy s(2,effect_parameters); s.merge_events(events(fortress)); // 本场景主被测策略/场次。
   auto p = fresh(0, 3, 3); // 当前场景的公开感知JSON。
   check(s.decide(p)["action"] == "defend", "offset fortress ignored or hardcoded");
   p = fresh(1, 3, 3); p["visible_entities"] = {robot(1, 1, 30)};
@@ -359,14 +389,14 @@ void fortress_and_effects() {
   p["tick"] = 20; p["self"]["last_action"]["tick"] = 19;
   check(s.decide(p)["action"] != "attack", "expired fortress buff retained");
   fortress["amount"] = 20;
-  Strategy same_damage; same_damage.merge_events(events(fortress)); // 不同动作回执但相似血量的策略对照。
+  Strategy same_damage(2,effect_parameters); same_damage.merge_events(events(fortress)); // 不同动作回执但相似血量的策略对照。
   for (int t = 0; t <= 2; ++t) {
     p = fresh(t, 3, 3);
     if (t == 2) p["visible_entities"] = {robot(1, 1, 10)};
     const auto result = same_damage.decide(p);
     if (t == 2) check(result["action"] == "attack", "custom fortress damage disabled area geometry");
   }
-  Strategy interrupted; interrupted.merge_events(events(fortress)); // 驻留被死亡打断的堡垒策略。
+  Strategy interrupted(2,effect_parameters); interrupted.merge_events(events(fortress)); // 驻留被死亡打断的堡垒策略。
   interrupted.decide(fresh(0, 3, 3)); interrupted.decide(fresh(1, 3, 3));
   p = fresh(2, 3, 3); p["self"]["alive"] = false; interrupted.decide(p);
   p = fresh(3, 3, 3); p["self"]["position_reason"] = "respawn";
@@ -375,7 +405,7 @@ void fortress_and_effects() {
 
   auto vulnerable = specification("vulnerability", 0, 5); // 移动触发的易伤事件。
   vulnerable["trigger_end"] = 2; vulnerable["multiplier"] = 2;
-  Strategy v; v.merge_events(events(vulnerable)); // 易伤事件策略。
+  Strategy v(2,effect_parameters); v.merge_events(events(vulnerable)); // 易伤事件策略。
   p = fresh(); p["self"]["hp"] = 30; p["visible_entities"] = {robot(1, 0)};
   check(v.decide(p)["action"] == "attack", "vulnerability applied before movement");
   p = fresh(1, 5, 4); p["self"]["hp"] = 30; p["visible_entities"] = {robot(1, 0)};
@@ -388,18 +418,18 @@ void fortress_and_effects() {
   check(v.decide(p)["action"] == "attack", "vulnerability expiry extended by respawn");
 
   auto reflect = specification("reflect", 0, 10); reflect["amount"] = 20; // 攻击防御者会反伤的事件。
-  Strategy r; r.merge_events(events(reflect)); // 反伤事件策略。
+  Strategy r(2,effect_parameters); r.merge_events(events(reflect)); // 反伤事件策略。
   p = fresh(); p["visible_entities"] = {robot(1, 0, 100, false, true)};
   check(r.decide(p)["action"] != "attack", "reflection into a defending target ignored");
 
   auto heal = specification("heal", 0, 10); // 成功入点才触发的治疗事件。
   heal["points"] = {{5, 4}}; heal["amount"] = 10; heal["effect_ticks"] = 3;
-  Strategy h; h.merge_events(events(heal)); // 治疗入点策略。
+  Strategy h(2,effect_parameters); h.merge_events(events(heal)); // 治疗入点策略。
   p = fresh(); p["self"]["hp"] = 30;
   check(h.decide(p)["direction"] == "right" && h.reason() == "seek_healing", "healing point not pursued at low HP");
 
   auto chili = specification("chili", 0, 10); chili["points"] = {{5, 4}}; chili["amount"] = 50; // 成功入点产生火线的辣椒事件。
-  Strategy c; c.merge_events(events(chili)); // 辣椒事件策略。
+  Strategy c(2,effect_parameters); c.merge_events(events(chili)); // 辣椒事件策略。
   p = fresh(); p["visible_entities"] = {robot(1, 3, 20)};
   check(c.decide(p)["direction"] == "right" && c.reason() == "trigger_chili", "chili entry opportunity ignored");
   p = fresh(1, 5, 3); p["self"]["hp"] = 30;
@@ -431,7 +461,7 @@ void session_contract() {
 
 // 汇总运行全部第二阶段核心场景；不需要网络或ROS。
 void full_scenarios() {
-  turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences(); frontier_exploration();
+  turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences(); frontier_exploration(); tactical_scenarios();
   combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
   future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";

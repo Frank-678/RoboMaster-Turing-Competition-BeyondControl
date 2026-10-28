@@ -51,5 +51,11 @@ inline constexpr int resource_plan_budget_ms = 10;  // 额外搜索软预算；�
 inline constexpr double frontier_value = 0.02;      // 每份潜在新视野的信息权重；不是资源分或必然有资源的概率。
 inline constexpr double opponent_contest_cost = 1.0; // 稳定轨迹预计争同格时，给路线增加一份等待成本；启发式，非概率。
 inline constexpr double opponent_pressure_cost = 0.25; // 下一Tick可能进入稳定轨迹敌车射线时的软成本，不改变攻击时序。
+inline constexpr bool tactical_search = true;       // 可见敌车附近才比较最多三Tick、多个合法对手情景。
+inline constexpr double tactical_risk = 0.35;        // 最差情景的权重；不是经训练的概率。
+inline constexpr double tactical_hp_value = 0.015;   // 每HP的未来机会估值，不写入官方分数。
+inline constexpr double tactical_death_cost = 1.0;   // 除规则D扣除外，死亡丢失位置/行动窗口的估值。
+inline constexpr double tactical_future_discount = 0.65; // 第二Tick相对第一Tick的收益权重。
+inline constexpr double tactical_goal_weight = 0.35; // 原目标评价在战术比较中的尾部价值。
 }  // namespace rmtc::match_config
 

@@ -24,6 +24,7 @@ std::optional<Json> Session::act(const Json &p) {
     bool understood = false, partial = false; // 完整理解与部分理解分开，HTTP2xx不替代它们。
     try {
       if (result->http_success && !result->mock_response && result->session == session_) {
+        if (result->status == "model_reply_received") strategy_.note_model_reply();
         const auto proposal = decode_event_proposal(result->reply, session_, result->source, // 校验后的模型提案。
                                           p.at("map").at("width").get<int>(),
                                           p.at("map").at("height").get<int>());

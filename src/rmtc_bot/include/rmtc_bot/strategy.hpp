@@ -26,6 +26,7 @@ public:
   // 把已校验事件交给下一次LLM请求，避免模型反复“重新发现”同一个事件。
   nlohmann::json known_events() const;
   const std::string &reason() const { return reason_; } // 最近动作的原因，供日志解释。
+  void note_model_reply() { model_reply_seen_ = true; } // 本场已见非mock模型正文；仅影响收益假设，不冒充裁判资格。
 
 private:
   using Cell = rmtc::Cell; // 一个绝对格子[x,y]，不是相对方向。
@@ -81,12 +82,17 @@ private:
   // 不知道幻术激活时的位置时，reverse_unknown_=true，避免猜反方向。
   double vulnerability_ = 1, attack_damage_ = 20, defended_damage_ = 10; // 本车易伤倍率、攻击/对防御者伤害。
   Tick healing_until_ = -1; // 已知回血效果的绝对结束Tick。
+  double healing_amount_ = 0; // 与最近有效入点记录对应的每Tick回血量，不固定猜10HP。
   std::optional<Cell> spawn_; // 已确认的初始出生点；未知时为空。
   std::map<Cell, Tile> tiles_; // 格子坐标→地图记忆。
   std::map<Cell, unsigned> probe_attempts_;  // 未知格的试探次数；不算已到达或已探明。
   std::map<Tick, Snapshot> history_; // 感知Tick→本车历史快照。
   std::map<std::string, OpponentTrack> opponents_; // 本场公开敌车ID→短期轨迹，换场清空。
   std::optional<Goal> goal_; // 只保留目标，绝不缓存一串必须执行的未来动作。
+  bool model_reply_seen_ = false, resource_counts_known_ = false;
+  int observed_normal_ = 0, observed_high_ = 0; // 连续完整历史下，从官方R增量确认的拾取次数。
+  Tick previous_score_tick_ = -1;
+  double previous_resource_total_ = 0;
   std::map<std::string, rmtc::Event> events_; // 稳定事件key→最后一次校验通过的解释。
   std::map<std::string, int> capture_progress_; // 堡垒key→当前已确认连续驻留Tick数。
   std::string reason_; // 决策日志使用的短原因。
