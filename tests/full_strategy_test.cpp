@@ -130,6 +130,29 @@ void opponent_prediction() {
   auto hurt = traffic(2, 3, 4); hurt["self"]["hp"] = 15; // 本Tick已经在射程，预测不应允许MOVE逃掉当前攻击。
   check(lethal.decide(hurt)["action"] == "defend", "future prediction overrode current lethal combat");
 }
+// 视野缩小时旧资源只过时1Tick；别为了1%的新鲜度差反复换方向。
+void persistent_goal() {
+  auto opening = fresh(); // 两份20价值资源都在已知视野，等距时先选上方。
+  opening["vision_radius"] = 2;
+  opening["visible_entities"] = {entity("resource_high", 0, -2), entity("resource_high", 1, 1)};
+  Strategy strategy(2);
+  check(strategy.decide(opening)["direction"] == "up", "goal fixture did not begin upward");
+  auto next = fresh(1); // 上次未执行移动；位置取本帧真值，不按意图推进。
+  next["vision_radius"] = 1;
+  next["visible_entities"] = {entity("resource_high", 1, 1)};
+  check(strategy.decide(next)["direction"] == "up", "one stale tick caused target oscillation");
+  auto gone = fresh(2); // 恢复视野，明确看到旧资源已消失，迟滞必须立即失效。
+  gone["visible_entities"] = {entity("resource_high", 1, 1)};
+  check(strategy.decide(gone)["direction"] == "right", "commitment retained a vanished resource");
+  strategy.reset();
+  check(strategy.decide(next)["direction"] == "right", "new match inherited a previous goal");
+  auto terminal = fresh(500); // 正式第二阶段最终状态，已没有动作窗口。
+  rmtc::Session stage2(2);
+  check(!stage2.act(terminal), "terminal stage2 frame emitted an action");
+  terminal["tick"] = 100;
+  rmtc::Session stage1(1);
+  check(!stage1.act(terminal), "terminal stage1 frame emitted an action");
+}
 // 验证封顶跨线、小数D、死亡扣除及官方D下降后的重新决策。
 void capped_score_decisions() {
   check(std::abs(rmtc::score_delta(119, 20, 120, 30) - 0.25) < 1e-9, "resource cap crossing arithmetic");
@@ -379,7 +402,7 @@ void session_contract() {
 
 // 汇总运行全部第二阶段核心场景；不需要网络或ROS。
 void full_scenarios() {
-  turn_state_transitions(); opponent_prediction();
+  turn_state_transitions(); opponent_prediction(); persistent_goal();
   combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
   future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
