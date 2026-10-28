@@ -1211,6 +1211,10 @@ Json Strategy::decide(const Json &p) {
         }
         if (contested > 0) utility += parameters_.stage2_assassin_value * contested;
       }
+      // 饼窗口攻击折扣：竞速期攻击会把我们从抢饼线路吸走（clusters-495：t20-26攻击致死、错过中簇70R）；
+      // 还手（incoming>0）不折扣，不白挨打。与race gate不同：只压攻击估值，不动任务/接近等其他行为。
+      if (parameters_.stage2_pie_attack_discount > 0 && tick - last_resource_sighting_ < 60 && incoming == 0)
+        utility *= 1.0 - parameters_.stage2_pie_attack_discount;
       if (reflected + pre_damage >= hp) continue;
       if (utility > attack_utility) { attack_utility = utility; attack_direction = direction; }
     }
