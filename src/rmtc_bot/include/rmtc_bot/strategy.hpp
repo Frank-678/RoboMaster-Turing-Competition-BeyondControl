@@ -52,12 +52,13 @@ private:
     int first; // 本Tick世界方向，最后发送时才处理幻术反转。
     Cell first_resource; // 路上最先拿到的资源，也是目标迟滞使用的坐标。
     double utility, benefit; // 整串收益/耗时、整串收益；均为估值，不回写官方成绩。
+    std::vector<Cell> stops; // 尚未执行的资源目标串，每帧重新验证，不是待发送动作队列。
   };
   // 在已知格上比较最多三个资源目标；每步核对公告期限和剩余Tick，只返回各首方向的最好资源串。
   std::vector<ResourcePlan> resource_plans(Cell start, Tick tick, Tick remaining_ticks,
       const std::vector<Cell> &targets, const std::set<Cell> &occupied,
       const std::array<bool, 4> &first_allowed, double current_r,
-      bool need_normal, bool need_high, double value_target) const;
+      bool need_normal, bool need_high, double value_target, const std::vector<Cell> &previous_plan) const;
   std::optional<Cell> predict_opponent(const std::string &identity, Cell position, Tick tick);
   // 预测仅用同一敌车连续观测；断帧/瞬移重置，预测只降低候选收益，不当成必然占位。
   bool split_wall(Cell cell, Tick tick) const;
@@ -76,6 +77,7 @@ private:
   std::map<Tick, Snapshot> history_; // 感知Tick→本车历史快照。
   std::map<std::string, OpponentTrack> opponents_; // 本场公开敌车ID→短期轨迹，换场清空。
   std::optional<Goal> goal_; // 只保留目标，绝不缓存一串必须执行的未来动作。
+  std::vector<Cell> planned_resources_; // 仅供下一帧重评的资源串；换场、断帧、失败和改目标后清空。
   bool model_reply_seen_ = false, resource_counts_known_ = false;
   int observed_normal_ = 0, observed_high_ = 0; // 连续完整历史下，从官方R增量确认的拾取次数。
   Tick previous_score_tick_ = -1;
