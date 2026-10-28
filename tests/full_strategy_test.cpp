@@ -427,6 +427,23 @@ void gateway_scenarios(const std::string &base) {
     }
     throw std::runtime_error("mock gateway result missing");
   };
+  // 感知可重复携带整段近期公告。逐渐增长的100批输入不能被拼成100份历史。
+  rmtc::AiWorker cumulative(config("/cumulative")); // 使用正式工作线程和HTTP请求体。
+  cumulative.reset("cumulative"); q["session_id"] = "cumulative";
+  std::string history; // 裁判在这一帧携带的累积原文，每条只应保留一次。
+  for (int i = 0; i < 100; ++i) {
+    if (!history.empty()) history += '\n';
+    history += "fixture notice-" + std::to_string(i) + " " + std::string(200, 'x');
+    q["event_text"] = history;
+    cumulative.observe(q, Json::array()); // 在途请求期间，新公告也应继续保存。
+  }
+  const auto first_batch = receive(cumulative); // 第一批可能已完成，但主线程此时才取走。
+  cumulative.acknowledge(first_batch, true);
+  cumulative.observe(q, Json::array());
+  const auto latest_batch = receive(cumulative); // 再次请求必须携带最新完整公告。
+  check(latest_batch.source == history, "cumulative announcements duplicated or lost original text");
+  cumulative.acknowledge(latest_batch, true);
+  q["event_text"] = ""; // 后续限流/错误测试不继承这个专用场景的公告。
   rmtc::AiWorker rate(config("/rate")); // 模拟暂时限流的工作线程。
   rate.reset("rate"); q["session_id"] = "rate"; rate.observe(q, Json::array());
   auto limited = receive(rate); // 第一次429限流结果。
@@ -523,3 +540,4 @@ void practice_gateway_scenario(const std::string &endpoint) {
   }
   throw std::runtime_error("original practice forwarding did not reach the strategy: " + session.ai_status());
 }
+

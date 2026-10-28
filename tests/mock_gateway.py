@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 counts = Counter()  # 每个请求路径的次数，用于检查去重、退避和阶段隔离。
 lock = threading.Lock()  # HTTP处理线程与主测试线程共用的计数锁。
+cumulative_lengths = []  # 累积公告测试实际发到HTTP正文的行数。
 
 class Handler(BaseHTTPRequestHandler):
     # 本机假网关：按URL路径选择固定成功/错误回复，不访问真实模型。
@@ -34,6 +35,10 @@ class Handler(BaseHTTPRequestHandler):
             assert request["thinking"] == {"type": "disabled"}
             assert request["response_format"] == {"type": "json_object"}
         context = json.loads(request["messages"][1]["content"])  # 用户消息里的场次、公告和已知事件。
+        if self.path == "/cumulative":
+            lines = context["announcements"].splitlines()  # 夹具每条公告占一行，检测实际请求是否重复。
+            assert len(lines) == len(set(lines)), "cumulative announcement text duplicated on the wire"
+            cumulative_lengths.append(len(lines))
         with lock:
             counts[self.path] += 1
             attempt = counts[self.path]  # 该路径第几次请求，决定限流/部分结果的下一次回复。
@@ -99,6 +104,7 @@ def main():
         subprocess.run([str(Path(sys.argv[1]).resolve())], env=env, check=True, timeout=30)
         with lock:
             assert counts["/ok"] == 1, ("announcement deduplication failed", counts)
+            assert counts["/cumulative"] == 2 and cumulative_lengths == [1, 100], cumulative_lengths
             assert counts["/partial"] == 2, ("partial interpretation was not retried exactly once", counts)
             assert counts["/quota"] == 1, ("quota retried", counts)
             assert counts["/stage1-must-not-call"] == 0, counts
@@ -116,3 +122,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

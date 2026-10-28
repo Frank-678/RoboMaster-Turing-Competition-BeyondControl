@@ -92,6 +92,11 @@ void AiWorker::observe(const Json &p, const Json &known_events) {
   const auto text = p.value("event_text", std::string()); // 这帧携带的近期公告批次，可能与上一帧重复。
   if (text.size() > 65536) { status_ = "announcement_too_large"; return; }
   if (!text.empty() && seen_.insert(text).second) {
+    // 感知经常携带“旧公告+新公告”。新批次已原样包含旧批次时，移除旧副本。
+    // 只比较原文字节，不解释事件；否则100批累积文本会膨胀成约50倍上下文。
+    announcements_.erase(std::remove_if(announcements_.begin(), announcements_.end(),
+        [&text](const std::string &previous) { return text.find(previous) != std::string::npos; }),
+        announcements_.end()); // previous是已保存的一批完整原文；未被包含的旧公告继续保留。
     announcements_.push_back(text);
     invalid_replies_ = 0;
   }
@@ -279,3 +284,4 @@ void AiWorker::run() {
   }
 }
 }  // namespace rmtc
+
