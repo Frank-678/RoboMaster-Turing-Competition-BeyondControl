@@ -667,6 +667,22 @@ Json Strategy::decide(const Json &p) {
                                          first_allowed, resource_value, need_normal, need_high, value_target))
       consider(plan.first, plan.utility, "collect_resource_chain", plan.first_resource, plan.benefit);
   }
+  if (best_utility < 0 && remaining_ticks > 1) {
+    // 没有资源/任务等更明确目标时，前往能增加可见范围的已知落点；不假设未知格里有什么。
+    for (const Cell &cell : order) {
+      const auto node = paths.at(cell); // 到观察点的真实绕障距离和首方向。
+      if (node.first < 0 || node.distance >= remaining_ticks) continue;
+      int newly_visible = 0; // 用本帧实际视野半径计数，不固定写成9×9。
+      for (int y = std::max(0, cell.second - radius); y <= std::min(height - 1, cell.second + radius); ++y) {
+        for (int x = std::max(0, cell.first - radius); x <= std::min(width - 1, cell.first + radius); ++x) {
+          const auto tile = tiles_.find({x, y}); // 只估计能多看多少格，未知内容仍然未知。
+          newly_visible += tile == tiles_.end() || !tile->second.seen;
+        }
+      }
+      if (newly_visible > 0)
+        consider(node.first, cfg::frontier_value * newly_visible / (node.distance + 1), "explore_frontier", cell);
+    }
+  }
   if (best_utility < 0 && exploration >= 0) consider(exploration, 0.01, "explore");
 
   int attack_direction = -1;
