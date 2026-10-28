@@ -65,13 +65,14 @@ private:
       const auto session = p.at("session_id").get<std::string>(); // 用它确认终端和网页在看同一场。
       const auto sent = action ? action->at("action").get<std::string>() : "none"; // none表示本回调未发布。
       const auto direction = action ? action->value("direction", std::string("-")) : "-"; // 计划方向，区别于回执的实际方向。
+      const auto navigation=session_->navigation_diagnostics().dump(); // 当前无进展时长、脱困目标和暂缓数。
       const auto ai = session_->ai_diagnostics().dump(); // 本场HTTP统计和最近传输状态。
       const auto mode = rmtc::turn_mode_name(rmtc::turn_mode(p, cfg::stage)); // 本帧动作权限状态，与状态机图一致。
-      RCLCPP_INFO(get_logger(), "session=%s tick=%lld pos=%s mode=%s sent=%s direction=%s reason=%s ai=%s http_success=%d ai_calls=%s last_action=%s",
+      RCLCPP_INFO(get_logger(), "session=%s tick=%lld pos=%s mode=%s sent=%s direction=%s reason=%s ai=%s http_success=%d ai_calls=%s navigation=%s last_action=%s",
                   session.c_str(),
                   static_cast<long long>(rmtc::frame_tick(p)),
                   position.c_str(), mode, sent.c_str(), direction.c_str(), session_->reason().c_str(),
-                  session_->ai_status().c_str(), session_->ai_http_success(), ai.c_str(), receipt.c_str());
+                  session_->ai_status().c_str(), session_->ai_http_success(), ai.c_str(), navigation.c_str(), receipt.c_str());
     } catch (const std::exception &e) { // e只输出错误原因，不输出感知全文、令牌或请求头。
       RCLCPP_WARN(get_logger(), "Skipping invalid perception: %s", e.what());
     }

@@ -14,6 +14,8 @@ struct StrategyParameters {
   int resource_refinement_trials;
   bool tactical_search;
   double tactical_risk, tactical_hp_value, tactical_death_cost, tactical_future_discount, tactical_goal_weight;
+  bool loop_recovery; // 离线可关闭作对照；正式仍由唯一配置封存。
+  int loop_window_ticks, recovery_ticks, stalled_goal_cooldown_ticks; // 检测窗口、脱困期限、坏目标冷却。
   static StrategyParameters competition() {
     namespace c=match_config;
     return {c::stale_resource_decay,c::resource_mission_bonus,c::reach_mission_value,c::healing_below_hp,
@@ -21,7 +23,8 @@ struct StrategyParameters {
       c::opponent_contest_cost,c::opponent_pressure_cost,c::hazard_lead_ticks,c::resource_plan_depth,
       c::resource_beam_width,c::resource_candidate_limit,c::resource_plan_budget_ms,
       c::collision_replan,c::resource_refinement,c::resource_refinement_trials,c::tactical_search,
-      c::tactical_risk,c::tactical_hp_value,c::tactical_death_cost,c::tactical_future_discount,c::tactical_goal_weight};
+      c::tactical_risk,c::tactical_hp_value,c::tactical_death_cost,c::tactical_future_discount,c::tactical_goal_weight,
+      c::loop_recovery,c::loop_window_ticks,c::recovery_ticks,c::stalled_goal_cooldown_ticks};
   }
   void validate() const {
     for (double value:{stale_resource_decay,resource_mission_bonus,reach_mission_value,healing_below_hp,
@@ -30,7 +33,8 @@ struct StrategyParameters {
       if (!std::isfinite(value) || value<0 || value>1000) throw std::runtime_error("invalid strategy weight");
     if (healing_below_hp>100 || tactical_risk>1 || tactical_future_discount>1 || hazard_lead_ticks<0 || hazard_lead_ticks>20 || resource_plan_depth<1 || resource_plan_depth>8 ||
         resource_beam_width<1 || resource_beam_width>32 || resource_candidate_limit<1 || resource_candidate_limit>32 ||
-        resource_refinement_trials<0 || resource_refinement_trials>32 || resource_plan_budget_ms<1 || resource_plan_budget_ms>30) throw std::runtime_error("invalid strategy budget");
+        resource_refinement_trials<0 || resource_refinement_trials>32 || resource_plan_budget_ms<1 || resource_plan_budget_ms>30 || loop_window_ticks<6 || loop_window_ticks>32 ||
+        recovery_ticks<2 || recovery_ticks>64 || stalled_goal_cooldown_ticks<1 || stalled_goal_cooldown_ticks>200) throw std::runtime_error("invalid strategy budget");
   }
 };
 } // namespace rmtc
