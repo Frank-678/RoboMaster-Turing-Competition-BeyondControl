@@ -48,6 +48,7 @@ inline constexpr int resource_plan_depth = 3;       // 资源串最多扩展3个
 inline constexpr int resource_beam_width = 5;       // 每层最多保留5条未执行计划，优先保留不同首方向。
 inline constexpr int resource_candidate_limit = 8;  // 先按现有收益/距离挑8个资源；地图资源数不写死。
 inline constexpr int resource_plan_budget_ms = 10;  // 额外搜索软预算；耗尽时交回已算好的合法基线。
+inline constexpr double frontier_value = 0.02;      // 每份潜在新视野的信息权重；不是资源分或必然有资源的概率。
 inline constexpr double opponent_contest_cost = 1.0; // 稳定轨迹预计争同格时，给路线增加一份等待成本；启发式，非概率。
 inline constexpr double opponent_pressure_cost = 0.25; // 下一Tick可能进入稳定轨迹敌车射线时的软成本，不改变攻击时序。
 }  // namespace rmtc::match_config

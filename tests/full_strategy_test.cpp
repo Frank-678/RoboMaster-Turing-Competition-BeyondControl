@@ -172,6 +172,16 @@ void resource_sequences() {
   p["visible_entities"].push_back(robot(-1, 0));
   check(choose(p)["action"] == "defend", "collection search bypassed current lethal combat");
 }
+// 靠上边界时继续向上没有信息增益；用当前实际视野半径选能揭开未知格的方向。
+void frontier_exploration() {
+  auto p = fresh(0, 4, 1); p["vision_radius"] = 1;
+  check(choose(p)["direction"] == "right", "explorer revisited the edge instead of revealing unknown cells");
+  check(choose(p, 1)["direction"] == "right", "stage1 ignored frontier information gain");
+  auto blast = specification("explosion", 1, 2); // 右侧虽然信息多，下一Tick爆炸也必须绕开。
+  blast["area"] = {5, 0, 5, 2}; blast["amount"] = 80;
+  Strategy guarded(2); guarded.merge_events(events(blast));
+  check(guarded.decide(p)["direction"] != "right", "frontier utility bypassed announced danger");
+}
 // 验证封顶跨线、小数D、死亡扣除及官方D下降后的重新决策。
 void capped_score_decisions() {
   check(std::abs(rmtc::score_delta(119, 20, 120, 30) - 0.25) < 1e-9, "resource cap crossing arithmetic");
@@ -421,7 +431,7 @@ void session_contract() {
 
 // 汇总运行全部第二阶段核心场景；不需要网络或ROS。
 void full_scenarios() {
-  turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences();
+  turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences(); frontier_exploration();
   combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
   future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
