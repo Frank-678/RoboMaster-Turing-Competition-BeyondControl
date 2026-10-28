@@ -167,6 +167,18 @@ void resource_sequences() {
   p["visible_entities"].push_back(robot(-1, 0));
   check(choose(p)["action"] == "defend", "collection search bypassed current lethal combat");
 }
+// 重复争格/受阻时改走另一条合法首步；失败只看回执，不自行推进位置。
+void blocked_replanning() {
+  auto parameters=rmtc::StrategyParameters::competition();parameters.collision_replan=true;
+  Strategy strategy(1,parameters);
+  auto p=fresh();p["visible_entities"]={entity("resource_high",2,0)};
+  check(strategy.decide(p)["direction"]=="right","blocked fixture did not begin toward resource");
+  p["tick"]=1;p["self"]["last_action"]={{"tick",0},{"action","move"},{"moved",false}};
+  check(strategy.decide(p)["direction"]=="right","one transient block prematurely abandoned direct route");
+  p["tick"]=2;p["self"]["last_action"]["tick"]=1;
+  check(strategy.decide(p)["direction"]!="right","two repeated blocked moves did not choose a legal alternate first step");
+  strategy.reset();check(strategy.decide(p)["direction"]=="right","new match inherited collision history");
+}
 // 靠上边界时继续向上没有信息增益；用当前实际视野半径选能揭开未知格的方向。
 void frontier_exploration() {
   auto p = fresh(0, 4, 1); p["vision_radius"] = 1;
@@ -368,7 +380,7 @@ void session_contract() {
 }  // namespace
 
 void full_scenarios() {
-  turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences(); frontier_exploration(); tactical_scenarios();
+  turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences(); blocked_replanning(); frontier_exploration(); tactical_scenarios();
   combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
   future_escape_route(); fortress_and_effects(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";

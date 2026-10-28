@@ -77,6 +77,10 @@ private:
   std::map<Tick, Snapshot> history_; // 感知Tick→本车历史快照。
   std::map<std::string, OpponentTrack> opponents_; // 本场公开敌车ID→短期轨迹，换场清空。
   std::optional<Goal> goal_; // 只保留目标，绝不缓存一串必须执行的未来动作。
+  struct MoveAttempt { Cell from, destination; Tick tick; }; // 已发布意图，仅用于核对失败，绝不据此改坐标。
+  std::optional<MoveAttempt> move_attempt_;
+  std::optional<Cell> failed_destination_; // 连续失败的同一落点。
+  unsigned failed_moves_ = 0; // 当前落点被回执连续拒绝的次数。
   std::vector<Cell> planned_resources_; // 仅供下一帧重评的资源串；换场、断帧、失败和改目标后清空。
   bool model_reply_seen_ = false, resource_counts_known_ = false;
   int observed_normal_ = 0, observed_high_ = 0; // 连续完整历史下，从官方R增量确认的拾取次数。
