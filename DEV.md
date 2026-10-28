@@ -97,7 +97,7 @@ bash run.sh
 
 ## 验证
 
-不需要ROS的回归依赖g++、nlohmann-json3-dev、libcurl4-openssl-dev、python3；只读运行原版转发器另需python3-requests（原练习环境已要求安装）。
+不需要ROS的回归依赖g++、nlohmann-json3-dev、libcurl4-openssl-dev、python3；只读运行原版转发器与上游诊断夹具另需python3-requests（原练习环境已要求安装）。
 
 ```bash
 cd ~/cst

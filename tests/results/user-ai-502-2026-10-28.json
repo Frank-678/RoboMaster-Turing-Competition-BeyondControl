@@ -1,0 +1,114 @@
+{
+  "date": "2026-10-28",
+  "timezone": "Asia/Shanghai",
+  "source": "User-supplied terminal log, not a run performed in this tool environment",
+  "terminal_sha256": "15b4c0e475024a0df6f397067af039c9388b548fd0d10724c6b0b9b412ffc84f",
+  "terminal_bytes": 31012,
+  "build_banner": "Oct 28 2026 15:16:43",
+  "source_commit_provided": false,
+  "startup": {
+    "model": "deepseek-flash",
+    "thinking": "disabled",
+    "timeout_ms": 35000,
+    "connect_timeout_ms": 5000,
+    "bot_to_gateway_proxy": "direct"
+  },
+  "runs": [
+    {
+      "id": "run-1",
+      "source": "previous run",
+      "observed_ticks": [
+        0,
+        37
+      ],
+      "completed_requests": [
+        {
+          "finished": 1,
+          "last_http": 502,
+          "last_curl": 0,
+          "elapsed_ms": 6091,
+          "connect_ms": 1,
+          "first_byte_ms": 6090
+        },
+        {
+          "finished": 2,
+          "last_http": 502,
+          "last_curl": 0,
+          "elapsed_ms": 10109,
+          "connect_ms": 2,
+          "first_byte_ms": 10108
+        }
+      ],
+      "last_calls": {
+        "connect_ms": 2,
+        "elapsed_ms": 10109,
+        "finished": 2,
+        "first_byte_ms": 10108,
+        "http_successes": 0,
+        "known_mock": false,
+        "last_curl": 0,
+        "last_http": 502,
+        "last_result": "http_502",
+        "started": 2
+      },
+      "confirmed_move_ticks": 37
+    },
+    {
+      "id": "run-2",
+      "source": "current screenshot session",
+      "observed_ticks": [
+        4,
+        30
+      ],
+      "completed_requests": [
+        {
+          "finished": 1,
+          "last_http": 502,
+          "last_curl": 0,
+          "elapsed_ms": 10118,
+          "connect_ms": 2,
+          "first_byte_ms": 10118
+        }
+      ],
+      "last_calls": {
+        "connect_ms": 2,
+        "elapsed_ms": 10118,
+        "finished": 1,
+        "first_byte_ms": 10118,
+        "http_successes": 0,
+        "known_mock": false,
+        "last_curl": 0,
+        "last_http": 502,
+        "last_result": "http_502",
+        "started": 2
+      },
+      "confirmed_move_ticks": 26
+    }
+  ],
+  "diagnosis": {
+    "client_timeout_observed": false,
+    "completed_request_statuses": [
+      502,
+      502,
+      502
+    ],
+    "local_gateway_connect_ms": [
+      1,
+      2,
+      2
+    ],
+    "upstream_root_cause": "unknown: original proxy collapses multiple failures to HTTP 502",
+    "full_match_completed": false,
+    "no_current_success_recorded": true,
+    "last_current_request": "in progress at last pasted Tick; not proven to fail"
+  },
+  "practice_source_contract": {
+    "connect_timeout_seconds": 5,
+    "read_timeout_seconds": 25,
+    "redirect_becomes_502": true,
+    "requests_exceptions_become_502": true,
+    "json_parse_error_becomes_502": true,
+    "upstream_nonredirect_http_status_preserved": true,
+    "audit_contains_underlying_exception": false
+  }
+}

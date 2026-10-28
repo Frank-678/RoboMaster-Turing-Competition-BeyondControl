@@ -31,6 +31,8 @@
 | `build.sh` | 在正确工作空间构建选手包，生成编辑器编译数据库 |
 | `run.sh` | 加载ROS环境，启动已构建的机器人；配置不从命令行或环境补值 |
 | `practice.sh` | 启动我们自己的练习配置入口，原版`practice/`不变 |
+| `check_ai.sh` | 验证诊断与启动器构建摘要，再选择一次上游检查；不加载ROS或启动裁判 |
+| `scripts/check_ai.py` | 最小真实上游请求，区分代理/TLS/连接/读取/HTTP/模型外壳失败，不打印密钥或响应正文 |
 | `src/rmtc_bot/package.xml` | ROS包名、版本、构建和运行依赖 |
 | `src/rmtc_bot/CMakeLists.txt` | 构建核心库、ROS入口、练习启动器和核心测试，安装可执行文件 |
 | `include/rmtc_bot/match_config.hpp` | 唯一赛前配置：身份、阶段、ROS、两段AI链路、权重和阈值 |
@@ -52,6 +54,7 @@
 | `tests/mock_gateway.py` | 本机固定HTTP响应，验证真实客户端的协议/错误处理；没有真实模型 |
 | `tests/practice_gateway.py` | 只读加载原版HTTP处理器，验证模型名优先级、令牌替换、代理和A席位记录；上游仍是夹具 |
 | `tests/startup_test.py` | 在临时工作空间检查旧配置启动拦截、固定二进制路径和练习启动环境 |
+| `tests/ai_check_test.py` | 本机HTTP及注入异常检查诊断分类、正文读取超时和敏感文本不回显 |
 | `tests/run.sh` | 用g++构建离线测试，启动HTTP夹具，退出时清理临时文件 |
 
 表中的`include/`和`src/`短路径均相对`src/rmtc_bot/`。
@@ -160,3 +163,13 @@
 新增配置：`goal_retention_bonus`迟滞余量，`resource_plan_depth`目标深度，`resource_beam_width`束宽，`resource_candidate_limit`候选数，`resource_plan_budget_ms`额外搜索预算，`frontier_value`信息权重；均是赛前明确取舍。`stage1_ticks/stage2_ticks`是规则时长配置，不作为优化器搜索参数。
 
 `tests/planning_benchmark.cpp`只有测试端持有完整合成地图，逐帧生成局部感知；`Fixture`保存场景，`entity`生成相对图，`run`执行独立策略并记录真实移动/拾取、覆盖格、受阻次数与决策耗时，`main`输出七例。`receipt`来自测试端已执行动作，`seen`只用于评测，不作为选手输入。
+
+## 上游出网诊断的主线
+
+`check_ai.sh → practice_launcher --check-ai → scripts/check_ai.py::main → probe`。仍只有`match_config.hpp`一处配置；进程环境只是启动器向Python传值，不要求用户输入。正常`practice.sh`入口不变。
+
+`check_ai`标志决定做诊断还是启动原裁判；`argc/argv`只接受这一内部选择。`build.sh`生成`ai_check.sha256`，记录启动器源码、诊断脚本、shell入口及已构建二进制的哈希。没有新记录或任一字节变化时拒绝执行，防止旧启动器忽略新参数后误启动裁判。
+
+Python的`probe`只发一次POST：`url/key/model/thinking/json_output/max_tokens`均由编译配置传入；`payload`是最小JSON请求，`started`是单调计时起点，`response/body/choice/content`是本地临时结果，`result`仅含错误分类、HTTP码和耗时。`ReadTimeoutError`处理requests把正文读取超时包装成连接错误的情况；其余连接错误不靠异常文本猜原因。
+
+`main`检查启动器交接变量，调用`probe`，再输出`upstream_proxy`是否明确配置、`upstream_host`主机及模型名；没有打印Key、URL查询参数、模型思考或响应正文。退出0只代表这个最小请求返回预期JSON，不代表完整公告或比赛资格。

@@ -89,6 +89,33 @@ bash run.sh
 | `known_mock=true`、`ai=mock_gateway` | 收到固定模拟响应，没有验证真实LLM；以real模式重开练习 |
 | `http_successes>0` | 完整HTTP请求成功；仍要核对模型输出、实际动作和裁判的本席位LLM记录 |
 
+### HTTP 502：先检查练习代理的出网
+
+`last_curl=0`且`last_http=502`表示本程序已经收到了网关的错误回复，不能直接说成客户端超时或模型思考太久。原版practice将连接/代理/TLS/读取异常、重定向及非JSON响应等情况包装为502；上游本身返回502也会透传。`ai.jsonl`只记状态和次数，不保存底层异常，仍不能单凭它区分原因。
+
+更新代码后先构建，再运行一次最小上游检查；配置仍只取同一个头文件，不手输环境变量：
+
+```bash
+cd ~/cst
+bash build.sh
+bash check_ai.sh
+```
+
+该命令不需要ROS发现、不启动裁判，只用当前编译的`practice_llm_url/key/proxy`和模型选项直测一次最小JSON。沿用原转发器的5秒连接/25秒读取设置，不自动换代理或重试。它会产生一次真实上游请求，**不计本场LLM次数或正式资格**，仅供赛前练习排查。它拒绝旧启动器和过时配置，避免把诊断误当成裁判启动。
+
+| `kind` / HTTP | 下一步 |
+| --- | --- |
+| `request_ok` | 当前最小请求成功；再重启已更新配置的裁判，检查完整公告请求。成功不保证大Prompt也及时 |
+| `connect_timeout` / `connection_error` | 检查WSL出网、DNS和连接；若确实需要代理，只改`practice_llm_proxy`，不要改机器人访问本机8080的代理 |
+| `proxy_error` | 检查所填代理是否在WSL可达、端口是否监听；程序不会自动猜7890 |
+| `tls_error` | 检查证书与代理TLS链路，不能仅靠增加模型等待时间解决 |
+| `read_timeout` | 等待上游数据超时；可能包含排队、生成或网络停顿，需要再测，不能当作模型思考时长 |
+| `http_error` + 400/401/402/429/5xx | 分别核对请求参数、密钥、余额、限流和上游服务；此状态来自直测上游 |
+| `redirect` | 填最终完整端点；不自动追随重定向 |
+| `invalid_completion` / `empty_content` / `output_truncated` | 网络已取得回复，但JSON外壳、最终正文或输出上限不合要求 |
+
+两段代理不同：启动日志里的`AI configured ... proxy=direct`只描述机器人→本机网关。练习代理→DeepSeek看`Practice ... upstream_proxy=...`，或本检查的`upstream_proxy`。**当`practice_llm_proxy`为空时，启动器会明确清空继承的HTTP代理设置**；终端其他程序能通过环境代理上网，不证明练习代理也在走它。修正配置后须重新构建，并停止、重启旧裁判与机器人。
+
 动作没有合适机会时，第二阶段存活车辆回退`DEFEND`；视野不足时可试探未知邻格。第一阶段或阵亡时不发送违法的防御动作。详细策略、源码注释和离线回归见[DEV.md](DEV.md)。
 
 如果网页上A看起来没动，先看自己日志：同一`session`的`pos`是否变化，下一帧`last_action.moved`是否为`true`。`sent=move`只代表发布意图，`moved=true`才是裁判确认移动；`direction`是提交方向，`effective_direction`是实际方向。你提供的日志已有连续`moved=true`，不能把那段记录解释为整场没有执行移动。再核对浏览器的场次、Tick及是否打开了另一个练习进程；这些网页数据只用于人工排查，不输入机器人策略。
