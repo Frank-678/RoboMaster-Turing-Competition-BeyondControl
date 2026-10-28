@@ -50,6 +50,13 @@ def main():
                 binary.write_text(original_binary)
             result = run_guard(work, script)
             assert result.returncode == 0 and "fixture-binary" in result.stdout
+            if script == "run.sh":
+                assert any("fixture-binary" in p.read_text() for p in (work / "log").glob("bot_*.log"))
+                bot = work / "install/rmtc_bot/lib/rmtc_bot/bot"
+                original = bot.read_text()
+                bot.write_text(original + "exit 7\n")
+                assert run_guard(work, script).returncode == 7  # tee不能把真实机器人失败伪装成成功。
+                bot.write_text(original)
             header.write_text("changed after compilation\n")
             assert run_guard(work, script).returncode == 2  # 改配置后仍旧二进制：必须拒绝。
             header.write_text("fixture configuration\n")

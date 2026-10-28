@@ -23,4 +23,7 @@ if [[ ! -x "$rmtc_bot_executable" ]]; then
   exit 1
 fi
 echo "启动：$rmtc_bot_executable"
-exec "$rmtc_bot_executable"
+mkdir -p "$PWD/log"
+rmtc_run_log="$PWD/log/bot_$(date +%Y%m%d_%H%M%S)_$$.log" # 本次A端的完整输出，与裁判run_dir分开保存。
+echo "本次机器人日志：$rmtc_run_log"
+"$rmtc_bot_executable" 2>&1 | tee "$rmtc_run_log" # pipefail保留机器人失败状态；无需再手工加tee。
