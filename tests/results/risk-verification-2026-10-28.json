@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-28",
+  "baseline": "4ba9dcdaf2056248505ebd2479077b77cf68a7ef",
+  "core_http_original_handler_arena_rules": "ASan/UBSan passed, LeakSanitizer disabled in this host",
+  "risk_fixtures": "32 current cases passed; same fixtures also ran old production core, expected old failures retained",
+  "maps": "30 cases per version; fixed handwritten NPCs, fresh seed49009; weights unchanged; all24 stage2 paired scores equal",
+  "actual_ros_sources": "Humble headers and libraries manually linked successfully; not colcon/DDS execution",
+  "practice_original_files": 18,
+  "practice_git_subtree": "3c352b3f29be4a008f46642063ce527c4fb4756f",
+  "local_relative_doc_links": "passed against pinned repository tree and new files; external links/anchors not checked",
+  "source_sha256": {
+    "src/rmtc_bot/src/strategy.cpp": "d3e606e1708649f088be773b203d695462650864146ef18e840100fa17c1e60a",
+    "src/rmtc_bot/src/events.cpp": "b4e84fc921363f7a739da4b517eb14959d2773d346de8982c6793e771f978866",
+    "tests/full_strategy_test.cpp": "96a648f23dea1d8546c5ab8f680e09665edc2e79569ecb3b7fb5063d4755ca25",
+    "tests/arena_test.cpp": "715af07b0a6fdcb1433f2178644a24779ad165c00fdd6422ee15267ef1a6ac23",
+    "tests/risk_benchmark.cpp": "ef96f3fc24db853ef494c61798da4c9208472a3ebf5b834b111cfa0553c729d4",
+    "tests/run_risk.py": "a70792b3489611290985d8095521e8d5e48c0761e043b64763576c577128dcd7"
+  },
+  "limitations": [
+    "No original DDS referee match, reported teammate map, official standard opponent result or new real LLM call",
+    "Prompt string tests do not measure real-model interpretation success",
+    "Hypothetical fire risk is a heuristic, not a calibrated probability",
+    "Lethal guard can still produce prolonged DEFEND",
+    "Synthetic judge shares rules with production; not a fully independent rules oracle"
+  ]
+}

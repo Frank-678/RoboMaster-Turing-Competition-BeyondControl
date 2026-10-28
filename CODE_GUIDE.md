@@ -21,6 +21,9 @@
 | 文件 | 职责 |
 | --- | --- |
 | `README.md` | 先看这里：地址、令牌、模型分别填哪，两个终端如何启动，零次调用如何查 |
+| `LESSONS.md` | 七份字幕的借鉴/否决、假设风险逃路修复与验证边界 |
+| `tests/risk_benchmark.cpp`、`tests/run_risk.py` | 四席位×四旋转×两敌方动作的最小反例与可选旧工程配对 |
+| `tests/results/risk-2026-10-28.json`、`risk-maps-2026-10-28.json` | 逃路逐Tick轨迹与新地图同条件数据 |
 | `NAVIGATION.md` | 无收益往返、争格、封闭区域的复现、脱困机制和日志说明 |
 | `tests/unstuck_benchmark.cpp` | 六个500Tick导航压力/正常路径夹具，与旧核心配对 |
 | `tests/run_unstuck.py` | 编译导航夹具，断言脱困与保留正常绕路，可只读比较旧工程 |
