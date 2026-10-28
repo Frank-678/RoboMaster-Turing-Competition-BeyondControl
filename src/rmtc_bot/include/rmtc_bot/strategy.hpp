@@ -43,6 +43,13 @@ private:
     bool alive, protected_spawn, respawn, moved; // 存活、出生保护、刚复活、上Tick成功移动。
     Tick receipt_tick; // 本帧last_action对应的执行Tick；-1表示缺少可信回执。
   };
+  struct OpponentTrack {
+    Cell position, delta; // 上次真实位置、最近一次世界方向位移；不预测隐藏坐标。
+    Tick tick; // 最近一次连续可见观测的Tick。
+    unsigned consistent; // 相同合法位移连续出现的次数，上限2；2次才提出一步预测。
+  };
+  std::optional<Cell> predict_opponent(const std::string &identity, Cell position, Tick tick);
+  // 预测仅用同一敌车连续观测；断帧/瞬移重置，预测只降低候选收益，不当成必然占位。
   bool split_wall(Cell cell, Tick tick) const;
   // 只判断已知爆炸和分裂，不把所有对手预测混成确定危险。
   bool dangerous(Cell cell, Tick tick) const;
@@ -60,7 +67,9 @@ private:
   std::map<Cell, Tile> tiles_; // 格子坐标→地图记忆。
   std::map<Cell, unsigned> probe_attempts_;  // 未知格的试探次数；不算已到达或已探明。
   std::map<Tick, Snapshot> history_; // 感知Tick→本车历史快照。
+  std::map<std::string, OpponentTrack> opponents_; // 本场公开敌车ID→短期轨迹，换场清空。
   std::map<std::string, rmtc::Event> events_; // 稳定事件key→最后一次校验通过的解释。
   std::map<std::string, int> capture_progress_; // 堡垒key→当前已确认连续驻留Tick数。
   std::string reason_; // 决策日志使用的短原因。
 };
+

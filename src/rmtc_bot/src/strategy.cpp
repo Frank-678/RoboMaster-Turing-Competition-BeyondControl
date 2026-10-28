@@ -62,7 +62,11 @@ int ray(Cell from, Cell target) {
   if (dy == 0 && dx >= -2 && dx <= -1) return 3;
   return -1;
 }
-struct Enemy { Cell position; double hp; bool defending, protected_spawn; }; // 当前可见敌车的位置、血量和上帧状态。
+struct Enemy {
+  Cell position; double hp; bool defending, protected_spawn; // 当前真实位置、血量和上帧状态。
+  std::string identity; // 公开席位/车辆ID；空串表示无法可靠关联历史。
+  std::optional<Cell> forecast; // 两次连续相同位移后的一步猜测，随时可能落空。
+};
 struct Entity { std::string type; Cell position; double value; bool high; }; // 解析后的实体类型、坐标和资源信息。
 }  // namespace
 
@@ -71,9 +75,26 @@ Strategy::Strategy(int stage) : stage_(stage) {
 }
 void Strategy::reset() {
   tiles_.clear(); probe_attempts_.clear(); history_.clear(); events_.clear(); capture_progress_.clear(); spawn_.reset();
+  opponents_.clear(); // 不把上一场或旧席位的轨迹带入新场。
   width_ = height_ = 0; reversed_ = reverse_unknown_ = empowered_ = false;
   vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
   reason_ = "new_session";
+}
+std::optional<Strategy::Cell> Strategy::predict_opponent(const std::string &identity, Cell position, Tick tick) {
+  if (identity.empty()) return std::nullopt;
+  const auto found = opponents_.find(identity); // 查找同一辆公开可见敌车的上次观测。
+  if (found == opponents_.end()) {
+    opponents_.emplace(identity, OpponentTrack{position, {0, 0}, tick, 0});
+    return std::nullopt; // 一帧位置不足以推断它的运动习惯。
+  }
+  auto &track = found->second; // 该敌车的最新轨迹；只在新的连续Tick推进。
+  if (tick <= track.tick) return std::nullopt;
+  const Cell delta{position.first - track.position.first, position.second - track.position.second}; // 世界坐标位移。
+  const bool consecutive = tick == track.tick + 1 && manhattan(position, track.position) <= 1; // 断帧/复活跳格不连续。
+  track.consistent = !consecutive ? 0 : delta == track.delta ? std::min(2U, track.consistent + 1) : 1;
+  track.position = position; track.delta = delta; track.tick = tick;
+  if (track.consistent < 2) return std::nullopt;
+  return Cell{position.first + delta.first, position.second + delta.second}; // 最多猜下一步，不外推长路线。
 }
 void Strategy::merge_events(const std::vector<rmtc::Event> &events) {
   if (stage_ == 1) return;
@@ -255,7 +276,14 @@ Json Strategy::decide(const Json &p) {
       const double enemy_hp = j.value("hp", 100.0); // 当前敌车生命；不跨帧累加猜测伤害。
       if (!std::isfinite(enemy_hp) || enemy_hp < 0) return fallback("invalid_enemy_hp");
       occupied.insert(cell);
-      enemies.push_back({cell, enemy_hp, j.value("defending", false), j.value("protected", false)});
+      std::string identity; // 优先公开席位，缺失时才用公开车辆ID；不按位置冒认同一辆车。
+      for (const char *field : {"team", "robot_id", "id"}) {
+        const auto value = j.find(field); // 只取公开且确为字符串的身份字段。
+        if (value != j.end() && value->is_string() && !value->get_ref<const std::string &>().empty()) {
+          identity = value->get<std::string>(); break;
+        }
+      }
+      enemies.push_back({cell, enemy_hp, j.value("defending", false), j.value("protected", false), identity, std::nullopt});
     }
   }
   width_ = width; height_ = height;
@@ -287,6 +315,15 @@ Json Strategy::decide(const Json &p) {
     }
   }
   ++tiles_.at(start).visits;
+  for (auto &enemy : enemies) {
+    enemy.forecast = predict_opponent(enemy.identity, enemy.position, tick);
+    if (!enemy.forecast || *enemy.forecast == enemy.position) continue;
+    const auto cell = *enemy.forecast; // 只检验预测的下一格；不改当前真实占位。
+    const auto tile = tiles_.find(cell); // 未知地形仍未知，不补全地图。
+    if (cell.first < 0 || cell.first >= width || cell.second < 0 || cell.second >= height ||
+        cell == start || occupied.count(cell) || split_wall(cell, tick) ||
+        (tile != tiles_.end() && tile->second.wall)) enemy.forecast.reset(); // 明知走不成就放弃这个猜测。
+  }
   // 规划始终用世界方向。只有最后发MOVE时补偿幻术，ATTACK方向保持不变。
   const auto move = [&](int step, const char *reason) {
     // step是世界方向索引；reason记录为什么选它，返回前才补偿幻术。
@@ -424,6 +461,17 @@ Json Strategy::decide(const Json &p) {
   const auto consider = [&](int step, double utility, const char *reason) {
     // step=-1代表留在当前格；安全检查也必须允许这一Tick继续原地驻留。
     if (!safe_steps[step < 0 ? 4 : step]) return;
+    if (stage_ == 2 && step >= 0 && utility > 0) {
+      const Cell next{start.first + steps[step].first, start.second + steps[step].second}; // 我方本Tick拟移动落点。
+      unsigned contests = 0, pressures = 0; // 预计争同格、下一Tick可能入射线的稳定轨迹数；不是实测概率。
+      for (const auto &enemy : enemies) {
+        if (!enemy.forecast) continue;
+        contests += *enemy.forecast == next;
+        pressures += ray(*enemy.forecast, next) >= 0;
+      }
+      // 预测错了也只影响收益排序；不封路、不伪造敌车、不用MOVE躲本Tick已经命中的攻击。
+      utility /= 1.0 + cfg::opponent_contest_cost * contests + cfg::opponent_pressure_cost * pressures;
+    }
     if (utility > best_utility + 1e-9) { best_utility = utility; best_step = step; best_reason = reason; }
   };
   unsigned least_visits = std::numeric_limits<unsigned>::max(); // 已知路线候选中最少访问次数。
@@ -555,3 +603,4 @@ Json Strategy::decide(const Json &p) {
     return fallback("defend_for_safe_route");
   return fallback(reverse_unknown_ ? "uncertain_illusion" : best_utility >= 0 ? best_reason : "no_path");
 }
+
