@@ -1050,13 +1050,13 @@ Json Strategy::decide(const Json &p) {
   }
   // 扫图候选：按BFS顺序评估能增加可见格的落点；不假设未知格里有什么。
   // boundary_only只评有未知邻格的边界格（第二阶段公平竞争用）；false保留“所有能新增视野的格子”的旧语义。
-  const auto consider_frontier = [&](bool boundary_only) {
+  const auto consider_frontier = [&](bool boundary_only, double value) {
     const double max_visible = (2 * radius + 1) * (2 * radius + 1); // 视野半径内最多未知格数，仅作提前停止的上界。
     double frontier_best = -1; // BFS距离不降；远处候选的最大收益低于已有近处候选时提前结束。
     for (const Cell &cell : order) {
       const auto node = paths.at(cell); // 到观察点的真实绕障距离和首方向。
       if (node.first < 0 || node.distance >= remaining_ticks) continue;
-      if (frontier_best >= 0 && parameters_.frontier_value * max_visible / (node.distance + 1) < frontier_best) break;
+      if (frontier_best >= 0 && value * max_visible / (node.distance + 1) < frontier_best) break;
       if (boundary_only) {
         bool boundary = false;
         for (const auto &delta : steps) {
@@ -1074,7 +1074,7 @@ Json Strategy::decide(const Json &p) {
         }
       }
       if (newly_visible > 0) {
-        const double utility = parameters_.frontier_value * newly_visible / (node.distance + 1);
+        const double utility = value * newly_visible / (node.distance + 1);
         if (utility > frontier_best) frontier_best = utility;
         consider(node.first, utility, "explore_frontier", cell);
       }
@@ -1156,14 +1156,14 @@ Json Strategy::decide(const Json &p) {
       if (nearest_first >= 0)
         consider(nearest_first, parameters_.stage1_flood_value * nearest_gain / (nearest_distance + 1), "flood_fill", nearest_cell);
     }
-    if (stage_ == 1) consider_frontier(false);
+    if (stage_ == 1) consider_frontier(false, parameters_.stage1_frontier_value);
   }
   // 第二阶段资源饼通常在150Tick内被抢光：之后继续扫图没有收益，还把行动力从交火/据点/任务上抢走。
   // 闸门双条件：Tick过闸且最近60Tick视野里没再出现过资源（他人捡走的资源不会从记忆里消失，只能靠“看不见”判断）。
   bool explore_suppressed = stage_ == 2 && parameters_.stage2_explore_gate_tick > 0 &&
       tick >= parameters_.stage2_explore_gate_tick && tick - last_resource_sighting_ >= 60;
   // 第二阶段到点任务没有截止时间、资源先到先得：扫近处边界必须与任务/交战公平竞争，不能只在空档期生效。
-  if (stage_ == 2 && !reverse_unknown_ && remaining_ticks > 1 && !explore_suppressed) consider_frontier(true);
+  if (stage_ == 2 && !reverse_unknown_ && remaining_ticks > 1 && !explore_suppressed) consider_frontier(true, parameters_.frontier_value);
   if (best_utility < 0 && exploration >= 0 && !explore_suppressed) consider(exploration, 0.01, "explore");
 
   // 6. 用移动前站位评估ATTACK。普通攻击只取最近一辆，无双才取整个5×5。

@@ -14,7 +14,7 @@ void configure(rmtc::StrategyParameters &p,const Json &values) {
 #define PARAMETER(name) if(values.contains(#name)){p.name=values.at(#name).get<decltype(p.name)>();recognized.insert(#name);}
   PARAMETER(stale_resource_decay) PARAMETER(resource_mission_bonus) PARAMETER(reach_mission_value)
   PARAMETER(healing_below_hp) PARAMETER(fortress_hold_value) PARAMETER(fortress_capture_value)
-  PARAMETER(goal_retention_bonus) PARAMETER(frontier_value) PARAMETER(opponent_contest_cost) PARAMETER(opponent_pressure_cost)
+  PARAMETER(goal_retention_bonus) PARAMETER(frontier_value) PARAMETER(stage1_frontier_value) PARAMETER(opponent_contest_cost) PARAMETER(opponent_pressure_cost)
   PARAMETER(opponent_claim_discount)
   PARAMETER(explore_toward_resource_value) PARAMETER(explore_tour_value) PARAMETER(mission_explore_value)
   PARAMETER(stage1_flood_value) PARAMETER(stage2_race_gate) PARAMETER(stage2_explore_gate_tick) PARAMETER(stage2_mission_pull_stale_ticks)
