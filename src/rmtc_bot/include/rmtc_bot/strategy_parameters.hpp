@@ -12,6 +12,8 @@ struct StrategyParameters {
   double explore_toward_resource_value; // 向绕行过远/未连通的已知资源试探边界格的机会权重。
   double explore_tour_value; // 第一阶段空档期，把散布的边界观察点排成小巡回的机会权重。
   double mission_explore_value; // 沿到点任务方向探路的权重（除以距离+1）；到点任务没有截止时间，不应压过近处扫图。
+  bool stage1_flood_fill; // 第一阶段空档探索改为最近边界洪泛（距离优先、同距离取更大新视野），替代散点巡回。
+  bool stage2_race_gate; // 第二阶段R未封顶且还有已知可收集资源时，把主动交火与到点任务让位给采集竞速。
   int hazard_lead_ticks, resource_plan_depth, resource_beam_width, resource_candidate_limit, resource_plan_budget_ms;
   bool collision_replan, resource_refinement;
   int resource_refinement_trials;
@@ -23,7 +25,8 @@ struct StrategyParameters {
     namespace c=match_config;
     return {c::stale_resource_decay,c::resource_mission_bonus,c::reach_mission_value,c::healing_below_hp,
       c::fortress_hold_value,c::fortress_capture_value,c::goal_retention_bonus,c::frontier_value,
-      c::opponent_contest_cost,c::opponent_pressure_cost,c::opponent_claim_discount,c::explore_toward_resource_value,c::explore_tour_value,c::mission_explore_value,c::hazard_lead_ticks,c::resource_plan_depth,
+      c::opponent_contest_cost,c::opponent_pressure_cost,c::opponent_claim_discount,c::explore_toward_resource_value,c::explore_tour_value,c::mission_explore_value,
+      c::stage1_flood_fill,c::stage2_race_gate,c::hazard_lead_ticks,c::resource_plan_depth,
       c::resource_beam_width,c::resource_candidate_limit,c::resource_plan_budget_ms,
       c::collision_replan,c::resource_refinement,c::resource_refinement_trials,c::tactical_search,
       c::tactical_risk,c::tactical_hp_value,c::tactical_death_cost,c::tactical_future_discount,c::tactical_goal_weight,
