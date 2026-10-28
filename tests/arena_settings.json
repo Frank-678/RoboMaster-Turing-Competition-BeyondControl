@@ -46,6 +46,7 @@
     "mission_explore_value": 2.0,
     "stage1_flood_value": 0.0,
     "stage2_race_gate": false,
+    "stage2_explore_gate_tick": 0,
     "tactical_search": false,
     "tactical_risk": 0.35,
     "tactical_hp_value": 0.015,

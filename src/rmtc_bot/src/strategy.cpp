@@ -88,6 +88,7 @@ void Strategy::reset() {
   goal_.reset(); // 新场没有上一目标，也没有必须继续执行的旧路线。
   model_reply_seen_ = resource_counts_known_ = false;
   observed_normal_ = observed_high_ = 0; previous_score_tick_ = -1; previous_resource_total_ = 0;
+  last_resource_sighting_ = -1;
   width_ = height_ = 0; reversed_ = reverse_unknown_ = empowered_ = false;
   vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
   healing_amount_ = 0; reason_ = "new_session";
@@ -632,7 +633,7 @@ Json Strategy::decide(const Json &p) {
       tile.wall = true;
       if (tile.wall_since < 0) tile.wall_since = tick;
     } else if (entity.type == "resource_normal" || entity.type == "resource_high") {
-      tile.value = entity.value; tile.high = entity.high;
+      tile.value = entity.value; tile.high = entity.high; last_resource_sighting_ = tick;
     }
   }
   for (auto &[cell, tile] : tiles_) {
@@ -1151,9 +1152,13 @@ Json Strategy::decide(const Json &p) {
     }
     if (stage_ == 1) consider_frontier(false);
   }
+  // 第二阶段资源饼通常在150Tick内被抢光：之后继续扫图没有收益，还把行动力从交火/据点/任务上抢走。
+  // 闸门双条件：Tick过闸且最近60Tick视野里没再出现过资源（他人捡走的资源不会从记忆里消失，只能靠“看不见”判断）。
+  bool explore_suppressed = stage_ == 2 && parameters_.stage2_explore_gate_tick > 0 &&
+      tick >= parameters_.stage2_explore_gate_tick && tick - last_resource_sighting_ >= 60;
   // 第二阶段到点任务没有截止时间、资源先到先得：扫近处边界必须与任务/交战公平竞争，不能只在空档期生效。
-  if (stage_ == 2 && !reverse_unknown_ && remaining_ticks > 1) consider_frontier(true);
-  if (best_utility < 0 && exploration >= 0) consider(exploration, 0.01, "explore");
+  if (stage_ == 2 && !reverse_unknown_ && remaining_ticks > 1 && !explore_suppressed) consider_frontier(true);
+  if (best_utility < 0 && exploration >= 0 && !explore_suppressed) consider(exploration, 0.01, "explore");
 
   // 6. 用移动前站位评估ATTACK。普通攻击只取最近一辆，无双才取整个5×5。
   int attack_direction = -1; // 当前最好的攻击方向；-1表示没有有价值的攻击。

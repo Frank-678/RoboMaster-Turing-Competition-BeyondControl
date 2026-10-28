@@ -17,7 +17,7 @@ void configure(rmtc::StrategyParameters &p,const Json &values) {
   PARAMETER(goal_retention_bonus) PARAMETER(frontier_value) PARAMETER(opponent_contest_cost) PARAMETER(opponent_pressure_cost)
   PARAMETER(opponent_claim_discount)
   PARAMETER(explore_toward_resource_value) PARAMETER(explore_tour_value) PARAMETER(mission_explore_value)
-  PARAMETER(stage1_flood_value) PARAMETER(stage2_race_gate)
+  PARAMETER(stage1_flood_value) PARAMETER(stage2_race_gate) PARAMETER(stage2_explore_gate_tick)
   PARAMETER(hazard_lead_ticks) PARAMETER(resource_plan_depth) PARAMETER(resource_beam_width)
   PARAMETER(resource_candidate_limit) PARAMETER(resource_plan_budget_ms)
   PARAMETER(loop_recovery) PARAMETER(loop_window_ticks) PARAMETER(recovery_ticks) PARAMETER(stalled_goal_cooldown_ticks)

@@ -121,6 +121,7 @@ private:
   bool model_reply_seen_ = false, resource_counts_known_ = false;
   int observed_normal_ = 0, observed_high_ = 0; // 连续完整历史下，从官方R增量确认的拾取次数。
   Tick previous_score_tick_ = -1;
+  Tick last_resource_sighting_ = -1; // 最近一次在视野里看到资源的Tick；第二阶段探索闸门以此判断资源饼是否清空。
   double previous_resource_total_ = 0;
   std::map<std::string, rmtc::Event> events_; // 稳定事件key→最后一次校验通过的解释。
   std::map<std::string, int> capture_progress_; // 堡垒key→当前已确认连续驻留Tick数。
