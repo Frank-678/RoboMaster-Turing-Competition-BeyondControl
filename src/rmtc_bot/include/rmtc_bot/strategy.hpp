@@ -45,6 +45,16 @@ private:
     std::string kind; // 资源、任务、治疗等目标类别，避免同坐标不同用途被误认。
     Tick tick; // 做出这次选择的Tick；断帧、复活和换场后不沿用迟滞。
   };
+  struct ResourcePlan {
+    int first; // 本Tick世界方向，最后发送时才处理幻术反转。
+    Cell first_resource; // 路上最先拿到的资源，也是目标迟滞使用的坐标。
+    double utility, benefit; // 整串收益/耗时、整串收益；均为估值，不回写官方成绩。
+  };
+  // 在已知格上比较最多三个资源目标；每步核对公告期限和剩余Tick，只返回各首方向的最好资源串。
+  std::vector<ResourcePlan> resource_plans(Cell start, Tick tick, Tick remaining_ticks,
+      const std::vector<Cell> &targets, const std::set<Cell> &occupied,
+      const std::array<bool, 4> &first_allowed, double current_r,
+      bool need_normal, bool need_high, double value_target) const;
   std::optional<Cell> predict_opponent(const std::string &identity, Cell position, Tick tick);
   // 预测仅用同一敌车连续观测；断帧/瞬移重置，预测只降低候选收益，不当成必然占位。
   bool split_wall(Cell cell, Tick tick) const;

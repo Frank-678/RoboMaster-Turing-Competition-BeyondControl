@@ -31,6 +31,10 @@ inline constexpr double fortress_hold_value = 20.0;  // 保住尚未完成的驻
 inline constexpr double fortress_capture_value = 12.0; // 前往堡垒的收益分子。
 inline constexpr int hazard_lead_ticks = 2;          // 比最短退出时间再提前几Tick。
 inline constexpr double goal_retention_bonus = 0.10; // 同一有效目标给10%排序余量，抑制小波动；不是官方加分。
+inline constexpr int resource_plan_depth = 3;       // 资源串最多扩展3个目标，不是完整战斗树或3Tick。
+inline constexpr int resource_beam_width = 5;       // 每层最多保留5条未执行计划，优先保留不同首方向。
+inline constexpr int resource_candidate_limit = 8;  // 先按现有收益/距离挑8个资源；地图资源数不写死。
+inline constexpr int resource_plan_budget_ms = 10;  // 额外搜索软预算；耗尽时交回已算好的合法基线。
 inline constexpr double opponent_contest_cost = 1.0; // 稳定轨迹预计争同格时，给路线增加一份等待成本；启发式，非概率。
 inline constexpr double opponent_pressure_cost = 0.25; // 下一Tick可能进入稳定轨迹敌车射线时的软成本，不改变攻击时序。
 }  // namespace rmtc::match_config
