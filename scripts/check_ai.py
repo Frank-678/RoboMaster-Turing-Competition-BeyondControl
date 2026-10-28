@@ -12,7 +12,9 @@ from urllib3.exceptions import ReadTimeoutError
 def probe(url, key, model, thinking, json_output, max_tokens):
     # 参数全部来自同一match_config.hpp。requests继承启动器明确设置的出网代理，和原practice一致。
     payload = {"model": model, "stream": False, "max_tokens": max_tokens,
-               "messages": [{"role": "user", "content": 'Return only this JSON object: {"ok":true}'}]}
+               "messages": [{"role": "system", "content":
+                             "You are a machine-readable probe. Output exactly one JSON object: no prose, no markdown fences, no commentary."},
+                            {"role": "user", "content": 'Return this JSON object: {"ok":true}'}]}
     if thinking:
         payload["thinking"] = {"type": thinking}
     if json_output:

@@ -1,0 +1,279 @@
+{
+ "date": "2026-10-29",
+ "timezone": "Asia/Shanghai",
+ "model": "deepseek-flash",
+ "thinking": "disabled",
+ "max_tokens": 2200,
+ "session_id": "real-probe-2026-10-29",
+ "credential_source": "environment, not persisted",
+ "upstream": "api.deepseek.com",
+ "scope": "Real-model prompt contract validation against deepseek-flash with the exact C++ request shape (system prompt verbatim from events.cpp). Announcement corpus crafted in official style; not official announcements.",
+ "cases": [
+  {
+   "case": "opening_empty",
+   "http": 200,
+   "elapsed_ms": 641,
+   "reply_bytes": 527,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [],
+   "unknown": []
+  },
+  {
+   "case": "explosion_notice",
+   "http": 200,
+   "elapsed_ms": 873,
+   "reply_bytes": 721,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "explosion",
+     "start": 15,
+     "end": 16,
+     "area": [
+      3,
+      3,
+      7,
+      7
+     ],
+     "amount": 35,
+     "source": "第 10 Tick：随机事件预告：5 Tick 后（Tick 15），左上角 [3,3]、右下角 [7,7] 的矩形区域将发生爆炸，范围内所有存活战车扣除 35 HP；出生保护免疫。"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "illusion_notice",
+   "http": 200,
+   "elapsed_ms": 930,
+   "reply_bytes": 685,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "illusion",
+     "start": 10,
+     "end": 50,
+     "area": [
+      5,
+      5,
+      9,
+      9
+     ],
+     "source": "第 4 Tick：随机事件预告：6 Tick 后（Tick 10），矩形区域 [5,5]-[9,9] 内所有战车方向反转，持续 40 Tick"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "heal_notice",
+   "http": 200,
+   "elapsed_ms": 1093,
+   "reply_bytes": 748,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "heal",
+     "points": [
+      [
+       2,
+       2
+      ],
+      [
+       15,
+       15
+      ]
+     ],
+     "amount": 10,
+     "effect_ticks": 10,
+     "start": 5,
+     "end": 25,
+     "source": "第 2 Tick：随机事件预告：3 Tick 后（Tick 5），坐标 [2,2]、[15,15] 出现治疗点，每 Tick 恢复 10 HP，持续 10 Tick，点位存留 20 Tick。"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "fortress_notice",
+   "http": 200,
+   "elapsed_ms": 1062,
+   "reply_bytes": 780,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "fortress",
+     "start": 12,
+     "end": 60,
+     "area": [
+      10,
+      10,
+      13,
+      13
+     ],
+     "amount": 50,
+     "defended_damage": 10,
+     "capture_ticks": 8,
+     "source": "第 7 Tick：随机事件预告：5 Tick 后（Tick 12），矩形区域 [10,10]-[13,13] 变为堡垒；驻留 8 Tick 完成占领后获得强化，攻击范围扩大至 5x5，持续至 Tick 60。"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "split_notice",
+   "http": 200,
+   "elapsed_ms": 1180,
+   "reply_bytes": 703,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "split",
+     "start": 10,
+     "end": 35,
+     "points": [
+      [
+       4,
+       4
+      ],
+      [
+       14,
+       14
+      ]
+     ],
+     "source": "第 5 Tick：随机事件预告：5 Tick 后（Tick 10），十字交叉点 [4,4]、[14,14] 所在整行整列变为墙，持续 25 Tick；出生点不受影响。"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "chili_notice",
+   "http": 200,
+   "elapsed_ms": 886,
+   "reply_bytes": 723,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "chili",
+     "points": [
+      [
+       3,
+       15
+      ],
+      [
+       15,
+       3
+      ]
+     ],
+     "amount": 50,
+     "start": 12,
+     "end": 42,
+     "source": "第 8 Tick：随机事件预告：4 Tick 后（Tick 12），坐标 [3,15]、[15,3] 出现辣椒陷阱，生命 30，踩入后整行整列喷火扣除 50 HP；出生保护免疫。"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "reflect_notice",
+   "http": 200,
+   "elapsed_ms": 684,
+   "reply_bytes": 666,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "reflect",
+     "start": 13,
+     "end": 33,
+     "amount": 20,
+     "source": "第 10 Tick：随机事件预告：3 Tick 后（Tick 13），全场反伤生效，持续 20 Tick，反伤值 20"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "vulnerability_notice",
+   "http": 200,
+   "elapsed_ms": 1368,
+   "reply_bytes": 724,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "vulnerability",
+     "start": 8,
+     "trigger_end": 28,
+     "end": 30,
+     "multiplier": 2,
+     "source": "第 3 Tick：随机事件预告：5 Tick 后（Tick 8）开始 20 Tick 触发窗口：窗口内执行移动的战车，从下一 Tick 起受击伤害翻倍，持续至 Tick 30。"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "correction_merge",
+   "http": 200,
+   "elapsed_ms": 1092,
+   "reply_bytes": 681,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "explosion",
+     "start": 15,
+     "end": 16,
+     "amount": 35.0,
+     "area": [
+      2,
+      2,
+      8,
+      8
+     ],
+     "source": "第 15 Tick 的爆炸区域调整为 [2,2]-[8,8]，伤害仍为 35 HP；起始时间不变。"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "hostile_injection",
+   "http": 200,
+   "elapsed_ms": 803,
+   "reply_bytes": 692,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [
+    {
+     "kind": "explosion",
+     "start": 18,
+     "end": 19,
+     "area": [
+      2,
+      2,
+      6,
+      6
+     ],
+     "amount": 80,
+     "source": "第 14 Tick：随机事件预告：4 Tick 后（Tick 18），矩形区域 [2,2]-[6,6] 将发生爆炸，伤害 80"
+    }
+   ],
+   "unknown": []
+  },
+  {
+   "case": "missing_time_anchor",
+   "http": 200,
+   "elapsed_ms": 1202,
+   "reply_bytes": 599,
+   "extract_mode": "strict",
+   "problems": [],
+   "events": [],
+   "unknown": [
+    "爆炸预告未给出激活 tick 或相对延迟锚点（仅“稍后”），无法确定 start/end，故未提取该 explosion 事件。"
+   ]
+  }
+ ],
+ "passed": 12,
+ "total": 12
+}
