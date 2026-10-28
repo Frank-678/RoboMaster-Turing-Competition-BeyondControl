@@ -1,0 +1,2194 @@
+{
+  "date": "2026-10-28",
+  "scope": "synthetic collection only; no official judge, opponents, events, missions or AI",
+  "benchmark_sha256": "f7b67a70bdd5f872d388d0f3acbbc7a75a1523479d787b578779726956dcfa1d",
+  "baseline": {
+    "cases": [
+      {
+        "added_R": 20.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.259593,
+        "decide_p95_ms": 0.259593,
+        "first_tick": 498,
+        "initial_R": 0.0,
+        "name": "late_chain",
+        "remaining_resources": 2,
+        "seen_cells": 81,
+        "stage": 2,
+        "stage2_resource_score_delta": 5.0,
+        "tick_budget": 2,
+        "ticks_used": 2,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              4,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 498
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 499
+          }
+        ]
+      },
+      {
+        "added_R": 20.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.308924,
+        "decide_p95_ms": 0.308924,
+        "first_tick": 498,
+        "initial_R": 110.0,
+        "name": "capped_chain",
+        "remaining_resources": 2,
+        "seen_cells": 81,
+        "stage": 2,
+        "stage2_resource_score_delta": 2.5,
+        "tick_budget": 2,
+        "ticks_used": 2,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              4,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 498
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 499
+          }
+        ]
+      },
+      {
+        "added_R": 20.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.059457,
+        "decide_p95_ms": 0.059457,
+        "first_tick": 499,
+        "initial_R": 0.0,
+        "name": "last_move",
+        "remaining_resources": 2,
+        "seen_cells": 81,
+        "stage": 2,
+        "stage2_resource_score_delta": 5.0,
+        "tick_budget": 1,
+        "ticks_used": 1,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              4,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 499
+          }
+        ]
+      },
+      {
+        "added_R": 40.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.071254,
+        "decide_p95_ms": 0.071254,
+        "first_tick": 0,
+        "initial_R": 0.0,
+        "name": "four_move_chain",
+        "remaining_resources": 1,
+        "seen_cells": 81,
+        "stage": 1,
+        "stage2_resource_score_delta": null,
+        "tick_budget": 4,
+        "ticks_used": 4,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              4,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 0
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 1
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              6,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 2
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 40.0,
+            "moved": true,
+            "position": [
+              6,
+              4
+            ],
+            "reason": "collect_resource",
+            "tick": 3
+          }
+        ]
+      },
+      {
+        "added_R": 30.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.329256,
+        "decide_p95_ms": 0.329256,
+        "first_tick": 0,
+        "initial_R": 0.0,
+        "name": "maze",
+        "remaining_resources": 0,
+        "seen_cells": 36,
+        "stage": 1,
+        "stage2_resource_score_delta": null,
+        "tick_budget": 80,
+        "ticks_used": 18,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              0
+            ],
+            "reason": "collect_resource",
+            "tick": 0
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              1
+            ],
+            "reason": "collect_resource",
+            "tick": 1
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              2
+            ],
+            "reason": "collect_resource",
+            "tick": 2
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 3
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              4
+            ],
+            "reason": "collect_resource",
+            "tick": 4
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 5
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              0,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 6
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              1,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 7
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              2,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 8
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              3,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 9
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              4,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 10
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 11
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              4
+            ],
+            "reason": "collect_resource",
+            "tick": 12
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 13
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              2
+            ],
+            "reason": "collect_resource",
+            "tick": 14
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              1
+            ],
+            "reason": "collect_resource",
+            "tick": 15
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              0
+            ],
+            "reason": "collect_resource",
+            "tick": 16
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 30.0,
+            "moved": true,
+            "position": [
+              4,
+              0
+            ],
+            "reason": "collect_resource",
+            "tick": 17
+          }
+        ]
+      },
+      {
+        "added_R": 0.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.185351,
+        "decide_p95_ms": 0.185351,
+        "first_tick": 0,
+        "initial_R": 0.0,
+        "name": "frontier_edge",
+        "remaining_resources": 0,
+        "seen_cells": 9,
+        "stage": 1,
+        "stage2_resource_score_delta": null,
+        "tick_budget": 1,
+        "ticks_used": 1,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              4,
+              0
+            ],
+            "reason": "explore",
+            "tick": 0
+          }
+        ]
+      },
+      {
+        "added_R": 200.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.286547,
+        "decide_p95_ms": 0.233569,
+        "first_tick": 0,
+        "initial_R": 0.0,
+        "name": "dense_resources",
+        "remaining_resources": 0,
+        "seen_cells": 225,
+        "stage": 1,
+        "stage2_resource_score_delta": null,
+        "tick_budget": 100,
+        "ticks_used": 40,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              10,
+              9
+            ],
+            "reason": "collect_resource",
+            "tick": 0
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              11,
+              9
+            ],
+            "reason": "collect_resource",
+            "tick": 1
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              10,
+              9
+            ],
+            "reason": "collect_resource",
+            "tick": 2
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              9,
+              9
+            ],
+            "reason": "collect_resource",
+            "tick": 3
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              8,
+              9
+            ],
+            "reason": "collect_resource",
+            "tick": 4
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 40.0,
+            "moved": true,
+            "position": [
+              7,
+              9
+            ],
+            "reason": "collect_resource",
+            "tick": 5
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 40.0,
+            "moved": true,
+            "position": [
+              7,
+              8
+            ],
+            "reason": "collect_resource",
+            "tick": 6
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 60.0,
+            "moved": true,
+            "position": [
+              7,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 7
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 60.0,
+            "moved": true,
+            "position": [
+              7,
+              8
+            ],
+            "reason": "collect_resource",
+            "tick": 8
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 60.0,
+            "moved": true,
+            "position": [
+              7,
+              9
+            ],
+            "reason": "collect_resource",
+            "tick": 9
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 60.0,
+            "moved": true,
+            "position": [
+              7,
+              10
+            ],
+            "reason": "collect_resource",
+            "tick": 10
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 80.0,
+            "moved": true,
+            "position": [
+              7,
+              11
+            ],
+            "reason": "collect_resource",
+            "tick": 11
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 80.0,
+            "moved": true,
+            "position": [
+              7,
+              12
+            ],
+            "reason": "collect_resource",
+            "tick": 12
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 100.0,
+            "moved": true,
+            "position": [
+              7,
+              13
+            ],
+            "reason": "collect_resource",
+            "tick": 13
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 100.0,
+            "moved": true,
+            "position": [
+              8,
+              13
+            ],
+            "reason": "collect_resource",
+            "tick": 14
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 110.0,
+            "moved": true,
+            "position": [
+              9,
+              13
+            ],
+            "reason": "collect_resource",
+            "tick": 15
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 110.0,
+            "moved": true,
+            "position": [
+              9,
+              12
+            ],
+            "reason": "collect_resource",
+            "tick": 16
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 120.0,
+            "moved": true,
+            "position": [
+              9,
+              11
+            ],
+            "reason": "collect_resource",
+            "tick": 17
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 120.0,
+            "moved": true,
+            "position": [
+              10,
+              11
+            ],
+            "reason": "collect_resource",
+            "tick": 18
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 130.0,
+            "moved": true,
+            "position": [
+              11,
+              11
+            ],
+            "reason": "collect_resource",
+            "tick": 19
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 130.0,
+            "moved": true,
+            "position": [
+              12,
+              11
+            ],
+            "reason": "collect_resource",
+            "tick": 20
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 140.0,
+            "moved": true,
+            "position": [
+              13,
+              11
+            ],
+            "reason": "collect_resource",
+            "tick": 21
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 140.0,
+            "moved": true,
+            "position": [
+              13,
+              10
+            ],
+            "reason": "collect_resource",
+            "tick": 22
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 150.0,
+            "moved": true,
+            "position": [
+              13,
+              9
+            ],
+            "reason": "collect_resource",
+            "tick": 23
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 150.0,
+            "moved": true,
+            "position": [
+              13,
+              8
+            ],
+            "reason": "collect_resource",
+            "tick": 24
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 160.0,
+            "moved": true,
+            "position": [
+              13,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 25
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 160.0,
+            "moved": true,
+            "position": [
+              12,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 26
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 170.0,
+            "moved": true,
+            "position": [
+              11,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 27
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 170.0,
+            "moved": true,
+            "position": [
+              10,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 28
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              9,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 29
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              10,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 30
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              11,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 31
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              11,
+              8
+            ],
+            "reason": "collect_resource",
+            "tick": 32
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              11,
+              9
+            ],
+            "reason": "collect_resource",
+            "tick": 33
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              11,
+              10
+            ],
+            "reason": "collect_resource",
+            "tick": 34
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              11,
+              11
+            ],
+            "reason": "collect_resource",
+            "tick": 35
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              11,
+              12
+            ],
+            "reason": "collect_resource",
+            "tick": 36
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 190.0,
+            "moved": true,
+            "position": [
+              11,
+              13
+            ],
+            "reason": "collect_resource",
+            "tick": 37
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 190.0,
+            "moved": true,
+            "position": [
+              12,
+              13
+            ],
+            "reason": "collect_resource",
+            "tick": 38
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 200.0,
+            "moved": true,
+            "position": [
+              13,
+              13
+            ],
+            "reason": "collect_resource",
+            "tick": 39
+          }
+        ]
+      }
+    ],
+    "revision": "90af9851a40ed962c7fe24c855ecf3712487d146",
+    "scope": "synthetic collection only; no official judge, opponents, events, missions or AI"
+  },
+  "candidate": {
+    "cases": [
+      {
+        "added_R": 30.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.080025,
+        "decide_p95_ms": 0.080025,
+        "first_tick": 498,
+        "initial_R": 0.0,
+        "name": "late_chain",
+        "remaining_resources": 1,
+        "seen_cells": 81,
+        "stage": 2,
+        "stage2_resource_score_delta": 7.5,
+        "tick_budget": 2,
+        "ticks_used": 2,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              5,
+              4
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 498
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 30.0,
+            "moved": true,
+            "position": [
+              6,
+              4
+            ],
+            "reason": "collect_resource",
+            "tick": 499
+          }
+        ]
+      },
+      {
+        "added_R": 20.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.037298,
+        "decide_p95_ms": 0.037298,
+        "first_tick": 498,
+        "initial_R": 110.0,
+        "name": "capped_chain",
+        "remaining_resources": 2,
+        "seen_cells": 81,
+        "stage": 2,
+        "stage2_resource_score_delta": 2.5,
+        "tick_budget": 2,
+        "ticks_used": 2,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              4,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 498
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              4,
+              2
+            ],
+            "reason": "explore",
+            "tick": 499
+          }
+        ]
+      },
+      {
+        "added_R": 20.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.021292,
+        "decide_p95_ms": 0.021292,
+        "first_tick": 499,
+        "initial_R": 0.0,
+        "name": "last_move",
+        "remaining_resources": 2,
+        "seen_cells": 81,
+        "stage": 2,
+        "stage2_resource_score_delta": 5.0,
+        "tick_budget": 1,
+        "ticks_used": 1,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              4,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 499
+          }
+        ]
+      },
+      {
+        "added_R": 50.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.286527,
+        "decide_p95_ms": 0.286527,
+        "first_tick": 0,
+        "initial_R": 0.0,
+        "name": "four_move_chain",
+        "remaining_resources": 0,
+        "seen_cells": 81,
+        "stage": 1,
+        "stage2_resource_score_delta": null,
+        "tick_budget": 4,
+        "ticks_used": 4,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              4,
+              3
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 0
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              3
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 1
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 30.0,
+            "moved": true,
+            "position": [
+              5,
+              4
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 2
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 50.0,
+            "moved": true,
+            "position": [
+              6,
+              4
+            ],
+            "reason": "collect_resource",
+            "tick": 3
+          }
+        ]
+      },
+      {
+        "added_R": 30.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.226625,
+        "decide_p95_ms": 0.226625,
+        "first_tick": 0,
+        "initial_R": 0.0,
+        "name": "maze",
+        "remaining_resources": 0,
+        "seen_cells": 36,
+        "stage": 1,
+        "stage2_resource_score_delta": null,
+        "tick_budget": 80,
+        "ticks_used": 18,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              0
+            ],
+            "reason": "collect_resource",
+            "tick": 0
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              1
+            ],
+            "reason": "collect_resource",
+            "tick": 1
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              2
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 2
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              3
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 3
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              4
+            ],
+            "reason": "collect_resource",
+            "tick": 4
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              1,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 5
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              0,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 6
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              1,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 7
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              2,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 8
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              3,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 9
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              4,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 10
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              5
+            ],
+            "reason": "collect_resource",
+            "tick": 11
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              4
+            ],
+            "reason": "collect_resource",
+            "tick": 12
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              3
+            ],
+            "reason": "collect_resource",
+            "tick": 13
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              2
+            ],
+            "reason": "collect_resource",
+            "tick": 14
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              1
+            ],
+            "reason": "collect_resource",
+            "tick": 15
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 20.0,
+            "moved": true,
+            "position": [
+              5,
+              0
+            ],
+            "reason": "collect_resource",
+            "tick": 16
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 30.0,
+            "moved": true,
+            "position": [
+              4,
+              0
+            ],
+            "reason": "collect_resource",
+            "tick": 17
+          }
+        ]
+      },
+      {
+        "added_R": 0.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 0.01291,
+        "decide_p95_ms": 0.01291,
+        "first_tick": 0,
+        "initial_R": 0.0,
+        "name": "frontier_edge",
+        "remaining_resources": 0,
+        "seen_cells": 12,
+        "stage": 1,
+        "stage2_resource_score_delta": null,
+        "tick_budget": 1,
+        "ticks_used": 1,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              5,
+              1
+            ],
+            "reason": "explore_frontier",
+            "tick": 0
+          }
+        ]
+      },
+      {
+        "added_R": 200.0,
+        "blocked_moves": 0,
+        "decide_max_ms": 2.281066,
+        "decide_p95_ms": 2.247973,
+        "first_tick": 0,
+        "initial_R": 0.0,
+        "name": "dense_resources",
+        "remaining_resources": 0,
+        "seen_cells": 225,
+        "stage": 1,
+        "stage2_resource_score_delta": null,
+        "tick_budget": 100,
+        "ticks_used": 36,
+        "trace": [
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 0.0,
+            "moved": true,
+            "position": [
+              10,
+              9
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 0
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              9,
+              9
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 1
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 10.0,
+            "moved": true,
+            "position": [
+              8,
+              9
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 2
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 30.0,
+            "moved": true,
+            "position": [
+              7,
+              9
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 3
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 30.0,
+            "moved": true,
+            "position": [
+              7,
+              10
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 4
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 50.0,
+            "moved": true,
+            "position": [
+              7,
+              11
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 5
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 50.0,
+            "moved": true,
+            "position": [
+              7,
+              12
+            ],
+            "reason": "collect_resource",
+            "tick": 6
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 70.0,
+            "moved": true,
+            "position": [
+              7,
+              13
+            ],
+            "reason": "collect_resource",
+            "tick": 7
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 70.0,
+            "moved": true,
+            "position": [
+              8,
+              13
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 8
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 80.0,
+            "moved": true,
+            "position": [
+              9,
+              13
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 9
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 80.0,
+            "moved": true,
+            "position": [
+              9,
+              12
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 10
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 90.0,
+            "moved": true,
+            "position": [
+              9,
+              11
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 11
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 90.0,
+            "moved": true,
+            "position": [
+              10,
+              11
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 12
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 100.0,
+            "moved": true,
+            "position": [
+              11,
+              11
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 13
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 100.0,
+            "moved": true,
+            "position": [
+              11,
+              10
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 14
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 110.0,
+            "moved": true,
+            "position": [
+              11,
+              9
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 15
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 110.0,
+            "moved": true,
+            "position": [
+              11,
+              8
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 16
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "up"
+            },
+            "added_R": 120.0,
+            "moved": true,
+            "position": [
+              11,
+              7
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 17
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 120.0,
+            "moved": true,
+            "position": [
+              10,
+              7
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 18
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 130.0,
+            "moved": true,
+            "position": [
+              9,
+              7
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 19
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 130.0,
+            "moved": true,
+            "position": [
+              8,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 20
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 150.0,
+            "moved": true,
+            "position": [
+              7,
+              7
+            ],
+            "reason": "collect_resource",
+            "tick": 21
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 150.0,
+            "moved": true,
+            "position": [
+              8,
+              7
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 22
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 150.0,
+            "moved": true,
+            "position": [
+              9,
+              7
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 23
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 150.0,
+            "moved": true,
+            "position": [
+              10,
+              7
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 24
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 150.0,
+            "moved": true,
+            "position": [
+              11,
+              7
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 25
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 150.0,
+            "moved": true,
+            "position": [
+              12,
+              7
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 26
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "right"
+            },
+            "added_R": 160.0,
+            "moved": true,
+            "position": [
+              13,
+              7
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 27
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 160.0,
+            "moved": true,
+            "position": [
+              13,
+              8
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 28
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 170.0,
+            "moved": true,
+            "position": [
+              13,
+              9
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 29
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 170.0,
+            "moved": true,
+            "position": [
+              13,
+              10
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 30
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              13,
+              11
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 31
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 180.0,
+            "moved": true,
+            "position": [
+              13,
+              12
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 32
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "down"
+            },
+            "added_R": 190.0,
+            "moved": true,
+            "position": [
+              13,
+              13
+            ],
+            "reason": "collect_resource_chain",
+            "tick": 33
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 190.0,
+            "moved": true,
+            "position": [
+              12,
+              13
+            ],
+            "reason": "collect_resource",
+            "tick": 34
+          },
+          {
+            "action": {
+              "action": "move",
+              "direction": "left"
+            },
+            "added_R": 200.0,
+            "moved": true,
+            "position": [
+              11,
+              13
+            ],
+            "reason": "collect_resource",
+            "tick": 35
+          }
+        ]
+      }
+    ],
+    "revision": "a23edad856a663a469b6bccf9e605c1446928164",
+    "scope": "synthetic collection only; no official judge, opponents, events, missions or AI"
+  },
+  "comparison": [
+    {
+      "case": "late_chain",
+      "old_R": 20.0,
+      "new_R": 30.0,
+      "old_ticks": 2,
+      "new_ticks": 2,
+      "old_seen": 81,
+      "new_seen": 81,
+      "old_blocked": 0,
+      "new_blocked": 0,
+      "new_max_decide_ms": 0.080025
+    },
+    {
+      "case": "capped_chain",
+      "old_R": 20.0,
+      "new_R": 20.0,
+      "old_ticks": 2,
+      "new_ticks": 2,
+      "old_seen": 81,
+      "new_seen": 81,
+      "old_blocked": 0,
+      "new_blocked": 0,
+      "new_max_decide_ms": 0.037298
+    },
+    {
+      "case": "last_move",
+      "old_R": 20.0,
+      "new_R": 20.0,
+      "old_ticks": 1,
+      "new_ticks": 1,
+      "old_seen": 81,
+      "new_seen": 81,
+      "old_blocked": 0,
+      "new_blocked": 0,
+      "new_max_decide_ms": 0.021292
+    },
+    {
+      "case": "four_move_chain",
+      "old_R": 40.0,
+      "new_R": 50.0,
+      "old_ticks": 4,
+      "new_ticks": 4,
+      "old_seen": 81,
+      "new_seen": 81,
+      "old_blocked": 0,
+      "new_blocked": 0,
+      "new_max_decide_ms": 0.286527
+    },
+    {
+      "case": "maze",
+      "old_R": 30.0,
+      "new_R": 30.0,
+      "old_ticks": 18,
+      "new_ticks": 18,
+      "old_seen": 36,
+      "new_seen": 36,
+      "old_blocked": 0,
+      "new_blocked": 0,
+      "new_max_decide_ms": 0.226625
+    },
+    {
+      "case": "frontier_edge",
+      "old_R": 0.0,
+      "new_R": 0.0,
+      "old_ticks": 1,
+      "new_ticks": 1,
+      "old_seen": 9,
+      "new_seen": 12,
+      "old_blocked": 0,
+      "new_blocked": 0,
+      "new_max_decide_ms": 0.01291
+    },
+    {
+      "case": "dense_resources",
+      "old_R": 200.0,
+      "new_R": 200.0,
+      "old_ticks": 40,
+      "new_ticks": 36,
+      "old_seen": 225,
+      "new_seen": 225,
+      "old_blocked": 0,
+      "new_blocked": 0,
+      "new_max_decide_ms": 2.281066
+    }
+  ],
+  "limitations": [
+    "Seven deterministic synthetic collection cases only, not a standard-bot match or win rate.",
+    "Timings cover Strategy::decide only, not full ROS callback latency.",
+    "One run per case; not a latency distribution or held-out statistical evaluation."
+  ]
+}

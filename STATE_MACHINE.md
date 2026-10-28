@@ -208,3 +208,23 @@ stateDiagram-v2
 当前没有校准轨迹延续概率，也未完成标准车胜率验证。多人精确分奖、裁判复活落点、暂停/重启后效果恢复和所有事件组合仍需原版裁判对局。练习方法与已观察限制见[实测记录](REAL_TEST.md)；完整赛后数据出来前不把合成场景通过写成实战成功。
 
 状态机/轨迹版本按教程重试的两项原版运行结果见[结构化记录](tests/results/state-match-attempt-2026-10-28.json)：参考A和A对标准B/C/D均在启动阶段被DDS接口权限阻止，未产生有效对局。
+
+## 目标持续性与采集搜索
+
+新行为见[PLANNING.md](PLANNING.md)。目标迟滞只改变近似同分候选的排序，不能跳过既有危险与权限状态。
+
+```mermaid
+stateDiagram-v2
+    [*] --> NoGoal
+    NoGoal --> Goal: 当前合法候选胜出
+    Goal --> Goal: 连续新Tick且目标仍有效
+    Goal --> NoGoal: 消失或完成或不可达
+    Goal --> NoGoal: 换场或复活或断帧或失败MOVE
+    Goal --> Escape: 致命攻击或预告危险
+    Escape --> NoGoal: 下一Tick重新观察
+    NoGoal --> Finished: Tick达到阶段总数
+    Goal --> Finished: Tick达到阶段总数
+    Finished --> [*]
+```
+
+资源搜索每帧独立展开最多3个目标、束宽5、最多8候选，只执行首步。通过虚拟R、已拾取集合、剩余Tick和预计到达时间评估，原8Tick安全接续仍保留。它不是完整多车战斗状态搜索；目标池、束宽、模型和软预算都限制其范围。

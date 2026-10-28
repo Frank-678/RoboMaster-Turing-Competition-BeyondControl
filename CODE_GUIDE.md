@@ -134,3 +134,29 @@
 
 这些原文件从初始构建起保持不变。我们的`practice_launcher.cpp`只传启动参数/环境，没有写入、替换或修补原版裁判。
 
+
+## 新增目标与资源规划
+
+详细行为与实际结果见[PLANNING.md](PLANNING.md)。原通信与AI结构不变。
+
+| 类型或函数 | 用途 |
+| --- | --- |
+| `Goal` | `position`目标坐标、`kind`类别、`tick`选择时刻；`goal_`仅在选择MOVE时续签 |
+| `ResourcePlan` | `first`世界首方向，`first_resource`首次拾取点，`utility`收益/耗时，`benefit`整串收益 |
+| `resource_plans` | 只在已知格比较有界资源串，不写回真实位置、地图或score |
+| `resource_plans`的参数 | `start/tick`本帧真值，`remaining_ticks`剩余动作数，`targets`少量资源候选，`occupied`当前敌车占位，`first_allowed`原BFS批准的首步，`current_r`官方R，`need_normal/high`任务机会，`value_target`资源任务门槛 |
+| 局部`State` | `position/elapsed`预计落点与耗时，`first/first_resource`首动作与首份资源，`virtual_r/benefit`预计资源与估值，`collected`防重复拾取，`mission_bonus`防重复支付同类任务机会 |
+| `route` | 单段BFS；`parent`保存前驱和步数，`pending`队列，`path`依序经过格，`action_tick`预计执行时间 |
+| `deadline/time_up` | 墙钟软预算，不改变逻辑Tick；超时保留已有基线或已完成的安全候选 |
+| `beam/expanded/selected` | 当前层、扩展层和剪枝后下一层；只存在于本帧 |
+| `best/used_direction/unique` | 按首方向保留资源串，给不同方向名额，以首步/落点/拾取集合/耗时去重 |
+| `ranked_before` | 严格排序，先比较收益/耗时，再比整串收益、耗时、方向和位置 |
+| `previous_goal/keep_goal/best_goal` | 上次目标、是否能给迟滞奖励、本帧候选；失败MOVE、断帧、复活不沿用奖励 |
+| `resource_options/targets/first_allowed` | 单目标排序得到的少量目标与可用首步；不重新放开占位或危险格 |
+| `best_benefit` | 同类资源单位收益近似打平时，比较实际计划兑现总量 |
+| `newly_visible` | 观察点按本帧实际视野半径可能新揭开的格数，未知内容仍未知 |
+| `tick_limit/remaining_ticks` | 配置给出的100/500动作窗口和本帧剩余步数，最终状态不发布动作 |
+
+新增配置：`goal_retention_bonus`迟滞余量，`resource_plan_depth`目标深度，`resource_beam_width`束宽，`resource_candidate_limit`候选数，`resource_plan_budget_ms`额外搜索预算，`frontier_value`信息权重；均是赛前明确取舍。`stage1_ticks/stage2_ticks`是规则时长配置，不作为优化器搜索参数。
+
+`tests/planning_benchmark.cpp`只有测试端持有完整合成地图，逐帧生成局部感知；`Fixture`保存场景，`entity`生成相对图，`run`执行独立策略并记录真实移动/拾取、覆盖格、受阻次数与决策耗时，`main`输出七例。`receipt`来自测试端已执行动作，`seen`只用于评测，不作为选手输入。
