@@ -2,6 +2,8 @@
 
 先读比赛配置，再沿“收感知→管场次→作决策→发动作”阅读。变量的具体含义写在声明旁，关键规则写在判断旁。
 
+[规则状态机](STATE_MACHINE.md)将条款、权限状态、事件和对手轨迹转移对应到代码；[实测记录](REAL_TEST.md)区分真实模型与完整裁判对局。
+
 ## 主线从哪里开始
 
 1. `bot.cpp::main`把头文件中的ROS网络设置交给DDS，初始化ROS，创建`Bot`。
@@ -21,6 +23,8 @@
 | `README.md` | 先看这里：地址、令牌、模型分别填哪，两个终端如何启动，零次调用如何查 |
 | `DEV.md` | 依赖、策略机制、事件表、测试方法和当前验证范围 |
 | `CODE_GUIDE.md` | 本文件：主线、文件、类型和函数索引 |
+| `STATE_MACHINE.md` | 全部编号规则对应、状态图、策略路径与预测边界 |
+| `REAL_TEST.md` | 真实模型调用及裁判启动结果 |
 | `MATERIALS_CHECK.md` | 原始材料和已有学习笔记具体对应哪些修复，以及验证范围 |
 | `LICENSE` | 本工程许可证 |
 | `.gitignore` | 排除构建、安装和日志等产物 |
@@ -68,6 +72,8 @@
 | `EventKind` / `Event` | 事件类型枚举与已经校验过的参数对象 |
 | `EventProposal` | 模型解释的已知事件`events`和未知说明`unknown` |
 | `Tile` / `Snapshot` | 地图格记忆、某帧本车位置及上一Tick执行反馈 |
+| `TurnMode` | dead/collecting/guarded/combat_ready四种动作权限状态 |
+| `OpponentTrack` | 公开敌车ID对应的最近位置、位移、Tick和连续一致次数，换场清空 |
 | `Enemy` / `Entity` / `Node` | 当前可见敌车、解析后实体、BFS的第一步与距离 |
 | `AiConfig` / `Job` / `Result` | 固定HTTP设置、待执行请求、带场次来源的结果 |
 | `CurlRuntime` / `Download` / `Cancellation` | curl全局资源、正文缓冲、换场取消上下文 |
@@ -86,9 +92,10 @@
 | --- | --- |
 | `bot.cpp` | `main`设置网络并运行ROS；`Bot`构造发布/订阅和Session；`on_perception`解析、处理、发布与记日志 |
 | `session.cpp` | 构造函数固定阶段/AI设置；`act`执行整帧主线；头文件的`reason/ai_status/ai_http_success/ai_diagnostics`只读取日志快照 |
-| 协议 | `frame_tick`验证感知信封；`action_for`检查提案并回填身份，返回合法动作或null |
+| 协议 | `frame_tick`验证信封；`turn_mode`建立本帧动作权限，`turn_mode_name`供日志；`action_for`按权限过滤并回填身份 |
 | 坐标工具 | `integer`检查整数；`absolute_position`读[x,y]；`relative_position`读实体图；`manhattan`算四向距离；`ray`判断普通攻击方向 |
 | 策略状态 | 构造函数固定阶段；`reset`换场清记忆；`merge_events`合并解释；`known_events`生成LLM上下文；`reason`返回决策原因 |
+| 对手预测 | `predict_opponent`由同ID连续位移推测一格，断帧/瞬移重置；`decide`检查预测合法性，只软调整移动收益 |
 | 策略时序 | `split_wall`判断临时墙并豁免已知出生点；`dangerous`判断已知环境危险；`safe_first_steps`倒推8Tick可接续路线；`update_effects`从实际回执重建效果；`decide`选本Tick动作 |
 | `decide`局部函数 | `fallback`合法防御或不发布；`skip`明确不发布；`move`补偿幻术；`possible_fire`估计可见敌人踩辣椒风险；`combat_value`估计新增D价值；`consider`更新最高收益候选 |
 | 计分 | `score_delta`用当前累计值和预计变化计算封顶前后分差，不修改官方成绩 |
@@ -101,6 +108,7 @@
 | 基础测试 | `frame/entity`生成公开消息；`check/expect`断言；`scenarios`测基础分支；`collect_in_synthetic_maze`模拟已知规则的采集；`main`汇总测试 |
 | 高阶测试夹具 | `fresh/robot/specification`生成感知/敌车/事件；`choose`运行一帧；`events/rejected`验证正式解析器 |
 | 高阶测试场景 | `combat_and_missions/capped_score_decisions/defend_fallback/event_validation/hazard_and_illusion/future_escape_route/fortress_and_effects/session_contract`分别验证其命名机制；`full_scenarios`汇总；`gateway_scenarios`测本机HTTP |
+| 状态/轨迹测试 | `turn_state_transitions`验证动作权限转移；`opponent_prediction`验证争格/未来射线及轨迹失效退路 |
 | Python夹具 | `Handler.log_message`静默访问日志；`do_POST`校验请求并返回指定夹具；`main`开服务、运行测试、核对次数并清理 |
 | 原版代理测试 | `original_handler`核对原件并只读导入；`ModelProxy.do_POST`检查实际转发的模型名/头/选项；`main`启动临时HTTP链路并核对原版A席位计数；`practice_gateway_scenario`验证正式Session采用结果 |
 | 启动测试 | `run_guard`只在临时副本替代ROS加载；`main`检查配置摘要，再编译真实启动器并用exec占位断言环境/参数；不启动裁判 |
@@ -125,3 +133,4 @@
 | `practice/__pycache__/` | 原Python程序生成/附带的字节码缓存 |
 
 这些原文件从初始构建起保持不变。我们的`practice_launcher.cpp`只传启动参数/环境，没有写入、替换或修补原版裁判。
+

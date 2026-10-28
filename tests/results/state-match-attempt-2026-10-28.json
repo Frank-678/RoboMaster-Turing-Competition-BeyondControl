@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-28",
+  "tested_feature_commit": "c80fb963c187f7667e8d6cf010b08512a0c5952c",
+  "host": "Ubuntu 24.04 with isolated Jammy/Humble runtime",
+  "practice_unchanged": true,
+  "method": "actual original processes; HTTP used only by test controller for start/status, never as bot decision input",
+  "attempts": [
+    {
+      "case": "reference_environment",
+      "stage": 1,
+      "A": "original reference robot",
+      "standard_opponents": [],
+      "ai_mode": "mock",
+      "resumed": false,
+      "complete_match": false,
+      "last_status": {},
+      "judge_exit": 1,
+      "errors": [
+        "getifaddrs: Operation not permitted",
+        "2026-10-28 01:50:49.294 [TRANSPORT Error] All whitelist interfaces were filtered out -> Function UDPv4Transport",
+        "RuntimeError: 裁判启动超时，请检查 ROS 环境与日志"
+      ],
+      "scores": null,
+      "elapsed_seconds": 13.67
+    },
+    {
+      "case": "strategy_vs_standard",
+      "stage": 2,
+      "A": "current actual ROS bot",
+      "standard_opponents": [
+        "B",
+        "C",
+        "D"
+      ],
+      "ai_mode": "real",
+      "resumed": false,
+      "complete_match": false,
+      "last_status": {},
+      "judge_exit": 1,
+      "errors": [
+        "getifaddrs: Operation not permitted",
+        "2026-10-28 01:51:02.900 [TRANSPORT Error] All whitelist interfaces were filtered out -> Function UDPv4Transport",
+        "RuntimeError: 裁判启动超时，请检查 ROS 环境与日志"
+      ],
+      "scores": null,
+      "elapsed_seconds": 13.67
+    }
+  ],
+  "win_rate": null
+}
