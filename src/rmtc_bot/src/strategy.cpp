@@ -72,8 +72,10 @@ struct Enemy {
 struct Entity { std::string type; Cell position; double value; bool high; }; // 解析后的实体类型、坐标和资源信息。
 }  // namespace
 
-Strategy::Strategy(int stage) : stage_(stage) {
+Strategy::Strategy(int stage) : Strategy(stage, rmtc::StrategyParameters::competition()) {}
+Strategy::Strategy(int stage, rmtc::StrategyParameters parameters) : stage_(stage), parameters_(parameters) {
   if (stage != 1 && stage != 2) throw std::runtime_error("stage must be 1 or 2");
+  parameters_.validate();
 }
 void Strategy::reset() {
   tiles_.clear(); probe_attempts_.clear(); history_.clear(); events_.clear(); capture_progress_.clear(); spawn_.reset();
@@ -181,7 +183,7 @@ std::vector<Strategy::ResourcePlan> Strategy::resource_plans(Cell start, Tick ti
     const std::array<bool, 4> &first_allowed, double current_r,
     bool need_normal, bool need_high, double value_target) const {
   using Clock = std::chrono::steady_clock; // 搜索墙钟只管计算预算，事件生效仍使用逻辑Tick。
-  const auto deadline = Clock::now() + std::chrono::milliseconds(cfg::resource_plan_budget_ms);
+  const auto deadline = Clock::now() + std::chrono::milliseconds(parameters_.resource_plan_budget_ms);
   const auto time_up = [&] { return Clock::now() >= deadline; };
   struct State {
     Cell position{}, first_resource{}; // 预计当前落点、途中第一份资源；不改本车真实位置。
@@ -225,7 +227,7 @@ std::vector<Strategy::ResourcePlan> Strategy::resource_plans(Cell start, Tick ti
   std::array<std::optional<State>, 4> best; // 每个真实首方向的最好资源串，避免只返回一条而漏掉争格替代路线。
   State initial; initial.position = start; initial.virtual_r = current_r;
   std::vector<State> beam{initial}; // 当前这一层保留的少量候选计划。
-  for (int depth = 0; depth < cfg::resource_plan_depth && !time_up(); ++depth) {
+  for (int depth = 0; depth < parameters_.resource_plan_depth && !time_up(); ++depth) {
     std::vector<State> expanded; // 从本层各候选再接一个资源目标。
     for (const auto &state : beam) {
       for (const Cell &target : targets) {
@@ -240,13 +242,13 @@ std::vector<Strategy::ResourcePlan> Strategy::resource_plans(Cell start, Tick ti
           const auto &tile = tiles_.at(cell); // 路段已确认该格可通行。
           if (tile.value <= 0 || !child.collected.insert(cell).second) continue;
           if (child.collected.size() == 1) child.first_resource = cell;
-          const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * cfg::stale_resource_decay);
+          const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * parameters_.stale_resource_decay);
           double gain = tile.value; // 第一阶段最大化采集；第二阶段才用封顶分差和任务机会。
           if (stage_ == 2) {
             gain = rmtc::score_delta(child.virtual_r, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
             const unsigned bonus_bit = tile.high ? 2U : 1U; // 两类资源任务各一个机会标记。
             if ((tile.high ? need_high : need_normal) && !(child.mission_bonus & bonus_bit)) {
-              gain += cfg::resource_mission_bonus; child.mission_bonus |= bonus_bit;
+              gain += parameters_.resource_mission_bonus; child.mission_bonus |= bonus_bit;
             }
             gain += 0.1 * std::min(tile.value, std::max(0.0, value_target - child.virtual_r));
           }
@@ -269,7 +271,7 @@ std::vector<Strategy::ResourcePlan> Strategy::resource_plans(Cell start, Tick ti
     std::array<bool, 4> used_direction = {};
     std::set<std::tuple<int, Cell, std::set<Cell>, int>> unique; // 相同首步、落点、拾取集合和耗时不重复占束宽。
     for (int pass = 0; pass < 2; ++pass) {
-      for (std::size_t i = 0; i < expanded.size() && selected.size() < static_cast<std::size_t>(cfg::resource_beam_width); ++i) {
+      for (std::size_t i = 0; i < expanded.size() && selected.size() < static_cast<std::size_t>(parameters_.resource_beam_width); ++i) {
         const auto &candidate = expanded[i];
         if (used[i] || (pass == 0 && used_direction[candidate.first])) continue;
         if (!unique.emplace(candidate.first, candidate.position, candidate.collected, candidate.elapsed).second) continue;
@@ -539,7 +541,7 @@ Json Strategy::decide(const Json &p) {
       const auto node = paths.at(cell); // 这个候选格的第一步和最短步数。
       if (!e.contains(cell) && node.distance < nearest_exit) { nearest_exit = node.distance; escape = node.first; }
     }
-    if (e.start - tick <= nearest_exit + static_cast<Tick>(cfg::hazard_lead_ticks) && escape >= 0 && !reverse_unknown_)
+    if (e.start - tick <= nearest_exit + static_cast<Tick>(parameters_.hazard_lead_ticks) && escape >= 0 && !reverse_unknown_)
       return move(escape, "escape_announced_hazard");
   }
 
@@ -594,11 +596,11 @@ Json Strategy::decide(const Json &p) {
         pressures += ray(*enemy.forecast, next) >= 0;
       }
       // 预测错了也只影响收益排序；不封路、不伪造敌车、不用MOVE躲本Tick已经命中的攻击。
-      utility /= 1.0 + cfg::opponent_contest_cost * contests + cfg::opponent_pressure_cost * pressures;
+      utility /= 1.0 + parameters_.opponent_contest_cost * contests + parameters_.opponent_pressure_cost * pressures;
     }
     const std::string kind = std::string(reason) == "collect_resource_chain" ? "collect_resource" : reason;
     if (keep_goal && target && previous_goal->kind == kind && previous_goal->position == *target)
-      utility *= 1.0 + cfg::goal_retention_bonus; // 只影响排序，危险守卫已在前面执行。
+      utility *= 1.0 + parameters_.goal_retention_bonus; // 只影响排序，危险守卫已在前面执行。
     if (utility > best_utility + 1e-9 || (std::abs(utility - best_utility) <= 1e-9 &&
         kind == "collect_resource" && best_goal && best_goal->kind == kind && benefit > best_benefit + 1e-9)) {
       best_utility = utility; best_step = step; best_reason = reason;
@@ -613,12 +615,12 @@ Json Strategy::decide(const Json &p) {
     const auto &tile = tiles_.at(cell); // 当前候选格的资源、观测时间和访问次数。
     if (node.first >= 0 && tile.visits < least_visits) { least_visits = tile.visits; exploration = node.first; }
     if (tile.value > 0) {
-      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * cfg::stale_resource_decay); // 旧资源记忆可信权重。
+      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * parameters_.stale_resource_decay); // 旧资源记忆可信权重。
       double benefit = tile.value; // 第一阶段按资源价值；第二阶段改用封顶分差和任务机会。
       if (stage_ == 2) {
         // R=119再拿20，只剩1点资源价值参与封顶计分，不能按20全额估值。
         benefit = rmtc::score_delta(resource_value, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
-        if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += cfg::resource_mission_bonus;
+        if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += parameters_.resource_mission_bonus;
         if (need_value) benefit += tile.value * 0.1;
       }
       const double utility = benefit * freshness / (node.distance + 1);
@@ -627,7 +629,7 @@ Json Strategy::decide(const Json &p) {
     }
     if (stage_ == 1) continue;
     for (const auto &target : reach) {
-      if (cell == target) consider(node.first, cfg::reach_mission_value / (node.distance + 1), "reach_mission", target);
+      if (cell == target) consider(node.first, parameters_.reach_mission_value / (node.distance + 1), "reach_mission", target);
       else if (node.first >= 0) {
         // 目标尚未探明时只走已知路线中靠近目标的格子，不穿过未知墙。
         int unknown_neighbors = 0; // 这个格子旁有多少尚未探明的地图内邻格。
@@ -642,14 +644,14 @@ Json Strategy::decide(const Json &p) {
     }
     for (const auto &[key, e] : events_) {
       if (!e.active(tick)) continue;
-      if (e.kind == Kind::heal && hp < cfg::healing_below_hp && healing_until_ <= tick + 2 && e.contains(cell) && cell != start &&
+      if (e.kind == Kind::heal && hp < parameters_.healing_below_hp && healing_until_ <= tick + 2 && e.contains(cell) && cell != start &&
           tick + node.distance - 1 < e.end)
         consider(node.first, std::min(100.0 - hp, e.amount * e.effect_ticks) * 0.2 / (node.distance + 1), "seek_healing", cell);
       if (e.kind == Kind::fortress && !empowered_ && e.contains(cell) &&
           e.end - tick >= node.distance + e.capture_ticks - capture_progress_[key] - (node.distance > 0 ? 1 : 0)) {
         // 路程太远、事件剩余时间不足就不追；已在堡垒内则重视保住进度。
-        if (cell == start) consider(-1, cfg::fortress_hold_value, "hold_fortress");
-        else consider(node.first, cfg::fortress_capture_value / (node.distance + e.capture_ticks), "capture_fortress", cell);
+        if (cell == start) consider(-1, parameters_.fortress_hold_value, "hold_fortress");
+        else consider(node.first, parameters_.fortress_capture_value / (node.distance + e.capture_ticks), "capture_fortress", cell);
       }
       if (e.kind == Kind::chili && (e.contains(cell) || (e.contains(start) && node.distance == 1))) {
         const Cell fire_point = e.contains(start) ? start : cell; // 计划进入/重新进入的辣椒点。
@@ -678,7 +680,7 @@ Json Strategy::decide(const Json &p) {
     std::vector<Cell> targets; // 只截取少量已知资源；候选数与地图资源总数无关。
     for (const auto &[utility, cell] : resource_options) {
       (void)utility;
-      if (targets.size() >= static_cast<std::size_t>(cfg::resource_candidate_limit)) break;
+      if (targets.size() >= static_cast<std::size_t>(parameters_.resource_candidate_limit)) break;
       targets.push_back(cell);
     }
     std::array<bool, 4> first_allowed = {}; // 复用已做完的本Tick时序、占位、火线和安全接续检查。
@@ -704,7 +706,7 @@ Json Strategy::decide(const Json &p) {
         }
       }
       if (newly_visible > 0)
-        consider(node.first, cfg::frontier_value * newly_visible / (node.distance + 1), "explore_frontier", cell);
+        consider(node.first, parameters_.frontier_value * newly_visible / (node.distance + 1), "explore_frontier", cell);
     }
   }
   if (best_utility < 0 && exploration >= 0) consider(exploration, 0.01, "explore");
