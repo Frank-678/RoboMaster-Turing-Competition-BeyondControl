@@ -115,6 +115,7 @@ private:
   std::size_t navigation_known_ = 0, navigation_missions_ = 0; // 已观测格数、完成任务数。
   int navigation_capture_ = 0; // 已确认堡垒驻留进度之和。
   bool recovery_blocked_ = false; // 已验证当前循环区无安全出口时持续守住，每帧重查，不再反复启动空跑。
+  int lethal_defend_streak_ = 0; // 连续致命防御驻守tick计数（跨tick累计，新场清零）；用于驻守超时后脱离接触。
   unsigned recovery_count_ = 0; // 本场触发次数，换场清零。
   std::map<std::pair<std::string,Cell>,Tick> deferred_goals_; // 目标类别/坐标→暂缓截止，不改地图可走性。
   std::vector<Cell> planned_resources_; // 仅供下一帧重评的资源串；换场、断帧、失败和改目标后清空。

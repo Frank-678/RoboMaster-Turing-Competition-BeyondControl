@@ -91,7 +91,7 @@ void Strategy::reset() {
   last_resource_sighting_ = -1;
   width_ = height_ = 0; reversed_ = reverse_unknown_ = empowered_ = false;
   vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
-  healing_amount_ = 0; reason_ = "new_session";
+  healing_amount_ = 0; lethal_defend_streak_ = 0; reason_ = "new_session";
 }
 // 只用已执行的连续观测识别“动了但没进展”；没有可信回执就重新积累窗口。
 void Strategy::observe_navigation(const Json &p, Cell position, Tick tick, Tick receipt_tick,
@@ -712,9 +712,30 @@ Json Strategy::decide(const Json &p) {
   }
   // MOVE 无法躲开本 Tick 已经先结算的战斗；防御可能保命时先防御。
   if (stage_ == 2 && incoming >= hp - pre_damage && defended_incoming < hp - pre_damage) {
+    // 连续致命防御=对手蹲守连击，驻守无进展（crossroads-542曾连续49Tick站防、R仅50）。
+    // 超过阈值后脱离接触：选距最近敌车最远的安全邻格；无路可退才继续防御保命。
+    if (parameters_.defend_stall_break_ticks > 0 && lethal_defend_streak_ >= parameters_.defend_stall_break_ticks) {
+      int retreat = -1, retreat_gain = 0;
+      for (int direction = 0; direction < 4; ++direction) {
+        const Cell next{start.first + steps[direction].first, start.second + steps[direction].second};
+        const auto tile = tiles_.find(next);
+        if (tile == tiles_.end() || !tile->second.seen || tile->second.wall) continue;
+        if (occupied.count(next) || dangerous(next, tick + 1)) continue;
+        int nearest = 1 << 30;
+        for (const auto &enemy : enemies)
+          if (!enemy.protected_spawn) nearest = std::min(nearest, manhattan(enemy.position, next));
+        if (nearest > retreat_gain) { retreat_gain = nearest; retreat = direction; }
+      }
+      if (retreat >= 0) {
+        lethal_defend_streak_ = 0; // 脱离后重新计数，避免一步脱离又立刻回防的振荡。
+        return move(retreat, "break_defend_stall");
+      }
+    }
+    ++lethal_defend_streak_;
     reason_ = "defend_lethal_threat";
     return {{"action", "defend"}};
   }
+  lethal_defend_streak_ = 0; // 本帧未致命防御，连续驻守清零。
 
   // 对手下一步可能踩辣椒，属于保守估计；不把其未知动作当作事实。
   const auto possible_fire = [&](Cell cell) {

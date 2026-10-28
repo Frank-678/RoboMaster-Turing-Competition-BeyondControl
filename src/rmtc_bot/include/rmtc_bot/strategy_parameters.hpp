@@ -21,6 +21,7 @@ struct StrategyParameters {
   double stage2_assassin_value; // 第二阶段派窗口刺杀：攻击正在扫资源簇的对手（击杀/击退→重生移位）的归属收益权重；0为关闭。
   double stage2_pie_attack_discount; // 第二阶段饼窗口攻击估值折扣（0-1）；还手不受折扣。
   double stage2_shadow_value; // 第二阶段饼窗口影子跟踪权重：对手朝未知区移动时向投影前端探路；0为关闭。
+  int defend_stall_break_ticks; // 第二阶段连续致命防御驻守超过该tick数后脱离接触；0为关闭。
   int hazard_lead_ticks, resource_plan_depth, resource_beam_width, resource_candidate_limit, resource_plan_budget_ms;
   bool collision_replan, resource_refinement;
   int resource_refinement_trials;
@@ -33,7 +34,7 @@ struct StrategyParameters {
     return {c::stale_resource_decay,c::resource_mission_bonus,c::reach_mission_value,c::healing_below_hp,
       c::fortress_hold_value,c::fortress_capture_value,c::goal_retention_bonus,c::frontier_value,
       c::opponent_contest_cost,c::opponent_pressure_cost,c::opponent_claim_discount,c::stage1_frontier_value,c::explore_toward_resource_value,c::explore_tour_value,c::mission_explore_value,
-      c::stage1_flood_value,c::stage1_ring_value,c::stage2_race_gate,c::stage2_explore_gate_tick,c::stage2_mission_pull_stale_ticks,c::stage2_assassin_value,c::stage2_pie_attack_discount,c::stage2_shadow_value,c::hazard_lead_ticks,c::resource_plan_depth,
+      c::stage1_flood_value,c::stage1_ring_value,c::stage2_race_gate,c::stage2_explore_gate_tick,c::stage2_mission_pull_stale_ticks,c::stage2_assassin_value,c::stage2_pie_attack_discount,c::stage2_shadow_value,c::defend_stall_break_ticks,c::hazard_lead_ticks,c::resource_plan_depth,
       c::resource_beam_width,c::resource_candidate_limit,c::resource_plan_budget_ms,
       c::collision_replan,c::resource_refinement,c::resource_refinement_trials,c::tactical_search,
       c::tactical_risk,c::tactical_hp_value,c::tactical_death_cost,c::tactical_future_discount,c::tactical_goal_weight,
@@ -45,7 +46,7 @@ struct StrategyParameters {
          opponent_claim_discount,stage1_frontier_value,
          explore_toward_resource_value,explore_tour_value,mission_explore_value,stage1_flood_value,stage1_ring_value,stage2_assassin_value,stage2_shadow_value,tactical_risk,tactical_hp_value,tactical_death_cost,tactical_future_discount,tactical_goal_weight})
       if (!std::isfinite(value) || value<0 || value>1000) throw std::runtime_error("invalid strategy weight");
-    if (healing_below_hp>100 || tactical_risk>1 || tactical_future_discount>1 || stage2_pie_attack_discount<0 || stage2_pie_attack_discount>1 || stage2_explore_gate_tick<0 || stage2_explore_gate_tick>500 || stage2_mission_pull_stale_ticks<0 || stage2_mission_pull_stale_ticks>500 || hazard_lead_ticks<0 || hazard_lead_ticks>20 || resource_plan_depth<1 || resource_plan_depth>8 ||
+    if (healing_below_hp>100 || tactical_risk>1 || tactical_future_discount>1 || stage2_pie_attack_discount<0 || stage2_pie_attack_discount>1 || stage2_explore_gate_tick<0 || stage2_explore_gate_tick>500 || stage2_mission_pull_stale_ticks<0 || stage2_mission_pull_stale_ticks>500 || defend_stall_break_ticks<0 || defend_stall_break_ticks>100 || hazard_lead_ticks<0 || hazard_lead_ticks>20 || resource_plan_depth<1 || resource_plan_depth>8 ||
         resource_beam_width<1 || resource_beam_width>32 || resource_candidate_limit<1 || resource_candidate_limit>32 ||
         resource_refinement_trials<0 || resource_refinement_trials>32 || resource_plan_budget_ms<1 || resource_plan_budget_ms>30 || loop_window_ticks<6 || loop_window_ticks>32 ||
         recovery_ticks<2 || recovery_ticks>64 || stalled_goal_cooldown_ticks<1 || stalled_goal_cooldown_ticks>200) throw std::runtime_error("invalid strategy budget");
