@@ -92,9 +92,9 @@ def candidates(count):
     randomizer = random.Random(20261028)  # 固定搜索序列，不用赛场随机数或隐藏地图。
     base = SETTINGS["baseline_parameters"]
     result = [{"name": "baseline", "parameters": dict(base)},
-              {"name": "new_default", "parameters": dict(base, tactical_search=True, resource_refinement=True, collision_replan=True)},
-              {"name": "collision_only", "parameters": dict(base, collision_replan=True)},
-              {"name": "aggressive", "parameters": dict(base, tactical_search=True, resource_refinement=True, collision_replan=True,
+              {"name": "new_default", "parameters": dict(base, tactical_search=True, resource_refinement=True, collision_replan=True, loop_recovery=True)},
+              {"name": "collision_only", "parameters": dict(base, collision_replan=True, loop_recovery=True)},
+              {"name": "aggressive", "parameters": dict(base, tactical_search=True, resource_refinement=True, collision_replan=True, loop_recovery=True,
                   tactical_risk=0.1, tactical_hp_value=0.005, tactical_death_cost=0.0, tactical_goal_weight=0.15,
                   resource_mission_bonus=2.5, reach_mission_value=6.0)}]
     ranges = {"resource_mission_bonus": [1.0, 2.5, 4.0, 5.0], "reach_mission_value": [4.0, 6.0, 8.0],
@@ -102,7 +102,7 @@ def candidates(count):
               "resource_plan_depth": [3, 4, 5], "tactical_risk": [0.1, 0.35, 0.6],
               "tactical_hp_value": [0.005, 0.015, 0.03], "tactical_death_cost": [0.0, 0.25, 1.0], "tactical_goal_weight": [0.15, 0.35, 0.65]}
     for i in range(max(0, count-4)):
-        values = dict(base, tactical_search=i % 5 != 4, resource_refinement=True, collision_replan=True)
+        values = dict(base, tactical_search=i % 5 != 4, resource_refinement=True, collision_replan=True, loop_recovery=True)
         values.update({key: randomizer.choice(choices) for key, choices in ranges.items()})
         result.append({"name": f"search_{i:02d}", "parameters": values})
     return result

@@ -21,6 +21,10 @@
 | 文件 | 职责 |
 | --- | --- |
 | `README.md` | 先看这里：地址、令牌、模型分别填哪，两个终端如何启动，零次调用如何查 |
+| `NAVIGATION.md` | 无收益往返、争格、封闭区域的复现、脱困机制和日志说明 |
+| `tests/unstuck_benchmark.cpp` | 六个500Tick导航压力/正常路径夹具，与旧核心配对 |
+| `tests/run_unstuck.py` | 编译导航夹具，断言脱困与保留正常绕路，可只读比较旧工程 |
+| `tests/results/unstuck-2026-10-28.json`、`unstuck-maps-2026-10-28.json` | 专门复现轨迹及新地图同条件对照 |
 | `ARENA.md` | 自建对手池、六类地图、规则模型、参数搜索和留出边界 |
 | `arena.sh` | 一键离线对战与调参；不改正式参数 |
 | `DEV.md` | 依赖、策略机制、事件表、测试方法和当前验证范围 |
@@ -232,3 +236,13 @@ Python的`probe`只发一次POST：`url/key/model/thinking/json_output/max_token
 | Python`candidates/main` | 固定种子生成搜索候选、训练筛选并一次留出对照，保存源码哈希和结果 |
 
 循环索引约定：`player/seat/i`是车，0–3；战术0总是本车。`mode`是手写情景，`depth`是本地推演Tick，`trial`是路线修改次数，`direction/d`是上右下左。`source/target`在伤害矩阵中是贡献者/受害者；`state/child/branch`均是推演副本，不是裁判感知。`normal/high`为计划拾取次数，`r/d`为计划R/D；配置含义在`match_config.hpp`逐项注释。
+
+## 导航进展与脱困变量
+
+`observe_navigation`在本帧地图更新后读取官方R/D/任务、HP、新格子数量及真实堡垒进度。`NavigationSample`只记可信连续Tick、实际坐标和上一目标；`recent_navigation_`至多保留一个配置窗口。`navigation_tick_/progress_tick_`分别记录上次可信回合和最近进展；`navigation_r_/d_/hp_/known_/missions_/capture_`是上一帧的对照，不是预测。
+
+`loop_cells_`是触发时反复经过的格子；`recovery_goal_/until_`是脱困目的地与绝对截止。`recovery_blocked_`表示检查后没有安全出口，保留原循环区防止隔一会又空跑；`recovery_count_`记录本场真正触发次数。`deferred_goals_`把目标类别/坐标暂缓到指定Tick，不改变格子可走性。换场、断帧/不可信回执和复活的失效规则见NAVIGATION。
+
+`decide`中的`available`检查脱困目标在当前BFS内可达且能在期限内到达；`best_escape`按新视野、低访问、有限距离与公开席位选择目标。仍只调用原`move`发布首步并处理幻术。`navigation_diagnostics`生成只读日志，经Session传给Bot；`navigation`是其JSON文本，含无进展时长、次数、目标、暂缓数和无出口标志。
+
+导航夹具`fixture/run`只在测试端建场和推进；`positions/repeats/longest`统计无成绩进展的周期运动，`first_resource/first_task`记录首次实际达成Tick，`reasons/trace`保留行为证据。`run_unstuck.py`的`build/run/verify/main`依次编译同夹具、执行、检查六个500Tick结果、保存摘要；旧版生产核心只读，不被新版策略当输入。

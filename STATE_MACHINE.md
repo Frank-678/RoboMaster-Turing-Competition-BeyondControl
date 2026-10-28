@@ -249,3 +249,25 @@ stateDiagram-v2
 ```
 
 意图不是位置，旧目标串不是必须执行的动作。新增离线裁判与五类/六类对手情景的结算检查见[ARENA.md](ARENA.md)，运行结果保留失败实验。自建规则自洽不替代原版裁判验收。
+
+
+## 成功往返也可能没有进展
+
+[复现与脱困](NAVIGATION.md)在原有失败MOVE改道之上增加一层真实进展状态：
+
+```mermaid
+stateDiagram-v2
+    [*] --> Normal
+    Normal --> Watch: 连续可信回执且无实际进展
+    Watch --> Normal: R或D或任务或视野或回血或驻留增长
+    Watch --> Relocate: 12帧周期重复或四格内徘徊
+    Relocate --> Relocate: 重读坐标并沿当前安全路只走首步
+    Relocate --> Hold: 循环区外无安全出口
+    Hold --> Relocate: 新感知出现安全出口
+    Hold --> Normal: 真实进展或上下文重置
+    Relocate --> Normal: 到达目标或期限届满
+    Watch --> Normal: 断帧或复活或换场
+    Relocate --> Normal: 断帧或复活或换场
+```
+
+确定危险和当前致命防御保持更高优先级；脱困不保证物理封死或危险包围时仍能移动。反伤有效时，不奖励接近预测正在防御的同一目标。默认期限、冷却和日志字段集中说明在NAVIGATION，具体用户地图仍待同场数据核对。

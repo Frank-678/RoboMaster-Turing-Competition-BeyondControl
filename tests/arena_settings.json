@@ -48,7 +48,11 @@
     "tactical_goal_weight": 0.35,
     "resource_refinement": false,
     "resource_refinement_trials": 12,
-    "collision_replan": false
+    "collision_replan": false,
+    "loop_recovery": false,
+    "loop_window_ticks": 12,
+    "recovery_ticks": 12,
+    "stalled_goal_cooldown_ticks": 24
   },
   "pilot_heldout_seeds": [
     19001

@@ -24,6 +24,11 @@
     "tactical_goal_weight": 0.65,
     "resource_refinement": true,
     "resource_refinement_trials": 12,
-    "collision_replan": true
-  }
+    "collision_replan": true,
+    "loop_recovery": true,
+    "loop_window_ticks": 12,
+    "recovery_ticks": 12,
+    "stalled_goal_cooldown_ticks": 24
+  },
+  "navigation_update": "2026-10-28 loop recovery added after reported oscillation; prior weights retained, new knobs not re-optimized"
 }

@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-28",
+  "scope": "No-progress navigation milestone",
+  "baseline_code": "3ecc01fa494de70ccef5b5e5507295c03c4842d2",
+  "core_and_http": "ASan/UBSan passed with detect_leaks=0; includes progress, missing receipt, forward traversal, fortress and lethal guard checks",
+  "navigation_cases": "6 cases x 500 ticks x 2 versions passed; 0 invalid",
+  "new_maps": "30 new scenes per version; fixed scripted NPCs, no weight retuning",
+  "ros_build": "actual bot/strategy/session and Humble headers/libraries manually linked",
+  "practice_original_files_unchanged": 18,
+  "mermaid_blocks_parsed": 8,
+  "limitations": [
+    "User map not obtained",
+    "No original DDS match",
+    "No real model call",
+    "Lethal safety guard may retain DEFEND",
+    "500-tick reflection is a stress case"
+  ]
+}
