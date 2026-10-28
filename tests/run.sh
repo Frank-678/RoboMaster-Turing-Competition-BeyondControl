@@ -16,3 +16,18 @@ g++ "${rmtc_test_flags[@]}" \
   "$rmtc_test_root"/tests/{strategy_test,full_strategy_test}.cpp \
   -lcurl -o "$rmtc_test_tmp/strategy_test"
 python3 "$rmtc_test_root/tests/mock_gateway.py" "$rmtc_test_tmp/strategy_test"
+# 可选参数仅指定待只读加载的原版practice.py；完整仓库中不传参数即可。
+rmtc_practice_source="${1:-$rmtc_test_root/practice/practice.py}"
+if [[ -f "$rmtc_practice_source" ]]; then
+  PYTHONDONTWRITEBYTECODE=1 python3 "$rmtc_test_root/tests/ai_check_test.py"
+  PYTHONDONTWRITEBYTECODE=1 python3 "$rmtc_test_root/tests/practice_gateway.py" "$rmtc_test_tmp/strategy_test" "$rmtc_practice_source"
+else
+  echo '原版practice.py未在本地，跳过原版HTTP转发测试；核心与固定HTTP测试已完成。'
+fi
+
+# 自建裁判规则边界；仍不启动ROS，也不调用模型。
+g++ "${rmtc_test_flags[@]}" \
+  "$rmtc_test_root/src/rmtc_bot/src/events.cpp" \
+  "$rmtc_test_root"/tests/{arena,arena_scenarios,arena_test}.cpp \
+  -o "$rmtc_test_tmp/arena_rules_test"
+"$rmtc_test_tmp/arena_rules_test"

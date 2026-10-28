@@ -16,22 +16,35 @@ inline constexpr const char *rmw_implementation = "rmw_fastrtps_cpp";
 // url 必须是完整的 /chat/completions 地址。正式赛填官方网关，不填模型服务主页。
 // 同机练习填 http://127.0.0.1:8080/v1/chat/completions，token 填 practice-A；
 // 练习裁判须另以 real 模式连接真实模型，mock 只验证通信。
-inline constexpr const char *ai_url = "";
-inline constexpr const char *ai_token = "";    // 本场令牌；填入真实令牌后不要提交此内容。
-inline constexpr const char *ai_model = "";    // 使用赛前公布的模型名。
-inline constexpr long ai_timeout_ms = 10000;  // 后台最多等10秒，不阻塞500ms的动作窗口。
-inline constexpr int ai_max_tokens = 2200;    // 按当场输出限制修改。
+inline constexpr const char *ai_url = "http://127.0.0.1:8080/v1/chat/completions";
+inline constexpr const char *ai_token = "practice-A"; // 仅公开练习令牌；正式令牌不要提交。
+inline constexpr const char *ai_model = "deepseek-flash"; // 请求体中的模型名；练习启动器同时设置PRACTICE_MODEL。
+inline constexpr long ai_timeout_ms = 35000;  // 后台等完整响应；覆盖练习代理5秒连接+25秒读取，不阻塞动作。
+inline constexpr long ai_connect_timeout_ms = 5000; // 建连单独限5秒；原来的500ms对出网/TLS过短。
+inline constexpr int ai_max_tokens = 2200;    // 多事件JSON预算；公告示例512不是已确认的赛事硬上限，按实际配额修改。
+inline constexpr const char *ai_http_proxy = ""; // 机器人→网关的网络代理；空串明确表示直连。
+// 2026-10-28正式公告：统一deepseek-flash，其他字段直接转发，默认思考开启。
+// 必须在请求JSON顶层明确disabled；不是改URL，也不是只改练习裁判配置。
+inline constexpr const char *ai_thinking = "disabled";
+inline constexpr bool ai_json_output = true; // 明确请求JSON模式；Prompt也要求JSON，仍需本地校验。
+
+// 只供 bash practice.sh 使用：练习代理→真实模型。正式赛不使用这组上游配置。
+// 模型名共用上面的ai_model。真实服务密钥与practice-A是两种不同的凭据。
+inline constexpr int practice_port = 8080;     // 原版练习代理监听端口，须与本机ai_url一致。
+inline constexpr const char *practice_llm_url = "https://api.deepseek.com/chat/completions"; // DeepSeek文档给出的完整POST端点。
+inline constexpr const char *practice_llm_key = "";
+inline constexpr const char *practice_llm_proxy = ""; // 上游出网代理；如确用WSL本机7890，填http://127.0.0.1:7890。
 
 // 下面只调策略取舍。攻击距离、伤害、计分公式和结算顺序按规则实现，不在这里调。
 inline constexpr double stale_resource_decay = 0.01; // 资源记忆每Tick衰减系数。
-inline constexpr double resource_mission_bonus = 5.0; // 未完成采集任务时的额外权重。
-inline constexpr double reach_mission_value = 8.0;    // 到点任务权重，还会除以距离+1。
-inline constexpr double healing_below_hp = 70.0;     // 低于此血量才主动找治疗点。
+inline constexpr double resource_mission_bonus = 4.0; // 未完成采集任务时的额外权重。
+inline constexpr double reach_mission_value = 4.0;    // 到点任务权重，还会除以距离+1。
+inline constexpr double healing_below_hp = 40.0;     // 低于此血量才主动找治疗点。
 inline constexpr double fortress_hold_value = 20.0;  // 保住尚未完成的驻留进度。
 inline constexpr double fortress_capture_value = 12.0; // 前往堡垒的收益分子。
 inline constexpr int hazard_lead_ticks = 2;          // 比最短退出时间再提前几Tick。
-inline constexpr double goal_retention_bonus = 0.10; // 同一有效目标给10%排序余量，抑制小波动；不是官方加分。
-inline constexpr int resource_plan_depth = 3;       // 资源串最多扩展3个目标，不是完整战斗树或3Tick。
+inline constexpr double goal_retention_bonus = 0.1; // 同一有效目标给10%排序余量，抑制小波动；不是官方加分。
+inline constexpr int resource_plan_depth = 4;       // 资源串最多扩展4个目标，不是完整战斗树或3Tick。
 inline constexpr int resource_beam_width = 5;       // 每层最多保留5条未执行计划，优先保留不同首方向。
 inline constexpr int resource_candidate_limit = 8;  // 先按现有收益/距离挑8个资源；地图资源数不写死。
 inline constexpr int resource_plan_budget_ms = 10;  // 额外搜索软预算；耗尽时交回已算好的合法基线。
@@ -41,11 +54,11 @@ inline constexpr double opponent_pressure_cost = 0.25; // 下一Tick可能进入
 inline constexpr bool collision_replan = true; // 同一起点同一落点连续两次MOVE失败，存在合法替代时改道一Tick。
 inline constexpr bool resource_refinement = true;  // 重评上一资源串，并尝试插入、交换/反转、删除目标。
 inline constexpr int resource_refinement_trials = 12; // 每帧最多12次局部修改，共享原有10ms软预算。
-inline constexpr bool tactical_search = true;       // 可见敌车附近才比较最多三Tick、多个合法对手情景。
-inline constexpr double tactical_risk = 0.35;        // 最差情景的权重；不是经训练的概率。
+inline constexpr bool tactical_search = false;       // 保留三Tick搜索供赛前试验；本轮训练选中关闭，不假定更复杂必然更强。
+inline constexpr double tactical_risk = 0.6;        // 最差情景的权重；不是经训练的概率。
 inline constexpr double tactical_hp_value = 0.015;   // 每HP的未来机会估值，不写入官方分数。
-inline constexpr double tactical_death_cost = 1.0;   // 除规则D扣除外，死亡丢失位置/行动窗口的估值。
+inline constexpr double tactical_death_cost = 0.25;   // 除规则D扣除外，死亡丢失位置/行动窗口的估值。
 inline constexpr double tactical_future_discount = 0.65; // 第二Tick相对第一Tick的收益权重。
-inline constexpr double tactical_goal_weight = 0.35; // 原目标评价在战术比较中的尾部价值。
+inline constexpr double tactical_goal_weight = 0.65; // 原目标评价在战术比较中的尾部价值。
 }  // namespace rmtc::match_config
 
