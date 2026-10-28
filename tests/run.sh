@@ -25,3 +25,10 @@ if [[ -f "$rmtc_practice_source" ]]; then
 else
   echo '原版practice.py未在本地，跳过原版HTTP转发测试；核心与固定HTTP测试已完成。'
 fi
+
+# 自建裁判规则边界；仍不启动ROS，也不调用模型。
+g++ "${rmtc_test_flags[@]}" \
+  "$rmtc_test_root/src/rmtc_bot/src/events.cpp" \
+  "$rmtc_test_root"/tests/{arena,arena_scenarios,arena_test}.cpp \
+  -o "$rmtc_test_tmp/arena_rules_test"
+"$rmtc_test_tmp/arena_rules_test"

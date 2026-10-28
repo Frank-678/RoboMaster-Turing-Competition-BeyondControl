@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+  "map_styles": [
+    "open",
+    "maze",
+    "rooms",
+    "lanes",
+    "clusters",
+    "crossroads"
+  ],
+  "opponent_styles": [
+    "collector",
+    "aggressive",
+    "defender",
+    "fortress",
+    "opportunist",
+    "wanderer"
+  ],
+  "train_seeds": [
+    101,
+    307
+  ],
+  "heldout_seeds": [
+    29003
+  ],
+  "baseline_parameters": {
+    "stale_resource_decay": 0.01,
+    "resource_mission_bonus": 5.0,
+    "reach_mission_value": 8.0,
+    "healing_below_hp": 70.0,
+    "fortress_hold_value": 20.0,
+    "fortress_capture_value": 12.0,
+    "hazard_lead_ticks": 2,
+    "goal_retention_bonus": 0.1,
+    "resource_plan_depth": 3,
+    "resource_beam_width": 5,
+    "resource_candidate_limit": 8,
+    "resource_plan_budget_ms": 10,
+    "frontier_value": 0.02,
+    "opponent_contest_cost": 1.0,
+    "opponent_pressure_cost": 0.25,
+    "tactical_search": false,
+    "tactical_risk": 0.35,
+    "tactical_hp_value": 0.015,
+    "tactical_death_cost": 1.0,
+    "tactical_future_discount": 0.65,
+    "tactical_goal_weight": 0.35,
+    "resource_refinement": false,
+    "resource_refinement_trials": 12,
+    "collision_replan": false
+  },
+  "pilot_heldout_seeds": [
+    19001
+  ]
+}
