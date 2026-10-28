@@ -399,6 +399,26 @@ void fortress_and_effects() {
   c.decide(p);
   check(c.reason() != "avoid_possible_chili_fire", "chili intersection incorrectly treated as damaged");
 }
+// 对手可能踩辣椒不是确定封路：只有一条爆炸逃路时也必须保留它。
+void uncertain_fire_escape() {
+  auto chili=specification("chili",0,10);chili["points"]={{4,2}};chili["amount"]=50;
+  auto blast=specification("explosion",1,2);blast["area"]={4,4,4,4};blast["amount"]=80;
+  auto p=fresh();p["self"]["hp"]=40;
+  p["visible_entities"]={entity("obstacle",-1,0),entity("obstacle",1,0),entity("obstacle",0,1),robot(1,-2)};
+  Strategy escape(2);escape.merge_events(events(chili));escape.merge_events(events(blast));
+  const auto action=escape.decide(p); // 上方可能挨火；原地下一Tick确定会爆炸，防御不减环境伤害。
+  check(action["action"]=="move" && action["direction"]=="up" && escape.reason()=="escape_announced_hazard",
+        "hypothetical enemy chili erased the only announced-blast escape");
+  p["visible_entities"]={robot(1,-2),entity("resource_high",0,-1),entity("resource_high",1,0)};
+  Strategy alternative(2);alternative.merge_events(events(chili));
+  check(alternative.decide(p)["direction"]=="right","lower-risk chili alternative was ignored");
+  // 相对时间必须锚定原公告；交叉火线里的点只免疫自己的那一道火。
+  const auto prompt=rmtc::event_system_prompt();
+  check(prompt.find("never to this request's tick")!=std::string::npos &&
+        prompt.find("another triggered point can still hit it")!=std::string::npos,
+        "event prompt lost original notice time or overlapping-fire semantics");
+}
+// 验证新Tick、同Tick、旧Tick、换场和坏输入回退。
 void session_contract() {
   rmtc::Session s(2);
   auto p = fresh(10); p["visible_entities"] = {entity("resource_normal", 1, 0)};
@@ -419,7 +439,7 @@ void session_contract() {
 void full_scenarios() {
   turn_state_transitions(); opponent_prediction(); persistent_goal(); resource_sequences(); blocked_replanning(); navigation_recovery(); frontier_exploration(); tactical_scenarios();
   combat_and_missions(); capped_score_decisions(); defend_fallback(); event_validation(); model_formatting(); hazard_and_illusion();
-  future_escape_route(); fortress_and_effects(); session_contract();
+  future_escape_route(); fortress_and_effects(); uncertain_fire_escape(); session_contract();
   std::cout << "combat, tasks, eight event kinds, and session contracts passed\n";
 }
 

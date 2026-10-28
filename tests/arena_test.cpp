@@ -54,6 +54,19 @@ void engine_contract() {
   require(delayed.interpreted_events().size()==1,"delayed announcement never delivered");
   auto hidden=s;hidden.resources[{8,8}]=20;s.resources[{8,8}]=10;s.radius=hidden.radius=1;Game first(s),second(hidden);
   require(first.observe(0)==second.observe(0),"hidden map resource leaked into public observation");
+  // 四个席位各看自己的身份、坐标和成绩，不能把A的整份观测复用给其他玩家。
+  Game actors(bare());
+  for(int seat=0;seat<4;++seat) {
+    auto &car=actors.fixture_cars()[seat];car.resource=10*seat;car.damage=7*seat;
+    const auto observation=actors.observe(seat);const std::string identity(1,static_cast<char>('A'+seat));
+    require(observation.at("self").at("team")==identity && observation.at("self").at("robot_id")==identity,
+            "actor observation reused another seat identity");
+    require(observation.at("self").at("position")==Json({car.fighter.position.first,car.fighter.position.second}) &&
+            observation.at("score").at("resource_value")==10*seat && observation.at("score").at("effective_damage")==7*seat,
+            "actor observation reused another seat state or score");
+    for(const auto &entity:observation.at("visible_entities")) if(entity.at("type")=="robot")
+      require(entity.at("team")!=identity,"actor appeared as its own opponent");
+  }
 }
 void event_contract() {
   using K=rules::ActionKind;

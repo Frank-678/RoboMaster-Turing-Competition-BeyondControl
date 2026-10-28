@@ -593,6 +593,14 @@ Json Strategy::decide(const Json &p) {
     }
     return damage;
   };
+  std::array<double,4> fire_damage{}, fire_cost{}; // 四个首步的假设火线伤害、无量纲风险折扣；不是发生概率。
+  std::array<int,4> first_order={0,1,2,3}; // 相同距离优先低风险首步；完全相同仍按上右下左。
+  for(int direction=0;direction<4;++direction) {
+    const Cell next{start.first+steps[direction].first,start.second+steps[direction].second};
+    fire_damage[direction]=possible_fire(next);
+    fire_cost[direction]=1.0+fire_damage[direction]/std::max(1.0,hp-pre_damage);
+  }
+  std::stable_sort(first_order.begin(),first_order.end(),[&](int a,int b) {return fire_damage[a]<fire_damage[b];});
 
   // 4. 在已知地图上BFS。每格只保存第一步和距离，每帧都会重算。
   auto safe_steps = safe_first_steps(start, tick, occupied); // 五个第一步的安全接续标志。
@@ -619,13 +627,15 @@ Json Strategy::decide(const Json &p) {
     const Cell current = queue.front(); queue.pop(); order.push_back(current); // 取出当前BFS格。
     const auto node = paths.at(current); // current为当前扩展格，node为它的最短路径摘要。
     if (node.distance >= remaining_ticks) continue; // 不规划比赛结束后才能到达的资源。
-    for (int i = 0; i < 4; ++i) {
-      const Cell next{current.first + steps[i].first, current.second + steps[i].second};
-      const auto tile = tiles_.find(next);
+    for (int ordinal = 0; ordinal < 4; ++ordinal) {
+      const int i=node.first==-1 ? first_order[ordinal] : ordinal; // 只调整首层顺序，后续仍是等步长BFS。
+      if (node.first == -1 && !safe_steps[i]) continue;
+      const Cell next{current.first + steps[i].first, current.second + steps[i].second}; // i是上右下左索引，next是邻格。
+      const auto tile = tiles_.find(next); // 邻格的已知地图记录，可能不存在。
       if (tile == tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(next) ||
           paths.count(next) || split_wall(next, tick + node.distance) ||
-          (node.distance == 0 && possible_fire(next) >= hp - pre_damage) ||
           dangerous(next, tick + node.distance + 1)) continue;
+      // 对手会不会踩点还未知，不能据此封路。否则可能删掉已公告爆炸的唯一逃路。
       paths[next] = {node.first == -1 ? i : node.first, node.distance + 1};
       queue.push(next);
     }
@@ -710,7 +720,8 @@ Json Strategy::decide(const Json &p) {
         pressures += ray(*enemy.forecast, next) >= 0;
       }
       // 预测错了也只影响收益排序；不封路、不伪造敌车、不用MOVE躲本Tick已经命中的攻击。
-      utility /= 1.0 + parameters_.opponent_contest_cost * contests + parameters_.opponent_pressure_cost * pressures;
+      utility /= fire_cost[step] *
+        (1.0 + parameters_.opponent_contest_cost * contests + parameters_.opponent_pressure_cost * pressures);
     }
     const std::string kind = std::string(reason) == "collect_resource_chain" ? "collect_resource" : reason;
     if(target) {
@@ -881,7 +892,7 @@ Json Strategy::decide(const Json &p) {
       };
       if(recovery_goal_ && !available(*recovery_goal_)) recovery_goal_.reset(); // 动态占位或危险改变就重选安全目标。
       if(!recovery_goal_) {
-        std::optional<std::tuple<bool,double,bool,int,int,int>> best_escape;
+        std::optional<std::tuple<bool,double,bool,int,double,int>> best_escape;
         const std::string team=self.value("team",std::string("A"));
         const int seat=team.size()==1 && team[0]>='A' && team[0]<='D' ? team[0]-'A' : 0;
         for(const Cell &cell:order) {
@@ -893,8 +904,8 @@ Json Strategy::decide(const Json &p) {
               const auto at=tiles_.find({x,y});unknown+=at==tiles_.end() || !at->second.seen;
             }
           // 先争取新视野，再少访问格；相同条件按公开席位打破两车完全对称的选择。
-          const auto value=std::make_tuple(unknown>0,unknown/(path.distance+1.0),tile.visits==0,
-            -static_cast<int>(std::min(tile.visits,1000000U)),path.distance,-((path.first-seat+4)%4));
+          const auto value=std::make_tuple(unknown>0,unknown/((path.distance+1.0)*fire_cost[path.first]),tile.visits==0,
+            -static_cast<int>(std::min(tile.visits,1000000U)),path.distance/fire_cost[path.first],-((path.first-seat+4)%4));
           if(!best_escape || value>*best_escape) {best_escape=value;recovery_goal_=cell;}
         }
       }
@@ -964,11 +975,14 @@ Json Strategy::decide(const Json &p) {
     for (int i = 0; i < 4; ++i) {
       const Cell next{start.first + steps[i].first, start.second + steps[i].second}; // i方向的待试探邻格。
       if (next.first < 0 || next.first >= width || next.second < 0 || next.second >= height ||
-          occupied.count(next) || !safe_steps[i] || split_wall(next, tick) || dangerous(next, tick + 1) ||
-          possible_fire(next) >= hp - pre_damage) continue;
+          occupied.count(next) || !safe_steps[i] || split_wall(next, tick) || dangerous(next, tick + 1)) continue;
       const auto tile = tiles_.find(next); // 邻格的已知地图记录，可能不存在。
       if (tile != tiles_.end() && (tile->second.seen || tile->second.wall)) continue;
-      if (probe_attempts_[next] < fewest) { fewest = probe_attempts_[next]; probe = i; }
+      // 未知格试探也只排序假设风险，不把“可能受伤”误写成“没有路”。
+      if (probe<0 || fire_damage[i]<fire_damage[probe] ||
+          (fire_damage[i]==fire_damage[probe] && probe_attempts_[next]<fewest)) {
+        fewest=probe_attempts_[next];probe=i;
+      }
     }
     if (probe >= 0) {
       ++probe_attempts_[{start.first + steps[probe].first, start.second + steps[probe].second}];
