@@ -40,6 +40,11 @@ private:
     Tick tick; // 最近一次连续可见观测的Tick。
     unsigned consistent; // 相同合法位移连续出现的次数，上限2；2次才提出一步预测。
   };
+  struct Goal {
+    Cell position; // 上一Tick选择的真实目标坐标；不是预测后的本车坐标。
+    std::string kind; // 资源、任务、治疗等目标类别，避免同坐标不同用途被误认。
+    Tick tick; // 做出这次选择的Tick；断帧、复活和换场后不沿用迟滞。
+  };
   std::optional<Cell> predict_opponent(const std::string &identity, Cell position, Tick tick);
   // 预测仅用同一敌车连续观测；断帧/瞬移重置，预测只降低候选收益，不当成必然占位。
   bool split_wall(Cell cell, Tick tick) const;
@@ -55,6 +60,7 @@ private:
   std::map<Cell, unsigned> probe_attempts_;  // 未知格的试探次数；不算已到达或已探明。
   std::map<Tick, Snapshot> history_; // 感知Tick→本车历史快照。
   std::map<std::string, OpponentTrack> opponents_; // 本场公开敌车ID→短期轨迹，换场清空。
+  std::optional<Goal> goal_; // 只保留目标，绝不缓存一串必须执行的未来动作。
   std::map<std::string, rmtc::Event> events_; // 稳定事件key→最后一次校验通过的解释。
   std::map<std::string, int> capture_progress_; // 堡垒key→当前已确认连续驻留Tick数。
   std::string reason_; // 决策日志使用的短原因。

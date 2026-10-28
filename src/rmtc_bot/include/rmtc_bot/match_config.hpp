@@ -5,6 +5,8 @@ namespace rmtc::match_config {
 inline constexpr const char *team = "A";       // 裁判分配的本场席位。
 inline constexpr const char *team_name = "Frank";
 inline constexpr int stage = 2;               // 1：采集；2：对抗。
+inline constexpr int stage1_ticks = 100;       // 正式规则§3：动作0–99，100是最终状态。
+inline constexpr int stage2_ticks = 500;       // 正式规则§3：动作0–499，500是最终状态；改练习长度时在这里明确改。
 
 inline constexpr const char *ros_domain_id = "27";
 inline constexpr const char *ros_localhost_only = "0";
@@ -28,6 +30,7 @@ inline constexpr double healing_below_hp = 70.0;     // 低于此血量才主动
 inline constexpr double fortress_hold_value = 20.0;  // 保住尚未完成的驻留进度。
 inline constexpr double fortress_capture_value = 12.0; // 前往堡垒的收益分子。
 inline constexpr int hazard_lead_ticks = 2;          // 比最短退出时间再提前几Tick。
+inline constexpr double goal_retention_bonus = 0.10; // 同一有效目标给10%排序余量，抑制小波动；不是官方加分。
 inline constexpr double opponent_contest_cost = 1.0; // 稳定轨迹预计争同格时，给路线增加一份等待成本；启发式，非概率。
 inline constexpr double opponent_pressure_cost = 0.25; // 下一Tick可能进入稳定轨迹敌车射线时的软成本，不改变攻击时序。
 }  // namespace rmtc::match_config

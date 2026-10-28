@@ -72,6 +72,7 @@ Strategy::Strategy(int stage) : stage_(stage) {
 void Strategy::reset() {
   tiles_.clear(); probe_attempts_.clear(); history_.clear(); events_.clear(); capture_progress_.clear(); spawn_.reset();
   opponents_.clear(); // 不把上一场或旧席位的轨迹带入新场。
+  goal_.reset(); // 新场没有上一目标，也没有必须继续执行的旧路线。
   width_ = height_ = 0; reversed_ = reverse_unknown_ = empowered_ = false;
   vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
   reason_ = "new_session";
@@ -157,13 +158,23 @@ void Strategy::update_effects(Tick tick) {
 }
 
 Json Strategy::decide(const Json &p) {
-  const auto wait = [&](const char *reason) { reason_ = reason; return Json{{"action", "wait"}}; };
-  const auto &self = p.at("self");
-  const Tick tick = p.at("tick").get<Tick>();
-  const bool alive = self.at("alive").get<bool>();
-  const Cell start = absolute_position(self.at("position"));
-  const int width = integer(p.at("map").at("width")), height = integer(p.at("map").at("height"));
-  const int radius = integer(p.at("vision_radius"));
+  const auto previous_goal = std::exchange(goal_, std::nullopt); // 先取出旧目标；异常、死亡和提前避险都不会续签它。
+  const auto fallback = [&](const char *reason) {
+    // reason是本次兜底原因；只在已知存活的第二阶段返回合法DEFEND。
+    reason_ = reason;
+    return stage_ == 2 && p.at("self").at("alive") == true ? Json{{"action", "defend"}} : Json();
+  };
+  const auto skip = [&](const char *reason) { reason_ = reason; return Json(); }; // 明确不发布，不产生默认WAIT。
+  // 1. 读本车真实状态，记上一Tick实际发生了什么。
+  const auto &self = p.at("self"); // p是本队感知，self是其中的本车状态。
+  const Tick tick = p.at("tick").get<Tick>(); // 当前动作窗口的逻辑回合。
+  const Tick tick_limit = stage_ == 1 ? cfg::stage1_ticks : cfg::stage2_ticks; // 赛前明确的本阶段总动作数。
+  if (tick >= tick_limit) return skip("finished"); // 最终状态不是新动作窗口。
+  const Tick remaining_ticks = tick_limit - tick; // 包含本Tick；Tick499还能执行一步。
+  const bool alive = self.at("alive").get<bool>(); // 阵亡时不得提交防御/攻击/移动。
+  const Cell start = absolute_position(self.at("position")); // 本帧确认位置，也是所有路径的起点。
+  const int width = integer(p.at("map").at("width")), height = integer(p.at("map").at("height")); // 当前地图宽、高。
+  const int radius = integer(p.at("vision_radius")); // 实际视野半径；width/height是本场地图边界。
   if (width <= 0 || height <= 0 || width > 1000000 || height > 1000000 ||
       start.first < 0 || start.first >= width || start.second < 0 || start.second >= height ||
       radius < 0 || radius > 4 || !p.at("visible_entities").is_array()) return wait("invalid_frame");
@@ -182,6 +193,9 @@ Json Strategy::decide(const Json &p) {
       moved = receipt.value("moved", false) && receipt.value("action", std::string()) == "move";
     }
   }
+  const bool keep_goal = previous_goal && previous_goal->tick == tick - 1 && !respawn &&
+      !(receipt_tick >= 0 && receipt.value("action", std::string()) == "move" && !moved);
+  // 上次MOVE失败时不发迟滞奖励，让重算路线及时换路；目标是否还存在仍由本帧候选决定。
   // 坐标永远取感知；回执只确认成功移动和已结算的效果，不用于累加位置。
   history_[tick] = Snapshot{start, alive, protected_spawn, respawn, moved, receipt_tick};
   if (alive && (tick == 0 || self.value("position_reason", std::string()) == "initial")) spawn_ = start;
@@ -315,8 +329,9 @@ Json Strategy::decide(const Json &p) {
   std::queue<Cell> queue;
   paths[start] = {-1, 0}; queue.push(start);
   while (!queue.empty()) {
-    const Cell current = queue.front(); queue.pop(); order.push_back(current);
-    const auto node = paths.at(current);
+    const Cell current = queue.front(); queue.pop(); order.push_back(current); // 取出当前BFS格。
+    const auto node = paths.at(current); // current为当前扩展格，node为它的最短路径摘要。
+    if (node.distance >= remaining_ticks) continue; // 不规划比赛结束后才能到达的资源。
     for (int i = 0; i < 4; ++i) {
       const Cell next{current.first + steps[i].first, current.second + steps[i].second};
       const auto tile = tiles_.find(next);
@@ -377,10 +392,11 @@ Json Strategy::decide(const Json &p) {
         reach.push_back(target);
     }
   }
-  int best_step = -1;
-  double best_utility = -1;
-  const char *best_reason = "explore";
-  const auto consider = [&](int step, double utility, const char *reason) {
+  int best_step = -1; // 当前收益最高的第一步；-1也可能表示值得留在原地。
+  double best_utility = -1; // 当前最高启发式收益，-1表示还没有候选。
+  const char *best_reason = "explore"; // 与best_step一起更新，便于日志解释。
+  std::optional<Goal> best_goal; // 只有最终提交MOVE时才续签这一目标。
+  const auto consider = [&](int step, double utility, const char *reason, std::optional<Cell> target = std::nullopt) {
     // step=-1代表留在当前格；安全检查也必须允许这一Tick继续原地驻留。
     if (!safe_steps[step < 0 ? 4 : step]) return;
     if (stage_ == 2 && step >= 0 && utility > 0) {
@@ -394,7 +410,12 @@ Json Strategy::decide(const Json &p) {
       // 预测错了也只影响收益排序；不封路、不伪造敌车、不用MOVE躲本Tick已经命中的攻击。
       utility /= 1.0 + cfg::opponent_contest_cost * contests + cfg::opponent_pressure_cost * pressures;
     }
-    if (utility > best_utility + 1e-9) { best_utility = utility; best_step = step; best_reason = reason; }
+    if (keep_goal && target && previous_goal->kind == reason && previous_goal->position == *target)
+      utility *= 1.0 + cfg::goal_retention_bonus; // 只影响排序，危险守卫已在前面执行。
+    if (utility > best_utility + 1e-9) {
+      best_utility = utility; best_step = step; best_reason = reason;
+      best_goal = target ? std::optional<Goal>(Goal{*target, reason, tick}) : std::nullopt;
+    }
   };
   unsigned least_visits = std::numeric_limits<unsigned>::max();
   int exploration = -1;
@@ -410,11 +431,11 @@ Json Strategy::decide(const Json &p) {
         if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += cfg::resource_mission_bonus;
         if (need_value) benefit += tile.value * 0.1;
       }
-      consider(node.first, benefit * freshness / (node.distance + 1), "collect_resource");
+      consider(node.first, benefit * freshness / (node.distance + 1), "collect_resource", cell);
     }
     if (stage_ == 1) continue;
     for (const auto &target : reach) {
-      if (cell == target) consider(node.first, cfg::reach_mission_value / (node.distance + 1), "reach_mission");
+      if (cell == target) consider(node.first, cfg::reach_mission_value / (node.distance + 1), "reach_mission", target);
       else if (node.first >= 0) {
         // 目标尚未探明时只走已知路线中靠近目标的格子，不穿过未知墙。
         int unknown_neighbors = 0;
@@ -424,18 +445,18 @@ Json Strategy::decide(const Json &p) {
               !tiles_.count(next)) ++unknown_neighbors;
         }
         if (unknown_neighbors && manhattan(cell, target) < manhattan(start, target))
-          consider(node.first, 2.0 / (node.distance + 1) + 1.0 / (manhattan(cell, target) + 1), "explore_toward_mission");
+          consider(node.first, 2.0 / (node.distance + 1) + 1.0 / (manhattan(cell, target) + 1), "explore_toward_mission", target);
       }
     }
     for (const auto &[key, e] : events_) {
       if (!e.active(tick)) continue;
       if (e.kind == Kind::heal && hp < cfg::healing_below_hp && healing_until_ <= tick + 2 && e.contains(cell) && cell != start &&
           tick + node.distance - 1 < e.end)
-        consider(node.first, std::min(100.0 - hp, e.amount * e.effect_ticks) * 0.2 / (node.distance + 1), "seek_healing");
+        consider(node.first, std::min(100.0 - hp, e.amount * e.effect_ticks) * 0.2 / (node.distance + 1), "seek_healing", cell);
       if (e.kind == Kind::fortress && !empowered_ && e.contains(cell) &&
           e.end - tick >= node.distance + e.capture_ticks - capture_progress_[key] - (node.distance > 0 ? 1 : 0)) {
         if (cell == start) consider(-1, cfg::fortress_hold_value, "hold_fortress");
-        else consider(node.first, cfg::fortress_capture_value / (node.distance + e.capture_ticks), "capture_fortress");
+        else consider(node.first, cfg::fortress_capture_value / (node.distance + e.capture_ticks), "capture_fortress", cell);
       }
       if (e.kind == Kind::chili && (e.contains(cell) || (e.contains(start) && node.distance == 1))) {
         const Cell fire_point = e.contains(start) ? start : cell;
@@ -447,7 +468,7 @@ Json Strategy::decide(const Json &p) {
             reward += enemy.hp <= e.amount ? combat_value(60) : 0.02;
         }
         if (reward > 0 && cell != start)
-          consider(node.first, reward / (node.distance + (e.contains(start) ? 2 : 1)), "trigger_chili");
+          consider(node.first, reward / (node.distance + (e.contains(start) ? 2 : 1)), "trigger_chili", fire_point);
       }
     }
     for (const auto &enemy : enemies) {
@@ -497,8 +518,32 @@ Json Strategy::decide(const Json &p) {
     reason_ = "attack_opportunity";
     return {{"action", "attack"}, {"direction", directions[attack_direction]}};
   }
-  if (best_step >= 0 && !reverse_unknown_) return move(best_step, best_reason);
-  if (stage_ == 2 && incoming > 0) { reason_ = "defend_while_holding"; return {{"action", "defend"}}; }
-  return wait(reverse_unknown_ ? "uncertain_illusion" : best_utility >= 0 ? best_reason : "no_path");
+  if (best_step >= 0 && !reverse_unknown_) {
+    goal_ = std::move(best_goal); // 记的是当前目标；下一帧仍重新BFS、重读真实位置与回执。
+    return move(best_step, best_reason);
+  }
+  // 没有已知路线时，试探地图内的未知邻格。移动失败不加无效动作；位置仍取下一帧感知。
+  if (best_utility < 0 && !reverse_unknown_) {
+    int probe = -1; // 未知邻格中本次准备试探的方向。
+    unsigned fewest = std::numeric_limits<unsigned>::max(); // 优先试以前较少试过的格子。
+    for (int i = 0; i < 4; ++i) {
+      const Cell next{start.first + steps[i].first, start.second + steps[i].second}; // i方向的待试探邻格。
+      if (next.first < 0 || next.first >= width || next.second < 0 || next.second >= height ||
+          occupied.count(next) || !safe_steps[i] || split_wall(next, tick) || dangerous(next, tick + 1) ||
+          possible_fire(next) >= hp - pre_damage) continue;
+      const auto tile = tiles_.find(next); // 邻格的已知地图记录，可能不存在。
+      if (tile != tiles_.end() && (tile->second.seen || tile->second.wall)) continue;
+      if (probe_attempts_[next] < fewest) { fewest = probe_attempts_[next]; probe = i; }
+    }
+    if (probe >= 0) {
+      ++probe_attempts_[{start.first + steps[probe].first, start.second + steps[probe].second}];
+      return move(probe, "probe_unknown_cell");
+    }
+  }
+  if (stage_ == 2 && incoming > 0 && safe_steps[4]) { reason_ = "defend_while_holding"; return {{"action", "defend"}}; }
+  if (!reverse_unknown_ && safe_steps[4] &&
+      std::none_of(safe_steps.begin(), safe_steps.begin() + 4, [](bool value) { return value; }))
+    return fallback("defend_for_safe_route");
+  return fallback(reverse_unknown_ ? "uncertain_illusion" : best_utility >= 0 ? best_reason : "no_path");
 }
 
