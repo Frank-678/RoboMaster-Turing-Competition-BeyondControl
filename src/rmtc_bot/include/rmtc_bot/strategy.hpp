@@ -26,6 +26,7 @@ public:
   void merge_events(const std::vector<rmtc::Event> &events);
   // 把已校验事件交给下一次LLM请求，避免模型反复“重新发现”同一个事件。
   nlohmann::json known_events() const;
+  nlohmann::json event_diagnostics(rmtc::Tick tick) const; // 已知事件按当前Tick计数及本车已重建效果，供人工排查。
   const std::string &reason() const { return reason_; } // 最近动作的原因，供日志解释。
   nlohmann::json navigation_diagnostics() const; // 日志：无进展多久、循环次数、脱困目标；不暴露真值。
   void note_model_reply() { model_reply_seen_ = true; } // 本场已见非mock模型正文；仅影响收益假设，不冒充裁判资格。

@@ -77,18 +77,27 @@ private:
       const auto direction = action ? action->value("direction", std::string("-")) : "-"; // 计划方向，区别于回执的实际方向。
       const auto navigation=session_->navigation_diagnostics().dump(); // 当前无进展时长、脱困目标和暂缓数。
       const auto ai = session_->ai_diagnostics().dump(); // 本场HTTP统计和最近传输状态。
+      const auto events=session_->event_diagnostics(); // 已校验、迟到、拒绝及本车效果；不包含模型正文或思考。
+      const auto replies=events.at("replies").get<unsigned>(); // 主线程实际消费的回包数，不等同于HTTP成功数。
+      if(session!=event_session_ || replies!=logged_event_replies_) {
+        event_session_=session;logged_event_replies_=replies;
+        RCLCPP_INFO(get_logger(),"session=%s event_update=%s",session.c_str(),events.dump().c_str());
+      }
       const auto mode = rmtc::turn_mode_name(rmtc::turn_mode(p, cfg::stage)); // 本帧动作权限状态，与状态机图一致。
-      RCLCPP_INFO(get_logger(), "session=%s tick=%lld pos=%s mode=%s sent=%s direction=%s reason=%s ai=%s http_success=%d ai_calls=%s navigation=%s last_action=%s",
+      RCLCPP_INFO(get_logger(), "session=%s tick=%lld pos=%s mode=%s sent=%s direction=%s reason=%s ai=%s http_success=%d ai_calls=%s navigation=%s last_action=%s events_known=%zu events_active=%u empowered=%d",
                   session.c_str(),
                   static_cast<long long>(rmtc::frame_tick(p)),
                   position.c_str(), mode, sent.c_str(), direction.c_str(), session_->reason().c_str(),
-                  session_->ai_status().c_str(), session_->ai_http_success(), ai.c_str(), navigation.c_str(), receipt.c_str());
+                  session_->ai_status().c_str(), session_->ai_http_success(), ai.c_str(), navigation.c_str(), receipt.c_str(),
+                  events.at("known").get<std::size_t>(),events.at("active").get<unsigned>(),events.at("empowered").get<bool>());
     } catch (const std::exception &e) { // e只输出错误原因，不输出感知全文、令牌或请求头。
       RCLCPP_WARN(get_logger(), "Skipping invalid perception: %s", e.what());
     }
   }
 
   std::unique_ptr<rmtc::Session> session_; // 节点独占的场次/决策状态。
+  std::string event_session_; // 最近写过event_update日志的场次；换场即写一份新的空状态。
+  unsigned logged_event_replies_=0; // 只在收到新回包时写详细事件，避免每Tick重复整份解释。
   Message registration_; // 注册队名的JSON正文。
   rclcpp::Publisher<Message>::SharedPtr action_pub_; // 向本队action发布动作。
   rclcpp::Publisher<Message>::SharedPtr registration_pub_; // 持有发布者，维持注册保留消息。

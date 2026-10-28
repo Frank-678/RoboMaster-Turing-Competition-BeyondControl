@@ -30,6 +30,7 @@ public:
   struct Result {
     std::string session, source, reply, status; // 场次、原公告证据、模型文本、请求状态。
     std::uint64_t generation = 0; // 本地换场代数，旧代结果必须丢弃。
+    std::int64_t request_tick = -1; // 发起请求时的逻辑Tick；-1表示没有来源，不能用返回时刻倒推。
     long http_status = 0; // 服务返回的HTTP状态；没收到时为0。
     int curl_code = 0; // curl传输错误码；0表示传输完成，28是超时。
     long elapsed_ms = 0, connect_ms = 0, first_byte_ms = 0; // 整次、连接完成、首字节时刻；均相对请求开始。
@@ -53,6 +54,7 @@ private:
   struct Job {
     std::string session, source, body; // 所属场次、原公告、已序列化的HTTP请求体。
     std::uint64_t generation; // 创建请求时的本地代数。
+    std::int64_t request_tick; // 此任务建立时的感知Tick，与HTTP墙钟耗时分开。
   };
   Result perform(const Job &job); // 只在后台运行，一次完整POST，不在这里作策略决策。
   void run(); // 等待任务→释放锁→联网→加锁放回结果。

@@ -72,6 +72,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/partial" and attempt > 1:
                 assert context["known_events"], "validated partial events were discarded"
                 events = []  # 固定模型事件列表，与真实语义推理无关。
+            if self.path == "/expired-event":
+                events = [{"kind": "explosion", "start": 1, "end": 2, "area": [0, 0, 1, 1], "amount": 35, "source": "fixture"}]
+            elif self.path == "/invalid-event":
+                events[0]["amount"] = -1  # HTTP成功、内层JSON有效，但违反事件契约。
             answer = {"session_id": context["session_id"], "events": events, "unknown": unknown}  # 内层模型JSON。
             body = {"choices": [{"message": {"content": json.dumps(answer)}}]}
             if self.path == "/fenced":
