@@ -72,3 +72,6 @@ Testing/
 /compile_commands.json
 
 .vscode/
+# 本地评测输出不作为源码提交；历史报告归分析仓库，选定参数仍供评测器读取。
+/tests/results/*
+!/tests/results/selected-parameters.json

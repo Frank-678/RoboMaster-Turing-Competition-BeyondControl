@@ -2,7 +2,7 @@
 
 先读比赛配置，再沿“收感知→管场次→作决策→发动作”阅读。变量的具体含义写在声明旁，关键规则写在判断旁。
 
-[规则状态机](STATE_MACHINE.md)将条款、权限状态、事件和对手轨迹转移对应到代码；[实测记录](REAL_TEST.md)区分真实模型与完整裁判对局。
+[规则状态机](STATE_MACHINE.md)将条款、权限状态、事件和对手轨迹转移对应到代码；[实测记录](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/REAL_TEST.md)区分真实模型与完整裁判对局。
 
 ## 主线从哪里开始
 
@@ -18,23 +18,23 @@
 
 ## 每个文件做什么
 
+表中跨仓链接为研究记录，已从代码仓库移出。历史JSON报告归分析仓库；仍在使用的selected-parameters.json保留。
+
 | 文件 | 职责 |
 | --- | --- |
 | `README.md` | 先看这里：地址、令牌、模型分别填哪，两个终端如何启动，零次调用如何查 |
-| `LESSONS.md` | 七份字幕的借鉴/否决、假设风险逃路修复与验证边界 |
+| [LESSONS.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/LESSONS.md) | 七份字幕的借鉴/否决、假设风险逃路修复与验证边界 |
 | `tests/risk_benchmark.cpp`、`tests/run_risk.py` | 四席位×四旋转×两敌方动作的最小反例与可选旧工程配对 |
-| `tests/results/risk-2026-10-28.json`、`risk-maps-2026-10-28.json` | 逃路逐Tick轨迹与新地图同条件数据 |
-| `NAVIGATION.md` | 无收益往返、争格、封闭区域的复现、脱困机制和日志说明 |
+| [NAVIGATION.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/NAVIGATION.md) | 无收益往返、争格、封闭区域的复现、脱困机制和日志说明 |
 | `tests/unstuck_benchmark.cpp` | 六个500Tick导航压力/正常路径夹具，与旧核心配对 |
 | `tests/run_unstuck.py` | 编译导航夹具，断言脱困与保留正常绕路，可只读比较旧工程 |
-| `tests/results/unstuck-2026-10-28.json`、`unstuck-maps-2026-10-28.json` | 专门复现轨迹及新地图同条件对照 |
 | `ARENA.md` | 自建对手池、六类地图、规则模型、参数搜索和留出边界 |
 | `arena.sh` | 一键离线对战与调参；不改正式参数 |
 | `DEV.md` | 依赖、策略机制、事件表、测试方法和当前验证范围 |
 | `CODE_GUIDE.md` | 本文件：主线、文件、类型和函数索引 |
 | `STATE_MACHINE.md` | 全部编号规则对应、状态图、策略路径与预测边界 |
-| `REAL_TEST.md` | 真实模型调用及裁判启动结果 |
-| `MATERIALS_CHECK.md` | 原始材料和已有学习笔记具体对应哪些修复，以及验证范围 |
+| [REAL_TEST.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/REAL_TEST.md) | 真实模型调用及裁判启动结果 |
+| [MATERIALS_CHECK.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/MATERIALS_CHECK.md) | 原始材料和已有学习笔记具体对应哪些修复，以及验证范围 |
 | `LICENSE` | 本工程许可证 |
 | `.gitignore` | 排除构建、安装和日志等产物 |
 | `build.sh` | 在正确工作空间构建选手包，生成编辑器编译数据库 |
@@ -75,7 +75,6 @@
 | `tests/arena_test.cpp` | 人工可算规则边界与输入隔离检查 |
 | `tests/arena_settings.json` | 冻结对照参数、训练/留出种子和风格列表 |
 | `tests/run_arena.py` | 编译、逐轮训练筛选、留出与模块消融；保存结果 |
-| `tests/results/arena-2026-10-28*.json` | 逐局R/D/M、耗时、训练候选和留出结果；含失败试验 |
 | `tests/results/selected-parameters.json` | 训练选中候选，不自动生效、不由机器人读取 |
 | `tests/run.sh` | 用g++构建离线测试，启动HTTP夹具，退出时清理临时文件 |
 
@@ -162,7 +161,7 @@
 
 ## 新增目标与资源规划
 
-详细行为与实际结果见[PLANNING.md](PLANNING.md)。原通信与AI结构不变。
+详细行为与实际结果见[PLANNING.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/PLANNING.md)。原通信与AI结构不变。
 
 | 类型或函数 | 用途 |
 | --- | --- |
@@ -249,3 +248,11 @@ Python的`probe`只发一次POST：`url/key/model/thinking/json_output/max_token
 `decide`中的`available`检查脱困目标在当前BFS内可达且能在期限内到达；`best_escape`按新视野、低访问、有限距离与公开席位选择目标。仍只调用原`move`发布首步并处理幻术。`navigation_diagnostics`生成只读日志，经Session传给Bot；`navigation`是其JSON文本，含无进展时长、次数、目标、暂缓数和无出口标志。
 
 导航夹具`fixture/run`只在测试端建场和推进；`positions/repeats/longest`统计无成绩进展的周期运动，`first_resource/first_task`记录首次实际达成Tick，`reasons/trace`保留行为证据。`run_unstuck.py`的`build/run/verify/main`依次编译同夹具、执行、检查六个500Tick结果、保存摘要；旧版生产核心只读，不被新版策略当输入。
+
+## 公告前置与诊断入口
+
+`Strategy::event_diagnostics(tick)`只读统计已校验事件的pending/active/expired及本车重建效果。`Session::EventFlow`记录本场回包、解释校验、合并/迟到和最近事件摘要；`Session::event_diagnostics()`合并两者。`AiWorker::Job/Result::request_tick`随后台任务保存来源逻辑Tick，不能用返回时刻重置事件。
+
+`Bot::event_session_`与`logged_event_replies_`让event_update只在换场/新回包时输出；逐Tick行保留事件数和无双标志。`run.sh`的rmtc_run_log是本次控制台输出文件，pipeline保留机器人失败退出码。模型原文、思考、令牌均不打印。
+
+未来堡垒路径使用arrival（本次规划到达Tick）、first_capture（开始驻留Tick）、needed（尚需结算次数）、finish（授予Tick）、wait（早到等待成本）。未激活不提前计算驻留，生效后继续原有capture_fortress/hold_fortress逻辑；prepare_fortress仅表示赶往已公告的未来堡垒。`tests/announcement_benchmark.cpp`是独立旧新核心配对夹具，解释由手工oracle延迟交付。
