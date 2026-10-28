@@ -110,7 +110,8 @@ def candidates(count):
               "opponent_claim_discount": [1.0, 0.75, 0.5, 0.25],
               "stage1_flood_value": [0.0, 0.03, 0.05, 0.08, 0.12],
               "stage2_race_gate": [True, False],
-              "stage2_explore_gate_tick": [0, 140, 160, 180, 200]}
+              "stage2_explore_gate_tick": [0, 140, 160, 180, 200],
+              "stage2_mission_pull_stale_ticks": [0, 15, 20, 30, 40]}
     for i in range(max(0, count-4)):
         values = dict(base, tactical_search=i % 5 != 4, resource_refinement=True, collision_replan=True, loop_recovery=True)
         values.update({key: randomizer.choice(choices) for key, choices in ranges.items()})

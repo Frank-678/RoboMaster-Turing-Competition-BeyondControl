@@ -55,6 +55,7 @@ inline constexpr double explore_tour_value = 0.03; // 第一阶段空档期，�
 inline constexpr double stage1_flood_value = 0.0; // 第一阶段空档探索的最近边界洪泛权重（距离优先、同距离取更大新视野）；与巡回/frontier同场竞争，0为关闭。
 inline constexpr bool stage2_race_gate = false; // 第二阶段竞速闸门：两轮实验均显示早期主动交火有压制对手扫资源的价值，关闭。
 inline constexpr int stage2_explore_gate_tick = 0; // 第二阶段资源饼通常在150Tick内被抢光：Tick≥此值且已知资源已清空时关闭扫图，让位给交火/据点；0为关闭。
+inline constexpr int stage2_mission_pull_stale_ticks = 0; // 第二阶段资源久未现身（前沿扫图空转）时向到点任务方向拉拽探索；0为关闭。
 inline constexpr double opponent_contest_cost = 1.0; // 稳定轨迹预计争同格时，给路线增加一份等待成本；启发式，非概率。
 inline constexpr double opponent_pressure_cost = 0.25; // 下一Tick可能进入稳定轨迹敌车射线时的软成本，不改变攻击时序。
 inline constexpr double opponent_claim_discount = 0.5; // 敌车直线距离不比自己绕障距离长时的资源估值乘数；小于1.0则避开会被先拿走的资源。

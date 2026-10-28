@@ -921,6 +921,10 @@ Json Strategy::decide(const Json &p) {
       if (node.first >= 0) resource_options.push_back({utility, cell});
     }
     if (stage_ == 1) continue;
+    // 前沿扫图长期无资源发现时，向到点任务方向拉拽探索（留出rooms上基线借此穿过富资源区拿到60R，我们向南空转只拿30R）。
+    // 资源正常现身时保持原权重，不把采集线拖离资源区；到点任务方向仍是已探明路线，不把未知格当空地。
+    const bool mission_pull_starved = stage_ == 2 && parameters_.stage2_mission_pull_stale_ticks > 0 &&
+        tick - last_resource_sighting_ >= parameters_.stage2_mission_pull_stale_ticks;
     if (!race_active) {
       for (const auto &target : reach) {
         if (cell == target) consider(node.first, parameters_.reach_mission_value / (node.distance + 1), "reach_mission", target);
@@ -932,8 +936,10 @@ Json Strategy::decide(const Json &p) {
             if (next.first >= 0 && next.first < width && next.second >= 0 && next.second < height &&
                 !tiles_.count(next)) ++unknown_neighbors;
           }
-          if (unknown_neighbors && manhattan(cell, target) < manhattan(start, target))
-            consider(node.first, parameters_.mission_explore_value / (node.distance + 1) + 1.0 / (manhattan(cell, target) + 1), "explore_toward_mission", target);
+          if (unknown_neighbors && manhattan(cell, target) < manhattan(start, target)) {
+            const double pull = std::max(parameters_.mission_explore_value, mission_pull_starved ? 2.0 : 0.0);
+            consider(node.first, pull / (node.distance + 1) + 1.0 / (manhattan(cell, target) + 1), "explore_toward_mission", target);
+          }
         }
       }
     }
