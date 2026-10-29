@@ -1,0 +1,53 @@
+{
+  "spec": "docs/38 版本联赛清单（冻结）。seeds = 12 张联赛图一次性冻结；versions = 版本身份（sha/params_digest 取自 git，binary_sha256 取自独立构建底座）；seats = 席位变体记录（build_seat_variants.sh 自动填充）。",
+  "seeds": [
+    20261201,
+    20261202,
+    20261203,
+    20261204,
+    20261205,
+    20261206,
+    20261207,
+    20261208,
+    20261209,
+    20261210,
+    20261211,
+    20261212
+  ],
+  "versions": {
+    "champion": {
+      "sha": "eb321df",
+      "build_dir": "build",
+      "install_base": "install",
+      "params_digest": "b1efdbc4d869a53ca05d850257e6dba99550ce4a7ccae8432cd9f04a441007c7",
+      "binary_sha256": "39557aa16d75fb07a2cae950efe549c4ae13d5625cc671a3440a4513ed399052",
+      "pins": {
+        "train_base_off_objective": 0.7970931712962963,
+        "deaths": 83,
+        "blocked": 93,
+        "stage1": 33.333,
+        "stage2": 41.25,
+        "D2": 1026.67,
+        "heldout_objective": 0.8298625,
+        "determinism_pin": 0.7710073
+      }
+    },
+    "old_champion": {
+      "sha": "9bc72a7",
+      "build_dir": "build-v-old_champion",
+      "install_base": null,
+      "params_digest": "d9cd2a2fb425e8578b22078d1413f862bf9ab74a59debb683bb42c2cc1394962",
+      "binary_sha256": null
+    },
+    "candidate": null
+  },
+  "seats": {
+    "old_champion": {
+      "B": {
+        "install_base": "/home/frank/cst-league-old/install-v-old_champion-B",
+        "binary_sha256": "bcebb860ae2a0d62f2bacbe336544acd43ea330b4ba6479ff6a81cbb8239bf1e",
+        "params_sha256": "d9cd2a2fb425e8578b22078d1413f862bf9ab74a59debb683bb42c2cc1394962"
+      }
+    }
+  }
+}

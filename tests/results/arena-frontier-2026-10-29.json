@@ -1,0 +1,1960 @@
+{
+  "date": "2026-10-29",
+  "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+  "settings": {
+    "version": 1,
+    "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+    "map_styles": [
+      "open",
+      "maze",
+      "rooms",
+      "lanes",
+      "clusters",
+      "crossroads"
+    ],
+    "opponent_styles": [
+      "collector",
+      "aggressive",
+      "defender",
+      "fortress",
+      "opportunist",
+      "wanderer"
+    ],
+    "train_seeds": [
+      101,
+      307
+    ],
+    "heldout_seeds": [
+      29003
+    ],
+    "baseline_parameters": {
+      "stale_resource_decay": 0.01,
+      "resource_mission_bonus": 5.0,
+      "reach_mission_value": 8.0,
+      "healing_below_hp": 70.0,
+      "fortress_hold_value": 20.0,
+      "fortress_capture_value": 12.0,
+      "hazard_lead_ticks": 2,
+      "goal_retention_bonus": 0.1,
+      "resource_plan_depth": 3,
+      "resource_beam_width": 5,
+      "resource_candidate_limit": 8,
+      "resource_plan_budget_ms": 10,
+      "frontier_value": 0.02,
+      "opponent_contest_cost": 1.0,
+      "opponent_pressure_cost": 0.25,
+      "opponent_claim_discount": 1.0,
+      "explore_toward_resource_value": 0.0,
+      "explore_tour_value": 0.0,
+      "mission_explore_value": 2.0,
+      "stage1_flood_value": 0.0,
+      "stage2_race_gate": false,
+      "stage2_explore_gate_tick": 0,
+      "stage2_mission_pull_stale_ticks": 0,
+      "tactical_search": false,
+      "tactical_risk": 0.35,
+      "tactical_hp_value": 0.015,
+      "tactical_death_cost": 1.0,
+      "tactical_future_discount": 0.65,
+      "tactical_goal_weight": 0.35,
+      "resource_refinement": false,
+      "resource_refinement_trials": 12,
+      "collision_replan": false,
+      "loop_recovery": false,
+      "loop_window_ticks": 12,
+      "recovery_ticks": 12,
+      "stalled_goal_cooldown_ticks": 24
+    },
+    "pilot_heldout_seeds": [
+      19001
+    ]
+  },
+  "selection": "training only; heldout evaluated once after selection",
+  "note": "anchored on gate-frontier search_04; varies frontier_value upward (0.03-0.06)",
+  "rounds": [
+    {
+      "round": 0,
+      "scenes": [
+        {
+          "style": "open",
+          "seed": 101,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "open",
+          "seed": 101,
+          "stage": 2,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "defender",
+            "baseline"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "open",
+          "seed": 307,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "open",
+          "seed": 307,
+          "stage": 2,
+          "seat": 1,
+          "opponents": [
+            "baseline",
+            "candidate",
+            "aggressive",
+            "fortress"
+          ],
+          "delay": 10,
+          "ai_success": true
+        },
+        {
+          "style": "maze",
+          "seed": 148,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "maze",
+          "seed": 148,
+          "stage": 2,
+          "seat": 2,
+          "opponents": [
+            "fortress",
+            "baseline",
+            "candidate",
+            "aggressive"
+          ],
+          "delay": 0,
+          "ai_success": true
+        }
+      ],
+      "profiles": [
+        {
+          "name": "s04",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.02,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "fr.03",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.03,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "fr.04",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.04,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "fr.05",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.05,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "fr.06",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.06,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "baseline",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 70.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.1,
+            "resource_plan_depth": 3,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.02,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 1.0,
+            "explore_toward_resource_value": 0.0,
+            "explore_tour_value": 0.0,
+            "mission_explore_value": 2.0,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "tactical_search": false,
+            "tactical_risk": 0.35,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 1.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.35,
+            "resource_refinement": false,
+            "resource_refinement_trials": 12,
+            "collision_replan": false,
+            "loop_recovery": false,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24
+          }
+        },
+        {
+          "name": "collision_only",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 70.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.1,
+            "resource_plan_depth": 3,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.02,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 1.0,
+            "explore_toward_resource_value": 0.0,
+            "explore_tour_value": 0.0,
+            "mission_explore_value": 2.0,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "tactical_search": false,
+            "tactical_risk": 0.35,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 1.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.35,
+            "resource_refinement": false,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24
+          }
+        }
+      ],
+      "summaries": {
+        "s04": {
+          "games": 6,
+          "objective": 0.7623055555555556,
+          "invalid": 0,
+          "deaths": 14,
+          "blocked": 64,
+          "decide_max_ms": 2.65413,
+          "stage1": {
+            "games": 3,
+            "score_mean": 32.0,
+            "R_mean": 160.0,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 3,
+            "score_mean": 39.166666666666664,
+            "R_mean": 56.666666666666664,
+            "D_mean": 615.0,
+            "M_mean": 2.6666666666666665,
+            "deaths_mean": 4.666666666666667,
+            "win_share": 0.3333333333333333
+          }
+        },
+        "fr.03": {
+          "games": 6,
+          "objective": 0.711,
+          "invalid": 0,
+          "deaths": 15,
+          "blocked": 114,
+          "decide_max_ms": 6.72881,
+          "stage1": {
+            "games": 3,
+            "score_mean": 28.0,
+            "R_mean": 140.0,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 3,
+            "score_mean": 38.96666666666667,
+            "R_mean": 56.666666666666664,
+            "D_mean": 663.3333333333334,
+            "M_mean": 2.6666666666666665,
+            "deaths_mean": 5,
+            "win_share": 0.3333333333333333
+          }
+        },
+        "fr.04": {
+          "games": 6,
+          "objective": 0.7555740740740741,
+          "invalid": 0,
+          "deaths": 13,
+          "blocked": 78,
+          "decide_max_ms": 3.234496,
+          "stage1": {
+            "games": 3,
+            "score_mean": 32.0,
+            "R_mean": 160.0,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 3,
+            "score_mean": 38.333333333333336,
+            "R_mean": 53.333333333333336,
+            "D_mean": 888.3333333333334,
+            "M_mean": 2.6666666666666665,
+            "deaths_mean": 4.333333333333333,
+            "win_share": 0.3333333333333333
+          }
+        },
+        "fr.05": {
+          "games": 6,
+          "objective": 0.7552962962962964,
+          "invalid": 0,
+          "deaths": 19,
+          "blocked": 29,
+          "decide_max_ms": 2.811237,
+          "stage1": {
+            "games": 3,
+            "score_mean": 32.0,
+            "R_mean": 160.0,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 3,
+            "score_mean": 38.333333333333336,
+            "R_mean": 53.333333333333336,
+            "D_mean": 743.3333333333334,
+            "M_mean": 2.6666666666666665,
+            "deaths_mean": 6.333333333333333,
+            "win_share": 0.3333333333333333
+          }
+        },
+        "fr.06": {
+          "games": 6,
+          "objective": 0.6922337962962963,
+          "invalid": 0,
+          "deaths": 20,
+          "blocked": 39,
+          "decide_max_ms": 3.333341,
+          "stage1": {
+            "games": 3,
+            "score_mean": 32.0,
+            "R_mean": 160.0,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 3,
+            "score_mean": 35.0,
+            "R_mean": 40.0,
+            "D_mean": 545.0,
+            "M_mean": 2.6666666666666665,
+            "deaths_mean": 6.666666666666667,
+            "win_share": 0.0
+          }
+        },
+        "baseline": {
+          "games": 6,
+          "objective": 0.7296828703703704,
+          "invalid": 0,
+          "deaths": 7,
+          "blocked": 666,
+          "decide_max_ms": 2.111102,
+          "stage1": {
+            "games": 3,
+            "score_mean": 32.0,
+            "R_mean": 160.0,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 3,
+            "score_mean": 35.266666666666666,
+            "R_mean": 56.666666666666664,
+            "D_mean": 398.3333333333333,
+            "M_mean": 2.6666666666666665,
+            "deaths_mean": 2.3333333333333335,
+            "win_share": 0.3333333333333333
+          }
+        },
+        "collision_only": {
+          "games": 6,
+          "objective": 0.7604166666666666,
+          "invalid": 0,
+          "deaths": 15,
+          "blocked": 15,
+          "decide_max_ms": 2.353274,
+          "stage1": {
+            "games": 3,
+            "score_mean": 32.0,
+            "R_mean": 160.0,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 3,
+            "score_mean": 38.96666666666667,
+            "R_mean": 56.666666666666664,
+            "D_mean": 566.6666666666666,
+            "M_mean": 2.6666666666666665,
+            "deaths_mean": 5,
+            "win_share": 0.3333333333333333
+          }
+        }
+      }
+    },
+    {
+      "round": 1,
+      "scenes": [
+        {
+          "style": "open",
+          "seed": 101,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "open",
+          "seed": 101,
+          "stage": 2,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "defender",
+            "baseline"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "open",
+          "seed": 307,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "open",
+          "seed": 307,
+          "stage": 2,
+          "seat": 1,
+          "opponents": [
+            "baseline",
+            "candidate",
+            "aggressive",
+            "fortress"
+          ],
+          "delay": 10,
+          "ai_success": true
+        },
+        {
+          "style": "maze",
+          "seed": 148,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "maze",
+          "seed": 148,
+          "stage": 2,
+          "seat": 2,
+          "opponents": [
+            "fortress",
+            "baseline",
+            "candidate",
+            "aggressive"
+          ],
+          "delay": 0,
+          "ai_success": true
+        },
+        {
+          "style": "maze",
+          "seed": 354,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "maze",
+          "seed": 354,
+          "stage": 2,
+          "seat": 3,
+          "opponents": [
+            "defender",
+            "opportunist",
+            "baseline",
+            "candidate"
+          ],
+          "delay": 10,
+          "ai_success": true
+        },
+        {
+          "style": "rooms",
+          "seed": 195,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "rooms",
+          "seed": 195,
+          "stage": 2,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "defender",
+            "opportunist",
+            "baseline"
+          ],
+          "delay": 10,
+          "ai_success": true
+        },
+        {
+          "style": "rooms",
+          "seed": 401,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "rooms",
+          "seed": 401,
+          "stage": 2,
+          "seat": 1,
+          "opponents": [
+            "baseline",
+            "candidate",
+            "fortress",
+            "wanderer"
+          ],
+          "delay": 6,
+          "ai_success": true
+        },
+        {
+          "style": "lanes",
+          "seed": 242,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "lanes",
+          "seed": 242,
+          "stage": 2,
+          "seat": 2,
+          "opponents": [
+            "wanderer",
+            "baseline",
+            "candidate",
+            "fortress"
+          ],
+          "delay": 10,
+          "ai_success": true
+        },
+        {
+          "style": "lanes",
+          "seed": 448,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "lanes",
+          "seed": 448,
+          "stage": 2,
+          "seat": 3,
+          "opponents": [
+            "opportunist",
+            "collector",
+            "baseline",
+            "candidate"
+          ],
+          "delay": 6,
+          "ai_success": true
+        }
+      ],
+      "profiles": [
+        {
+          "name": "s04",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.02,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "collision_only",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 70.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.1,
+            "resource_plan_depth": 3,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.02,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 1.0,
+            "explore_toward_resource_value": 0.0,
+            "explore_tour_value": 0.0,
+            "mission_explore_value": 2.0,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "tactical_search": false,
+            "tactical_risk": 0.35,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 1.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.35,
+            "resource_refinement": false,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24
+          }
+        },
+        {
+          "name": "fr.04",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.04,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "fr.05",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.05,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "baseline",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 70.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.1,
+            "resource_plan_depth": 3,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.02,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 1.0,
+            "explore_toward_resource_value": 0.0,
+            "explore_tour_value": 0.0,
+            "mission_explore_value": 2.0,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "tactical_search": false,
+            "tactical_risk": 0.35,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 1.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.35,
+            "resource_refinement": false,
+            "resource_refinement_trials": 12,
+            "collision_replan": false,
+            "loop_recovery": false,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24
+          }
+        },
+        {
+          "name": "fr.03",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.03,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        }
+      ],
+      "summaries": {
+        "s04": {
+          "games": 16,
+          "objective": 0.759578125,
+          "invalid": 0,
+          "deaths": 38,
+          "blocked": 146,
+          "decide_max_ms": 3.100877,
+          "stage1": {
+            "games": 8,
+            "score_mean": 31.25,
+            "R_mean": 156.25,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 8,
+            "score_mean": 40.9375,
+            "R_mean": 56.25,
+            "D_mean": 621.875,
+            "M_mean": 2.625,
+            "deaths_mean": 4.75,
+            "win_share": 0.25
+          }
+        },
+        "collision_only": {
+          "games": 16,
+          "objective": 0.7124635416666667,
+          "invalid": 0,
+          "deaths": 36,
+          "blocked": 125,
+          "decide_max_ms": 2.141887,
+          "stage1": {
+            "games": 8,
+            "score_mean": 29.5,
+            "R_mean": 147.5,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 8,
+            "score_mean": 38.05,
+            "R_mean": 50.0,
+            "D_mean": 580.625,
+            "M_mean": 2.375,
+            "deaths_mean": 4.5,
+            "win_share": 0.25
+          }
+        },
+        "fr.04": {
+          "games": 16,
+          "objective": 0.7583402777777778,
+          "invalid": 0,
+          "deaths": 40,
+          "blocked": 236,
+          "decide_max_ms": 3.258867,
+          "stage1": {
+            "games": 8,
+            "score_mean": 30.25,
+            "R_mean": 151.25,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 8,
+            "score_mean": 42.1875,
+            "R_mean": 58.75,
+            "D_mean": 762.5,
+            "M_mean": 2.75,
+            "deaths_mean": 5,
+            "win_share": 0.25
+          }
+        },
+        "fr.05": {
+          "games": 16,
+          "objective": 0.7555920138888889,
+          "invalid": 0,
+          "deaths": 48,
+          "blocked": 77,
+          "decide_max_ms": 3.345611,
+          "stage1": {
+            "games": 8,
+            "score_mean": 30.25,
+            "R_mean": 151.25,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 8,
+            "score_mean": 41.875,
+            "R_mean": 57.5,
+            "D_mean": 636.25,
+            "M_mean": 2.75,
+            "deaths_mean": 6,
+            "win_share": 0.25
+          }
+        },
+        "baseline": {
+          "games": 16,
+          "objective": 0.6655295138888889,
+          "invalid": 0,
+          "deaths": 26,
+          "blocked": 860,
+          "decide_max_ms": 1.956148,
+          "stage1": {
+            "games": 8,
+            "score_mean": 29.5,
+            "R_mean": 147.5,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 8,
+            "score_mean": 34.1,
+            "R_mean": 47.5,
+            "D_mean": 457.5,
+            "M_mean": 2.25,
+            "deaths_mean": 3.25,
+            "win_share": 0.125
+          }
+        },
+        "fr.03": {
+          "games": 16,
+          "objective": 0.7235121527777778,
+          "invalid": 0,
+          "deaths": 40,
+          "blocked": 200,
+          "decide_max_ms": 5.010835,
+          "stage1": {
+            "games": 8,
+            "score_mean": 27.75,
+            "R_mean": 138.75,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 8,
+            "score_mean": 41.8,
+            "R_mean": 57.5,
+            "D_mean": 725.0,
+            "M_mean": 2.75,
+            "deaths_mean": 5,
+            "win_share": 0.25
+          }
+        }
+      }
+    },
+    {
+      "round": 2,
+      "scenes": [
+        {
+          "style": "open",
+          "seed": 101,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "open",
+          "seed": 101,
+          "stage": 2,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "defender",
+            "baseline"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "open",
+          "seed": 307,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "open",
+          "seed": 307,
+          "stage": 2,
+          "seat": 1,
+          "opponents": [
+            "baseline",
+            "candidate",
+            "aggressive",
+            "fortress"
+          ],
+          "delay": 10,
+          "ai_success": true
+        },
+        {
+          "style": "maze",
+          "seed": 148,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "maze",
+          "seed": 148,
+          "stage": 2,
+          "seat": 2,
+          "opponents": [
+            "fortress",
+            "baseline",
+            "candidate",
+            "aggressive"
+          ],
+          "delay": 0,
+          "ai_success": true
+        },
+        {
+          "style": "maze",
+          "seed": 354,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "maze",
+          "seed": 354,
+          "stage": 2,
+          "seat": 3,
+          "opponents": [
+            "defender",
+            "opportunist",
+            "baseline",
+            "candidate"
+          ],
+          "delay": 10,
+          "ai_success": true
+        },
+        {
+          "style": "rooms",
+          "seed": 195,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "rooms",
+          "seed": 195,
+          "stage": 2,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "defender",
+            "opportunist",
+            "baseline"
+          ],
+          "delay": 10,
+          "ai_success": true
+        },
+        {
+          "style": "rooms",
+          "seed": 401,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "rooms",
+          "seed": 401,
+          "stage": 2,
+          "seat": 1,
+          "opponents": [
+            "baseline",
+            "candidate",
+            "fortress",
+            "wanderer"
+          ],
+          "delay": 6,
+          "ai_success": true
+        },
+        {
+          "style": "lanes",
+          "seed": 242,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "lanes",
+          "seed": 242,
+          "stage": 2,
+          "seat": 2,
+          "opponents": [
+            "wanderer",
+            "baseline",
+            "candidate",
+            "fortress"
+          ],
+          "delay": 10,
+          "ai_success": true
+        },
+        {
+          "style": "lanes",
+          "seed": 448,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "lanes",
+          "seed": 448,
+          "stage": 2,
+          "seat": 3,
+          "opponents": [
+            "opportunist",
+            "collector",
+            "baseline",
+            "candidate"
+          ],
+          "delay": 6,
+          "ai_success": true
+        },
+        {
+          "style": "clusters",
+          "seed": 289,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "clusters",
+          "seed": 289,
+          "stage": 2,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "opportunist",
+            "collector",
+            "baseline"
+          ],
+          "delay": 6,
+          "ai_success": true
+        },
+        {
+          "style": "clusters",
+          "seed": 495,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "clusters",
+          "seed": 495,
+          "stage": 2,
+          "seat": 1,
+          "opponents": [
+            "baseline",
+            "candidate",
+            "wanderer",
+            "aggressive"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "crossroads",
+          "seed": 336,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "crossroads",
+          "seed": 336,
+          "stage": 2,
+          "seat": 2,
+          "opponents": [
+            "aggressive",
+            "baseline",
+            "candidate",
+            "wanderer"
+          ],
+          "delay": 6,
+          "ai_success": true
+        },
+        {
+          "style": "crossroads",
+          "seed": 542,
+          "stage": 1,
+          "seat": 0,
+          "opponents": [
+            "candidate",
+            "collector",
+            "collector",
+            "collector"
+          ],
+          "delay": 0,
+          "ai_success": false
+        },
+        {
+          "style": "crossroads",
+          "seed": 542,
+          "stage": 2,
+          "seat": 3,
+          "opponents": [
+            "collector",
+            "defender",
+            "baseline",
+            "candidate"
+          ],
+          "delay": 0,
+          "ai_success": true
+        }
+      ],
+      "profiles": [
+        {
+          "name": "s04",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.02,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "fr.04",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 40.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.0,
+            "resource_plan_depth": 4,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.04,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 0.5,
+            "explore_toward_resource_value": 0.5,
+            "explore_tour_value": 0.03,
+            "mission_explore_value": 0.0,
+            "tactical_search": false,
+            "tactical_risk": 0.6,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 0.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.65,
+            "resource_refinement": true,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "stage2_assassin_value": 0.0
+          }
+        },
+        {
+          "name": "baseline",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 70.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.1,
+            "resource_plan_depth": 3,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.02,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 1.0,
+            "explore_toward_resource_value": 0.0,
+            "explore_tour_value": 0.0,
+            "mission_explore_value": 2.0,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "tactical_search": false,
+            "tactical_risk": 0.35,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 1.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.35,
+            "resource_refinement": false,
+            "resource_refinement_trials": 12,
+            "collision_replan": false,
+            "loop_recovery": false,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24
+          }
+        },
+        {
+          "name": "collision_only",
+          "parameters": {
+            "stale_resource_decay": 0.01,
+            "resource_mission_bonus": 5.0,
+            "reach_mission_value": 8.0,
+            "healing_below_hp": 70.0,
+            "fortress_hold_value": 20.0,
+            "fortress_capture_value": 12.0,
+            "hazard_lead_ticks": 2,
+            "goal_retention_bonus": 0.1,
+            "resource_plan_depth": 3,
+            "resource_beam_width": 5,
+            "resource_candidate_limit": 8,
+            "resource_plan_budget_ms": 10,
+            "frontier_value": 0.02,
+            "opponent_contest_cost": 1.0,
+            "opponent_pressure_cost": 0.25,
+            "opponent_claim_discount": 1.0,
+            "explore_toward_resource_value": 0.0,
+            "explore_tour_value": 0.0,
+            "mission_explore_value": 2.0,
+            "stage1_flood_value": 0.0,
+            "stage2_race_gate": false,
+            "stage2_explore_gate_tick": 0,
+            "stage2_mission_pull_stale_ticks": 0,
+            "tactical_search": false,
+            "tactical_risk": 0.35,
+            "tactical_hp_value": 0.015,
+            "tactical_death_cost": 1.0,
+            "tactical_future_discount": 0.65,
+            "tactical_goal_weight": 0.35,
+            "resource_refinement": false,
+            "resource_refinement_trials": 12,
+            "collision_replan": true,
+            "loop_recovery": true,
+            "loop_window_ticks": 12,
+            "recovery_ticks": 12,
+            "stalled_goal_cooldown_ticks": 24
+          }
+        }
+      ],
+      "summaries": {
+        "s04": {
+          "games": 24,
+          "objective": 0.7890775462962963,
+          "invalid": 0,
+          "deaths": 56,
+          "blocked": 192,
+          "decide_max_ms": 5.221428,
+          "stage1": {
+            "games": 12,
+            "score_mean": 33.333333333333336,
+            "R_mean": 166.66666666666666,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 12,
+            "score_mean": 41.25,
+            "R_mean": 60.0,
+            "D_mean": 673.3333333333334,
+            "M_mean": 2.5833333333333335,
+            "deaths_mean": 4.666666666666667,
+            "win_share": 0.25
+          }
+        },
+        "fr.04": {
+          "games": 24,
+          "objective": 0.7857534722222222,
+          "invalid": 0,
+          "deaths": 59,
+          "blocked": 304,
+          "decide_max_ms": 3.792223,
+          "stage1": {
+            "games": 12,
+            "score_mean": 32.5,
+            "R_mean": 162.5,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 12,
+            "score_mean": 42.05833333333334,
+            "R_mean": 61.666666666666664,
+            "D_mean": 719.1666666666666,
+            "M_mean": 2.75,
+            "deaths_mean": 4.916666666666667,
+            "win_share": 0.25
+          }
+        },
+        "baseline": {
+          "games": 24,
+          "objective": 0.6657447916666667,
+          "invalid": 0,
+          "deaths": 33,
+          "blocked": 1463,
+          "decide_max_ms": 4.35079,
+          "stage1": {
+            "games": 12,
+            "score_mean": 31.5,
+            "R_mean": 157.5,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 12,
+            "score_mean": 30.641666666666666,
+            "R_mean": 44.166666666666664,
+            "D_mean": 412.0833333333333,
+            "M_mean": 2,
+            "deaths_mean": 2.75,
+            "win_share": 0.16666666666666666
+          }
+        },
+        "collision_only": {
+          "games": 24,
+          "objective": 0.7392129629629629,
+          "invalid": 0,
+          "deaths": 61,
+          "blocked": 206,
+          "decide_max_ms": 2.987519,
+          "stage1": {
+            "games": 12,
+            "score_mean": 31.5,
+            "R_mean": 157.5,
+            "D_mean": 0.0,
+            "M_mean": 0,
+            "deaths_mean": 0,
+            "win_share": null
+          },
+          "stage2": {
+            "games": 12,
+            "score_mean": 38.208333333333336,
+            "R_mean": 51.666666666666664,
+            "D_mean": 565.6547619047619,
+            "M_mean": 2.4166666666666665,
+            "deaths_mean": 5.083333333333333,
+            "win_share": 0.25
+          }
+        }
+      }
+    }
+  ],
+  "module_inert_round0": false,
+  "selection_guard": {
+    "stage1_min_score": 30.5,
+    "invalid_max": 0,
+    "eligible": [
+      "s04",
+      "fr.04",
+      "collision_only",
+      "baseline"
+    ],
+    "selected_name": "s04"
+  },
+  "heldout_note": "selected_name equals the sealed champion search_04, so the sealed heldout obj 0.8437 (stage1 32.67, stage2 43.89) is reused and NOT re-evaluated.",
+  "selected": {
+    "name": "selected",
+    "parameters": {
+      "stale_resource_decay": 0.01,
+      "resource_mission_bonus": 5.0,
+      "reach_mission_value": 8.0,
+      "healing_below_hp": 40.0,
+      "fortress_hold_value": 20.0,
+      "fortress_capture_value": 12.0,
+      "hazard_lead_ticks": 2,
+      "goal_retention_bonus": 0.0,
+      "resource_plan_depth": 4,
+      "resource_beam_width": 5,
+      "resource_candidate_limit": 8,
+      "resource_plan_budget_ms": 10,
+      "frontier_value": 0.02,
+      "opponent_contest_cost": 1.0,
+      "opponent_pressure_cost": 0.25,
+      "opponent_claim_discount": 0.5,
+      "explore_toward_resource_value": 0.5,
+      "explore_tour_value": 0.03,
+      "mission_explore_value": 0.0,
+      "tactical_search": false,
+      "tactical_risk": 0.6,
+      "tactical_hp_value": 0.015,
+      "tactical_death_cost": 0.0,
+      "tactical_future_discount": 0.65,
+      "tactical_goal_weight": 0.65,
+      "resource_refinement": true,
+      "resource_refinement_trials": 12,
+      "collision_replan": true,
+      "loop_recovery": true,
+      "loop_window_ticks": 12,
+      "recovery_ticks": 12,
+      "stalled_goal_cooldown_ticks": 24,
+      "stage1_flood_value": 0.0,
+      "stage2_race_gate": false,
+      "stage2_explore_gate_tick": 0,
+      "stage2_mission_pull_stale_ticks": 0,
+      "stage2_assassin_value": 0.0
+    }
+  },
+  "source_sha256": {
+    "src/rmtc_bot/src/strategy.cpp": "b9724aba2c2f1dbac8d0c17745ac14c3615a88952eaf19446cb6924e358d17de",
+    "src/rmtc_bot/src/tactics.cpp": "f890c4fce21335149a2f8e26a406c2dfc2cc05c92f942e3bf088d1f1a55c38b7",
+    "src/rmtc_bot/include/rmtc_bot/match_config.hpp": "222eb0336eccd922b01111b243ef55d4d3e42437213ad460c4d01928becf451b",
+    "tests/arena.cpp": "04007f7d60832ae6a5af334c1285705b5cf4e740ce385b81fc231b1d416b1d51",
+    "tests/arena_scenarios.cpp": "2ac359e30b46cff354f5cadb00fac9380eac260a883e90aa534f36254eac0e4a",
+    "tests/arena_opponents.cpp": "f07f9ed357388caece386609e1b1a12be80dd2a2b82225c7efd6f01e65f2480a"
+  }
+}

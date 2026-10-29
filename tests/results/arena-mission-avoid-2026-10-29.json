@@ -1,0 +1,171 @@
+{
+  "date": "2026-10-29",
+  "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+  "settings": {
+    "version": 1,
+    "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+    "map_styles": [
+      "open",
+      "maze",
+      "rooms",
+      "lanes",
+      "clusters",
+      "crossroads"
+    ],
+    "opponent_styles": [
+      "collector",
+      "aggressive",
+      "defender",
+      "fortress",
+      "opportunist",
+      "wanderer"
+    ],
+    "train_seeds": [
+      101,
+      307
+    ],
+    "heldout_seeds": [
+      29003
+    ],
+    "baseline_parameters": {
+      "stale_resource_decay": 0.01,
+      "resource_mission_bonus": 5.0,
+      "reach_mission_value": 8.0,
+      "healing_below_hp": 70.0,
+      "fortress_hold_value": 20.0,
+      "fortress_capture_value": 12.0,
+      "hazard_lead_ticks": 2,
+      "goal_retention_bonus": 0.1,
+      "resource_plan_depth": 3,
+      "resource_beam_width": 5,
+      "resource_candidate_limit": 8,
+      "resource_plan_budget_ms": 10,
+      "frontier_value": 0.02,
+      "opponent_contest_cost": 1.0,
+      "opponent_pressure_cost": 0.25,
+      "opponent_claim_discount": 1.0,
+      "explore_toward_resource_value": 0.0,
+      "explore_tour_value": 0.0,
+      "mission_explore_value": 2.0,
+      "stage1_flood_value": 0.0,
+      "stage2_race_gate": false,
+      "stage2_explore_gate_tick": 0,
+      "stage2_mission_pull_stale_ticks": 0,
+      "tactical_search": false,
+      "tactical_risk": 0.35,
+      "tactical_hp_value": 0.015,
+      "tactical_death_cost": 1.0,
+      "tactical_future_discount": 0.65,
+      "tactical_goal_weight": 0.35,
+      "resource_refinement": false,
+      "resource_refinement_trials": 12,
+      "collision_replan": false,
+      "loop_recovery": false,
+      "loop_window_ticks": 12,
+      "recovery_ticks": 12,
+      "stalled_goal_cooldown_ticks": 24
+    },
+    "pilot_heldout_seeds": [
+      19001
+    ]
+  },
+  "selection": "任务时机族与路径避让族：miss+/miss-惰性、avoid+惰性、avoid-负，均未晋升，冠军参数不变。",
+  "note": "参数空间最后两组未测权重的合批扫描，24训练场景。(1) 任务时机族：miss+（reach 12/bonus 8/fortress 30/20）与miss-（reach 4/bonus 2/fortress 10/6）阶段二与s04比特级相同（R/D/M/score逐局同，M=2.58不变）——任务完成度是R竞速的下游（此前结论第三次确认），权重上下沿完全惰性；阶段一比特级相同（无任务无对手，权重不触发）。(2) 路径避让族：avoid+（contest 2.0/pressure 0.5）R不变、D −5.6、win +1局噪音、deaths +0.25；avoid-（contest 0.5/pressure 0.0）R 58.3（open-307 100→80）、score 40.83。冠军contest 1.0/pressure 0.25处于边界：降低会丢抢饼，提高无实质变化。至此全部可写参数双向测尽，冠军在每个轴上都是经验局部最优。",
+  "rounds": {
+    "mission_avoid": {
+      "profiles": [
+        "s04",
+        "miss+",
+        "miss-",
+        "avoid+",
+        "avoid-"
+      ],
+      "stage2_summary": {
+        "s04": {
+          "R_mean": 60.0,
+          "D_mean": 673.3,
+          "M_mean": 2.58,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.67
+        },
+        "miss+": {
+          "R_mean": 60.0,
+          "D_mean": 672.9,
+          "M_mean": 2.58,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.67
+        },
+        "miss-": {
+          "R_mean": 60.0,
+          "D_mean": 681.7,
+          "M_mean": 2.58,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.67
+        },
+        "avoid+": {
+          "R_mean": 60.0,
+          "D_mean": 667.7,
+          "M_mean": 2.58,
+          "score_mean": 41.25,
+          "win_share": 0.33,
+          "deaths_mean": 4.92
+        },
+        "avoid-": {
+          "R_mean": 58.3,
+          "D_mean": 687.3,
+          "M_mean": 2.58,
+          "score_mean": 40.83,
+          "win_share": 0.25,
+          "deaths_mean": 4.83
+        }
+      },
+      "stage1": "bit-identical (R per scene)",
+      "per_scene_R_stage2": {
+        "s04": [
+          40,
+          100,
+          30,
+          90,
+          30,
+          60,
+          40,
+          60,
+          120,
+          30,
+          70,
+          50
+        ],
+        "avoid-": [
+          40,
+          80,
+          30,
+          90,
+          30,
+          60,
+          40,
+          60,
+          120,
+          30,
+          70,
+          50
+        ]
+      }
+    }
+  },
+  "selection_guard": "selection未变（s04），不重跑heldout；封存heldout复用：obj 0.8437（stage1 32.67/40, stage2 43.89/60）。",
+  "selected": "selected-parameters-mission-avoid-2026-10-29.json（s04）",
+  "heldout_scenes": "29003（封存复用，未重评）",
+  "heldout_results": "sealed reuse: obj 0.8437",
+  "heldout_summaries": {
+    "stage1_score_mean": 32.666666666666664,
+    "stage2_score_mean": 43.8875,
+    "R_mean": 69.58333333333333,
+    "D_mean": 590.1041666666666,
+    "M_mean": 2.8333333333333335,
+    "deaths_mean": 4.708333333333333,
+    "win_share": 0.5416666666666666
+  }
+}

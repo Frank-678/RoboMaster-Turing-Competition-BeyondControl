@@ -1,0 +1,498 @@
+{
+  "date": "2026-10-29",
+  "levers": "coverage",
+  "scenes": [
+    {
+      "style": "open",
+      "seed": 101,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "open",
+      "seed": 101,
+      "stage": 2,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "defender",
+        "baseline"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "open",
+      "seed": 307,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "open",
+      "seed": 307,
+      "stage": 2,
+      "seat": 1,
+      "opponents": [
+        "baseline",
+        "candidate",
+        "aggressive",
+        "fortress"
+      ],
+      "delay": 10,
+      "ai_success": true
+    },
+    {
+      "style": "maze",
+      "seed": 148,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "maze",
+      "seed": 148,
+      "stage": 2,
+      "seat": 2,
+      "opponents": [
+        "fortress",
+        "baseline",
+        "candidate",
+        "aggressive"
+      ],
+      "delay": 0,
+      "ai_success": true
+    },
+    {
+      "style": "maze",
+      "seed": 354,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "maze",
+      "seed": 354,
+      "stage": 2,
+      "seat": 3,
+      "opponents": [
+        "defender",
+        "opportunist",
+        "baseline",
+        "candidate"
+      ],
+      "delay": 10,
+      "ai_success": true
+    },
+    {
+      "style": "rooms",
+      "seed": 195,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "rooms",
+      "seed": 195,
+      "stage": 2,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "defender",
+        "opportunist",
+        "baseline"
+      ],
+      "delay": 10,
+      "ai_success": true
+    },
+    {
+      "style": "rooms",
+      "seed": 401,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "rooms",
+      "seed": 401,
+      "stage": 2,
+      "seat": 1,
+      "opponents": [
+        "baseline",
+        "candidate",
+        "fortress",
+        "wanderer"
+      ],
+      "delay": 6,
+      "ai_success": true
+    },
+    {
+      "style": "lanes",
+      "seed": 242,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "lanes",
+      "seed": 242,
+      "stage": 2,
+      "seat": 2,
+      "opponents": [
+        "wanderer",
+        "baseline",
+        "candidate",
+        "fortress"
+      ],
+      "delay": 10,
+      "ai_success": true
+    },
+    {
+      "style": "lanes",
+      "seed": 448,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "lanes",
+      "seed": 448,
+      "stage": 2,
+      "seat": 3,
+      "opponents": [
+        "opportunist",
+        "collector",
+        "baseline",
+        "candidate"
+      ],
+      "delay": 6,
+      "ai_success": true
+    },
+    {
+      "style": "clusters",
+      "seed": 289,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "clusters",
+      "seed": 289,
+      "stage": 2,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "opportunist",
+        "collector",
+        "baseline"
+      ],
+      "delay": 6,
+      "ai_success": true
+    },
+    {
+      "style": "clusters",
+      "seed": 495,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "clusters",
+      "seed": 495,
+      "stage": 2,
+      "seat": 1,
+      "opponents": [
+        "baseline",
+        "candidate",
+        "wanderer",
+        "aggressive"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "crossroads",
+      "seed": 336,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "crossroads",
+      "seed": 336,
+      "stage": 2,
+      "seat": 2,
+      "opponents": [
+        "aggressive",
+        "baseline",
+        "candidate",
+        "wanderer"
+      ],
+      "delay": 6,
+      "ai_success": true
+    },
+    {
+      "style": "crossroads",
+      "seed": 542,
+      "stage": 1,
+      "seat": 0,
+      "opponents": [
+        "candidate",
+        "collector",
+        "collector",
+        "collector"
+      ],
+      "delay": 0,
+      "ai_success": false
+    },
+    {
+      "style": "crossroads",
+      "seed": 542,
+      "stage": 2,
+      "seat": 3,
+      "opponents": [
+        "collector",
+        "defender",
+        "baseline",
+        "candidate"
+      ],
+      "delay": 0,
+      "ai_success": true
+    }
+  ],
+  "train_only": true,
+  "competition_parameters": {
+    "collision_replan": true,
+    "defend_stall_break_ticks": 0,
+    "explore_component_value": 0.0,
+    "explore_tour_value": 0.03,
+    "explore_toward_resource_value": 0.5,
+    "fortress_capture_value": 12.0,
+    "fortress_hold_value": 20.0,
+    "frontier_value": 0.02,
+    "goal_retention_bonus": 0.0,
+    "hazard_lead_ticks": 2,
+    "healing_below_hp": 40.0,
+    "loop_recovery": true,
+    "loop_window_ticks": 12,
+    "mission_explore_value": 0.0,
+    "opponent_claim_discount": 0.5,
+    "opponent_contest_cost": 1.0,
+    "opponent_pressure_cost": 0.25,
+    "post_cap_combat_weight": 0.02,
+    "prepare_fortress_value": 0.0,
+    "reach_mission_value": 8.0,
+    "recovery_ticks": 12,
+    "resource_beam_width": 5,
+    "resource_candidate_limit": 8,
+    "resource_mission_bonus": 5.0,
+    "resource_plan_budget_ms": 10,
+    "resource_plan_depth": 4,
+    "resource_refinement": true,
+    "resource_refinement_trials": 12,
+    "stage1_flood_value": 0.0,
+    "stage1_frontier_value": 0.02,
+    "stage1_ring_value": 0.0,
+    "stage2_assassin_value": 0.0,
+    "stage2_explore_gate_tick": 0,
+    "stage2_mission_pull_stale_ticks": 0,
+    "stage2_pie_attack_discount": 0.0,
+    "stage2_race_gate": false,
+    "stage2_shadow_value": 0.0,
+    "stale_grace_ticks": 0,
+    "stale_resource_decay": 0.01,
+    "stalled_goal_cooldown_ticks": 24,
+    "tactical_death_cost": 0.0,
+    "tactical_future_discount": 0.65,
+    "tactical_goal_weight": 0.65,
+    "tactical_hp_value": 0.015,
+    "tactical_risk": 0.6,
+    "tactical_search": false,
+    "worst_case_survival": false
+  },
+  "summaries": {
+    "base_off": {
+      "games": 24,
+      "objective": 0.7970931712962963,
+      "invalid": 0,
+      "deaths": 83,
+      "blocked": 93,
+      "decide_max_ms": 6.696349,
+      "stage1": {
+        "games": 12,
+        "score_mean": 33.333333333333336,
+        "R_mean": 166.66666666666666,
+        "D_mean": 0.0,
+        "M_mean": 0,
+        "deaths_mean": 0,
+        "win_share": null
+      },
+      "stage2": {
+        "games": 12,
+        "score_mean": 41.25,
+        "R_mean": 60.0,
+        "D_mean": 1026.6666666666667,
+        "M_mean": 2.5833333333333335,
+        "deaths_mean": 6.916666666666667,
+        "win_share": 0.3333333333333333
+      }
+    },
+    "cov002": {
+      "games": 24,
+      "objective": 0.7945069444444445,
+      "invalid": 0,
+      "deaths": 98,
+      "blocked": 86,
+      "decide_max_ms": 6.368442,
+      "stage1": {
+        "games": 12,
+        "score_mean": 33.333333333333336,
+        "R_mean": 166.66666666666666,
+        "D_mean": 0.0,
+        "M_mean": 0,
+        "deaths_mean": 0,
+        "win_share": null
+      },
+      "stage2": {
+        "games": 12,
+        "score_mean": 41.875,
+        "R_mean": 60.833333333333336,
+        "D_mean": 1000.4166666666666,
+        "M_mean": 2.75,
+        "deaths_mean": 8.166666666666666,
+        "win_share": 0.25
+      }
+    },
+    "cov008": {
+      "games": 24,
+      "objective": 0.8084016203703703,
+      "invalid": 0,
+      "deaths": 86,
+      "blocked": 212,
+      "decide_max_ms": 8.715516,
+      "stage1": {
+        "games": 12,
+        "score_mean": 33.333333333333336,
+        "R_mean": 166.66666666666666,
+        "D_mean": 0.0,
+        "M_mean": 0,
+        "deaths_mean": 0,
+        "win_share": null
+      },
+      "stage2": {
+        "games": 12,
+        "score_mean": 42.5,
+        "R_mean": 61.666666666666664,
+        "D_mean": 844.5833333333334,
+        "M_mean": 2.8333333333333335,
+        "deaths_mean": 7.166666666666667,
+        "win_share": 0.3333333333333333
+      }
+    },
+    "cov02": {
+      "games": 24,
+      "objective": 0.7659965277777778,
+      "invalid": 0,
+      "deaths": 85,
+      "blocked": 125,
+      "decide_max_ms": 9.50725,
+      "stage1": {
+        "games": 12,
+        "score_mean": 33.333333333333336,
+        "R_mean": 166.66666666666666,
+        "D_mean": 0.0,
+        "M_mean": 0,
+        "deaths_mean": 0,
+        "win_share": null
+      },
+      "stage2": {
+        "games": 12,
+        "score_mean": 39.641666666666666,
+        "R_mean": 50.833333333333336,
+        "D_mean": 737.3214285714286,
+        "M_mean": 2.75,
+        "deaths_mean": 7.083333333333333,
+        "win_share": 0.16666666666666666
+      }
+    }
+  }
+}

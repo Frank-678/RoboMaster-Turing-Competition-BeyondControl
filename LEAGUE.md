@@ -128,3 +128,42 @@ python3 tests/scenario_test.py
 ```
 
 非标准环境可在freeze/run/回归加`--json-include /包含nlohmann的目录`。正常Ubuntu安装依赖后，不要求环境变量。
+
+## 原版ROS与真实模型联赛
+
+快速离线用`league.sh`；原版`practice/`、DDS、真实模型用`practice_league.sh`。两个入口保留，不能把离线胜率当作原版实测结果。同名冲突已处理：DeepSeek原`tests/version_league.py`改名为`tests/practice_version_league.py`，离线文件保留原名。
+
+先在唯一的`match_config.hpp`填好`practice_llm_url / practice_llm_key / practice_llm_proxy / practice_port / ai_model`和ROS域，再`bash build.sh`。`practice_batch.sh`通过C++启动器把这些已编译值交给原版裁判；不另读`llm.env`，不需要手工export。真实调用会消耗配额。
+
+```bash
+# 先核对清单里已有的冠军/旧冠军路径、二进制摘要；不会重新命名已有版本。
+bash practice_league.sh --maps 20261201,20261202 --mixes M1,M2 --out build/practice-league/pilot
+# 同图同事件只转四次出生点；也能单独跑批量驱动。
+bash practice_batch.sh --seed 20261201 --map-locked --count 4 --summary build/practice-league/example.json
+# 补编号3，必须与原批count/seed/summary和程序身份一致；完整生成再筛选。
+bash practice_batch.sh --seed 20261201 --map-locked --count 4 --only 3 --summary build/practice-league/example.json
+python3 tools/archive_batch.py --summary build/practice-league/example.json --to build/practice-league/archive
+python3 tests/practice_tools_test.py
+```
+
+每个summary旁有独立`.runs/case-编号-随机后缀/`，内含本局输入与机器人/裁判日志。summary记录配置摘要、各席实际二进制摘要和原版session；归档从每条记录自己的目录取日志，包括失败局。旧摘要若没有这些身份字段，另用新输出路径，不悄悄覆盖。完成局同身份重跑会复用，失败局重跑保留此前日志目录。筛选后的完成数只指本次请求的编号。
+
+`--base-config PATH`可换完整练习模板，需保持18×18及四席结构；当前实测生成器仍只是六墙随机扰动，不能称为12种地形全覆盖。离线12局面族已经提供单桥、房间、蛇形、死路、动态封路和空资源末局等；把这些有结构的模板迁入原版配置并验证，是下一项真实联赛工作。M3未配候选就列为跳过，实际完成数不凑144。
+
+`tools/versions.json`保留DeepSeek的champion=`eb321df`、old_champion=`9bc72a7`及原二进制/钉集；这和本轮离线比较的65c8714/8da0ede是两套标识，不互换。机器上若找不到冻结程序，先核对本地路径；不能拿最新bot覆盖旧冠军再沿用旧名。
+
+### 实测工具的文件与函数
+
+| 文件/函数 | 做什么 |
+| --- | --- |
+| `practice_league.sh / tests/practice_version_league.py` | 按图seed、对手混合、四次出生轮换调度原版对局，核对冻结程序；缺局和0/0都失败 |
+| `practice_batch.sh / practice_launcher --batch` | 唯一配置入口，把模型、密钥、出网代理、ROS域和监听端口交给驱动，不打印密钥 |
+| `tools/batch_practice.py::variants` | 固定随机流先生成各编号，再筛选补跑，避免重测另一张图 |
+| `config_digest / seat_hashes` | 记录完整地图配置与实际各席程序的身份，拒绝混用旧摘要 |
+| `owned_run / run_battle` | 从本机API确认session、目录和配置；等待四席注册、启动、观察结束，所有异常都回收 |
+| `stop_battle` | 只停止已确认session并清理本次进程组；组长已退出仍收子进程 |
+| `tools/build_seat_variants.sh / .py::snapshot` | 在独立源码副本中修改team与公开practice令牌，构建各席并记录实际配置/源码/二进制摘要 |
+| `tools/run_seat.sh` | 启动指定安装底座的bot；节点名重映射不等于改变已编译席位 |
+| `tools/archive_batch.py::scan_keys / main` | 扫描目录和摘要单文件，按session归档各局日志、输入、分数及失败状态，写可读战报 |
+
+主数据类型：`variant`是完整裁判配置字典；`our_seats`是席位→安装目录；`identities`是席位→程序摘要；`results`是编号→状态记录；`session`是裁判场次标识；`processes`只包含本次独立进程组，不是机器全部进程。

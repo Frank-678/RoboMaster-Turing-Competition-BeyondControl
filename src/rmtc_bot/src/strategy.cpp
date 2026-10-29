@@ -88,9 +88,10 @@ void Strategy::reset() {
   goal_.reset(); // 新场没有上一目标，也没有必须继续执行的旧路线。
   model_reply_seen_ = resource_counts_known_ = false;
   observed_normal_ = observed_high_ = 0; previous_score_tick_ = -1; previous_resource_total_ = 0;
+  last_resource_sighting_ = -1;
   width_ = height_ = 0; reversed_ = reverse_unknown_ = empowered_ = false;
   vulnerability_ = 1; attack_damage_ = 20; defended_damage_ = 10; healing_until_ = -1;
-  healing_amount_ = 0; reason_ = "new_session";
+  healing_amount_ = 0; lethal_defend_streak_ = 0; reason_ = "new_session";
 }
 // 只用已执行的连续观测识别“动了但没进展”；没有可信回执就重新积累窗口。
 void Strategy::observe_navigation(const Json &p, Cell position, Tick tick, Tick receipt_tick,
@@ -433,6 +434,115 @@ void Strategy::update_effects(Tick tick) {
   }
 }
 
+std::optional<Strategy::ResourcePlan> Strategy::resource_tour(Cell start, Tick remaining_ticks,
+    const std::vector<Cell> &targets, const std::set<Cell> &occupied,
+    const std::map<Cell, double> *values, Cell first_hint) const {
+  if (targets.size() < 2 || targets.size() > 16) return std::nullopt; // 只对已知资源巡回；数量有界，不承诺全局最优。
+  const auto walkable = [&](Cell cell) {
+    if (cell.first < 0 || cell.second < 0 || cell.first >= width_ || cell.second >= height_) return false;
+    const auto tile = tiles_.find(cell);
+    return tile != tiles_.end() && tile->second.seen && !tile->second.wall && !occupied.count(cell);
+  };
+  // 只走已知格；资源两两距离各跑一次BFS，起点单独一份并保留首方向。全部仅本帧有效。
+  const auto bfs = [&](Cell origin) {
+    std::map<Cell,std::pair<int,int>> route; // 格子→{第一步方向,距离}；起点自己{4,0}。
+    std::queue<Cell> queue;
+    if (!walkable(origin)) return route;
+    route[origin] = {4, 0}; queue.push(origin);
+    while (!queue.empty()) {
+      const Cell cell = queue.front(); queue.pop();
+      for (int direction = 0; direction < 4; ++direction) {
+        const Cell next{cell.first + steps[direction].first, cell.second + steps[direction].second};
+        if (!walkable(next) || route.count(next)) continue;
+        const auto node = route.at(cell);
+        route[next] = {node.second == 0 ? direction : node.first, node.second + 1};
+        queue.push(next);
+      }
+    }
+    return route;
+  };
+  const auto start_route = bfs(start);
+  std::vector<Cell> nodes; // 起点已知可达的资源才进入巡回；其余留给探索与下一帧。
+  std::map<Cell,std::map<Cell,int>> table; // 资源→到其他已知格的距离。
+  for (const Cell &cell : targets) {
+    if (cell == start) continue; // 脚下资源由单目标原地拾取，不进巡回。
+    const auto found = start_route.find(cell);
+    if (found == start_route.end()) continue;
+    nodes.push_back(cell);
+    std::map<Cell,int> distances;
+    for (const auto &entry : bfs(cell)) distances[entry.first] = entry.second.second;
+    table[cell] = std::move(distances);
+  }
+  if (nodes.size() < 2) return std::nullopt;
+  const std::size_t size = nodes.size() + 1; // 下标0是当前格，1..k是资源。
+  std::vector<std::vector<int>> matrix(size, std::vector<int>(size, 1000000)); // 大数只表示未找到已知路线。
+  for (std::size_t i = 0; i < nodes.size(); ++i) {
+    matrix[0][i + 1] = matrix[i + 1][0] = start_route.at(nodes[i]).second;
+    matrix[i + 1][i + 1] = 0;
+    for (std::size_t j = i + 1; j < nodes.size(); ++j) {
+      int leg = 1000000;
+      const auto row = table.find(nodes[i]);
+      if (row != table.end()) {
+        const auto found = row->second.find(nodes[j]);
+        if (found != row->second.end()) leg = found->second;
+      }
+      matrix[i + 1][j + 1] = matrix[j + 1][i + 1] = leg;
+    }
+  }
+  std::vector<std::size_t> order{0}; // 近邻构造的访问顺序；不是待执行动作队列。
+  std::vector<bool> used(size, false); used[0] = true;
+  while (order.size() < size) {
+    std::size_t best = size; int best_leg = std::numeric_limits<int>::max();
+    for (std::size_t i = 1; i < size; ++i)
+      if (!used[i] && matrix[order.back()][i] < best_leg) { best_leg = matrix[order.back()][i]; best = i; }
+    if (best == size) break; // 与已知格图断开的资源不硬凑路线。
+    order.push_back(best); used[best] = true;
+  }
+  if (order.size() < 3) return std::nullopt; // 少于两个资源时单目标逻辑已足够。
+  if (first_hint.first >= 0) { // 观察点巡回沿用上一帧首停点：它仍在边界上就固定为本周起点，保持扫掠方向稳定。
+    for (std::size_t k = 2; k < order.size(); ++k)
+      if (nodes[order[k] - 1] == first_hint) {
+        std::rotate(order.begin() + 1, order.begin() + k, order.begin() + k + 1);
+        break;
+      }
+  }
+  for (int pass = 0; pass < 6; ++pass) { // 有界2-opt：只改善访问顺序，不改距离或已结算Tick。
+    bool improved = false;
+    // 观察点巡回在已有锚点（上一帧首停点）时保留它：首停点若随2-opt整体翻转，对称边界上会每帧在两端来回跳（原地抖动）。
+    // 探索一段的起始帧没有锚点，允许2-opt自由选择整串起点，扫掠方向更有全局眼光。
+    for (std::size_t i = (values != nullptr && first_hint.first >= 0) ? 1 : 0; i + 2 < order.size(); ++i) {
+      for (std::size_t j = i + 2; j + 1 < order.size(); ++j) {
+        const int removed = matrix[order[i]][order[i + 1]] + matrix[order[j]][order[j + 1]];
+        const int added = matrix[order[i]][order[j]] + matrix[order[i + 1]][order[j + 1]];
+        if (added < removed) { std::reverse(order.begin() + i + 1, order.begin() + j + 1); improved = true; }
+      }
+    }
+    if (!improved) break;
+  }
+  double benefit = 0; Tick elapsed = 0; // 剩余窗口内能兑现的巡回前缀收益。
+  std::vector<Cell> stops;
+  for (std::size_t i = 1; i < order.size(); ++i) {
+    const int leg = matrix[order[i - 1]][order[i]];
+    if (leg >= 1000000 || elapsed + leg > remaining_ticks) break; // 装不下的留给下一帧重评。
+    elapsed += leg;
+    const auto tile = tiles_.find(nodes[order[i] - 1]);
+    double value = 0;
+    if (values != nullptr) { // 边界观察点巡回：价值来自调用方估值，不读写资源记录。
+      const auto found = values->find(nodes[order[i] - 1]);
+      if (found == values->end() || found->second <= 0) continue;
+      value = found->second;
+    } else {
+      if (tile == tiles_.end() || tile->second.value <= 0) continue; // 本帧内消失的资源不计数。
+      value = tile->second.value;
+    }
+    benefit += value;
+    stops.push_back(nodes[order[i] - 1]);
+  }
+  if (stops.empty()) return std::nullopt;
+  return ResourcePlan{start_route.at(stops.front()).first, stops.front(),
+    benefit / static_cast<double>(elapsed + 1), benefit, stops};
+}
+
 Json Strategy::decide(const Json &p) {
   const auto previous_attempt=std::exchange(move_attempt_,std::nullopt); // 只验证意图是否被真实回执执行。
   const auto previous_plan=std::exchange(planned_resources_,std::vector<Cell>()); // 旧串仅是待重评候选，提前返回即失效。
@@ -532,7 +642,7 @@ Json Strategy::decide(const Json &p) {
       tile.wall = true;
       if (tile.wall_since < 0) tile.wall_since = tick;
     } else if (entity.type == "resource_normal" || entity.type == "resource_high") {
-      tile.value = entity.value; tile.high = entity.high;
+      tile.value = entity.value; tile.high = entity.high; last_resource_sighting_ = tick;
     }
   }
   for (auto &[cell, tile] : tiles_) {
@@ -581,7 +691,23 @@ Json Strategy::decide(const Json &p) {
     if (e.kind == Kind::split && e.start == tick && split_wall(start, tick)) return skip("split_forced_wait");
   }
   if (pre_damage >= hp) return skip("lethal_activation_before_action");
-  double incoming = 0, defended_incoming = 0; // 不防御/防御时的本Tick可能受伤总量。
+  double incoming = 0, defended_incoming = 0; // 不防御/防御时的本Tick可能受伤总量（机会口径：预测防御的敌车不计入）。
+  double incoming_worst = 0, defended_incoming_worst = 0; // 全敌攻击的最坏情形（生存口径：防御预测不是对方已提交动作）。
+  // 敌车通用的防御规则只看公开信息（各射线内可见车辆的伤害与自身生命），是对陪练策略的推测，
+  // 不是对方本Tick已提交的动作：只用于机会估值，不能作为伤害上界里的确定排除项。
+  // 生存判定按全敌攻击的最坏情形算，避免低血量互杀里把预测防御当成免伤承诺而白送一命。
+  const auto enemy_will_defend = [&](const Enemy &enemy) {
+    if (enemy.protected_spawn) return false;
+    double incoming_e = 0;
+    for (int direction = 0; direction < 4; ++direction) {
+      bool any = ray(enemy.position, start) == direction; // 本车在其射线内。
+      for (const auto &other : enemies)
+        if (other.position != enemy.position && manhattan(enemy.position, other.position) <= radius &&
+            ray(enemy.position, other.position) == direction) any = true; // 视野半径公开，超出的车辆它看不见。
+      if (any) incoming_e += 20;
+    }
+    return incoming_e >= enemy.hp && incoming_e / 2 < enemy.hp;
+  };
   // 这是可见敌车可能造成的伤害上界，不是对手已提交的动作或实测概率。
   for (const auto &enemy : enemies) {
     if (enemy.protected_spawn || protected_spawn) continue;
@@ -591,15 +717,44 @@ Json Strategy::decide(const Json &p) {
           manhattan(enemy.position, other.position) < manhattan(enemy.position, start)) nearest = false;
     if (nearest) {
       // 未观测确认的敌方无双只进入后面的不确定情景，不能把所有敌车一律当50伤害强制原地防御。
-      incoming += 20 * vulnerability_;
-      defended_incoming += reflection ? 0 : 10 * vulnerability_;
+      incoming_worst += 20 * vulnerability_;
+      defended_incoming_worst += reflection ? 0 : 10 * vulnerability_;
+      if (!enemy_will_defend(enemy)) {
+        incoming += 20 * vulnerability_;
+        defended_incoming += reflection ? 0 : 10 * vulnerability_;
+      }
     }
   }
   // MOVE 无法躲开本 Tick 已经先结算的战斗；防御可能保命时先防御。
-  if (stage_ == 2 && incoming >= hp - pre_damage && defended_incoming < hp - pre_damage) {
+  // worst_case_survival=1 时按全敌攻击的最坏情形判定；0 保留旧行为（预测防御的敌车不计入）。
+  const double survival_incoming = parameters_.worst_case_survival ? incoming_worst : incoming;
+  const double survival_defended = parameters_.worst_case_survival ? defended_incoming_worst : defended_incoming;
+  if (stage_ == 2 && survival_incoming >= hp - pre_damage && survival_defended < hp - pre_damage) {
+    // 连续致命防御=对手蹲守连击，驻守无进展（crossroads-542曾连续49Tick站防、R仅50）。
+    // 超过阈值后脱离接触：本Tick战斗在移动前结算，此时脱离是接受死亡代价的主动重生换位
+    // （落点仍选距最近敌车最远的安全邻格，只决定重生后的位置）；无路可退才继续防御保命。
+    if (parameters_.defend_stall_break_ticks > 0 && lethal_defend_streak_ >= parameters_.defend_stall_break_ticks) {
+      int retreat = -1, retreat_gain = 0;
+      for (int direction = 0; direction < 4; ++direction) {
+        const Cell next{start.first + steps[direction].first, start.second + steps[direction].second};
+        const auto tile = tiles_.find(next);
+        if (tile == tiles_.end() || !tile->second.seen || tile->second.wall) continue;
+        if (occupied.count(next) || dangerous(next, tick + 1)) continue;
+        int nearest = 1 << 30;
+        for (const auto &enemy : enemies)
+          if (!enemy.protected_spawn) nearest = std::min(nearest, manhattan(enemy.position, next));
+        if (nearest > retreat_gain) { retreat_gain = nearest; retreat = direction; }
+      }
+      if (retreat >= 0) {
+        lethal_defend_streak_ = 0; // 脱离后重新计数，避免一步脱离又立刻回防的振荡。
+        return move(retreat, "break_defend_stall");
+      }
+    }
+    ++lethal_defend_streak_;
     reason_ = "defend_lethal_threat";
     return {{"action", "defend"}};
   }
+  lethal_defend_streak_ = 0; // 本帧未致命防御，连续驻守清零。
 
   // 对手下一步可能踩辣椒，属于保守估计；不把其未知动作当作事实。
   const auto possible_fire = [&](Cell cell) {
@@ -749,7 +904,8 @@ Json Strategy::decide(const Json &p) {
       utility /= fire_cost[step] *
         (1.0 + parameters_.opponent_contest_cost * contests + parameters_.opponent_pressure_cost * pressures);
     }
-    const std::string kind = std::string(reason) == "collect_resource_chain" ? "collect_resource" : reason;
+    const std::string normalized = std::string(reason);
+    const std::string kind = (normalized == "collect_resource_chain" || normalized == "collect_resource_tour") ? "collect_resource" : reason;
     if(target) {
       const auto deferred=deferred_goals_.find({kind,*target});
       if(deferred!=deferred_goals_.end() && tick<deferred->second) return false; // 只暂缓收益目标，不把道路封掉。
@@ -772,6 +928,27 @@ Json Strategy::decide(const Json &p) {
     }
     return improves_direction;
   };
+  // 第二阶段竞速闸门：R未封顶、且还有已知可收集资源时，采集竞速优先于主动开战和到点任务。
+  // 到点任务没有截止时间，M点晚拿不丢；主动交火在资源被抢光后再打也不迟（资源先到先得）。
+  bool race_active = false;
+  if (stage_ == 2 && parameters_.stage2_race_gate && resource_value < 120) {
+    for (const auto &[cell, tile] : tiles_) {
+      if (tile.value <= 0 || tile.wall) continue;
+      const auto node = paths.find(cell);
+      if (node != paths.end() && node->second.first >= 0) { race_active = true; break; }
+    }
+  }
+  // docs/35 损失路径（首分钟资源争抢）：任务链完成后，已知资源仍会被 reach_mission(8/(d+1)) 压过
+  // （V1 t62 弃 [7,4]+[6,2] 20R、V4 t14 弃 10R；V0/V2 冻结时已知资源为 0，本杠杆 no-op——发现力是另一轴）。
+  // race_reach_holdoff>0 时，只要还有已知可达资源，到点任务按 (1-holdoff) 打折；资源清空后恢复（M 点晚拿不丢）。
+  bool known_resource_race = false;
+  if (stage_ == 2 && parameters_.race_reach_holdoff > 0 && resource_value < 120) {
+    for (const auto &[cell, tile] : tiles_) {
+      if (tile.value <= 0 || tile.wall) continue;
+      const auto node = paths.find(cell);
+      if (node != paths.end() && node->second.first >= 0) { known_resource_race = true; break; }
+    }
+  }
   unsigned least_visits = std::numeric_limits<unsigned>::max(); // 已知路线候选中最少访问次数。
   int exploration = -1; // 没有更高收益时采用的探索第一步。
   for (const auto &cell : order) {
@@ -779,11 +956,16 @@ Json Strategy::decide(const Json &p) {
     const auto &tile = tiles_.at(cell); // 当前候选格的资源、观测时间和访问次数。
     if (node.first >= 0 && tile.visits < least_visits) { least_visits = tile.visits; exploration = node.first; }
     if (tile.value > 0) {
-      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * parameters_.stale_resource_decay); // 旧资源记忆可信权重。
+      // 资源离开视野的第 stale_grace_ticks 个Tick不衰减：未观测≠消失，别为单Tick视野缩小反复换方向。
+      // 0=旧行为：离视野当Tick即开始衰减。
+      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen - parameters_.stale_grace_ticks) * parameters_.stale_resource_decay); // 旧资源记忆可信权重。
       double benefit = tile.value; // 第一阶段按资源价值；第二阶段改用封顶分差和任务机会。
       if (stage_ == 2) {
         // R=119再拿20，只剩1点资源价值参与封顶计分，不能按20全额估值。
         benefit = rmtc::score_delta(resource_value, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
+        // 资源先到先得：可见敌车的直线距离不比自己绕障距离长时按参数折扣，避开会被先拿走的格子。
+        for (const auto &enemy : enemies)
+          if (!enemy.protected_spawn && manhattan(enemy.position, cell) <= node.distance) { benefit *= parameters_.opponent_claim_discount; break; }
         if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += parameters_.resource_mission_bonus;
         if (need_value) benefit += tile.value * 0.1;
       }
@@ -792,18 +974,27 @@ Json Strategy::decide(const Json &p) {
       if (node.first >= 0) resource_options.push_back({utility, cell});
     }
     if (stage_ == 1) continue;
-    for (const auto &target : reach) {
-      if (cell == target) consider(node.first, parameters_.reach_mission_value / (node.distance + 1), "reach_mission", target);
-      else if (node.first >= 0) {
-        // 目标尚未探明时只走已知路线中靠近目标的格子，不穿过未知墙。
-        int unknown_neighbors = 0; // 这个格子旁有多少尚未探明的地图内邻格。
-        for (const auto &delta : steps) {
-          const Cell next{cell.first + delta.first, cell.second + delta.second}; // delta为四向位移，next用于检查未知边界。
-          if (next.first >= 0 && next.first < width && next.second >= 0 && next.second < height &&
-              !tiles_.count(next)) ++unknown_neighbors;
+    // 前沿扫图长期无资源发现时，向到点任务方向拉拽探索（留出rooms上基线借此穿过富资源区拿到60R，我们向南空转只拿30R）。
+    // 资源正常现身时保持原权重，不把采集线拖离资源区；到点任务方向仍是已探明路线，不把未知格当空地。
+    const bool mission_pull_starved = stage_ == 2 && parameters_.stage2_mission_pull_stale_ticks > 0 &&
+        tick - last_resource_sighting_ >= parameters_.stage2_mission_pull_stale_ticks;
+    if (!race_active) {
+      for (const auto &target : reach) {
+        const double reach_scale = known_resource_race ? 1.0 - parameters_.race_reach_holdoff : 1.0;
+        if (cell == target) consider(node.first, parameters_.reach_mission_value * reach_scale / (node.distance + 1), "reach_mission", target);
+        else if (node.first >= 0) {
+          // 目标尚未探明时只走已知路线中靠近目标的格子，不穿过未知墙。
+          int unknown_neighbors = 0; // 这个格子旁有多少尚未探明的地图内邻格。
+          for (const auto &delta : steps) {
+            const Cell next{cell.first + delta.first, cell.second + delta.second}; // delta为四向位移，next用于检查未知边界。
+            if (next.first >= 0 && next.first < width && next.second >= 0 && next.second < height &&
+                !tiles_.count(next)) ++unknown_neighbors;
+          }
+          if (unknown_neighbors && manhattan(cell, target) < manhattan(start, target)) {
+            const double pull = std::max(parameters_.mission_explore_value, mission_pull_starved ? 2.0 : 0.0);
+            consider(node.first, pull / (node.distance + 1) + 1.0 / (manhattan(cell, target) + 1), "explore_toward_mission", target);
+          }
         }
-        if (unknown_neighbors && manhattan(cell, target) < manhattan(start, target))
-          consider(node.first, 2.0 / (node.distance + 1) + 1.0 / (manhattan(cell, target) + 1), "explore_toward_mission", target);
       }
     }
     for (const auto &[key, e] : events_) {
@@ -814,10 +1005,11 @@ Json Strategy::decide(const Json &p) {
         const int needed=e.capture_ticks; // 还未激活，当前不能已有这次堡垒的占领进度。
         const Tick finish=first_capture+std::max(0,needed-1); // 增益在这一Tick结算后授予，不能补打本Tick。
         // 只在出发后至多多等一段占领时间时提前抢点；不为遥远预告放弃整局采集。
-        if(finish<std::min(e.end,tick_limit) && e.start-tick<=node.distance+e.capture_ticks) {
+        // prepare_fortress_value 默认0关闭（冠军行为不变），竞技场评估通过后再给值。
+        if(finish<std::min(e.end,tick_limit) && e.start-tick<=node.distance+e.capture_ticks && parameters_.prepare_fortress_value>0) {
           const Tick wait=std::max<Tick>(0,e.start-arrival); // 早到的等待成本，不修改事件绝对期限。
           if(cell==start) consider(-1,parameters_.fortress_hold_value/(wait+1),"hold_fortress",cell);
-          else consider(node.first,parameters_.fortress_capture_value/(node.distance+needed+wait),"prepare_fortress",cell);
+          else consider(node.first,parameters_.prepare_fortress_value/(node.distance+needed+wait),"prepare_fortress",cell);
         }
       }
       if (!e.active(tick)) continue;
@@ -845,11 +1037,56 @@ Json Strategy::decide(const Json &p) {
     }
     for (const auto &enemy : enemies) {
       if (!enemy.protected_spawn && node.first >= 0 && ray(cell, enemy.position) >= 0 &&
-          !(reflection && enemy.defending)) { // 当前预测攻击只会反伤，就不奖励反复接近同一防御目标。
-        const double damage = enemy.defending ? defended_damage_ : attack_damage_; // 接近后按当前可见状态估计伤害。
+          !(reflection && (enemy.defending || enemy_will_defend(enemy)))) { // 当前预测攻击只会反伤，就不奖励反复接近同一防御目标。
+        const double damage = (enemy.defending || enemy_will_defend(enemy)) ? defended_damage_ : attack_damage_; // 接近后按当前可见状态估计伤害。
         const double contribution = std::min(damage, enemy.hp) + (enemy.hp <= damage ? 60.0 : 0.0); // 实际损血加可能击杀奖励。
-        consider(node.first, (combat_value(contribution) + (need_damage ? 0.5 : 0.0)) /
-                 (node.distance + 2), "approach_enemy", enemy.position);
+        // 竞速期间或D已封顶且没有伤害任务时，不再主动接近敌车开战；被本Tick火力波及时的还手不受限。
+        // D封顶只表示官方原始分不再增加；同分同任务同R时裁判按D决胜，故封顶后按 post_cap_combat_weight
+        // 给增量D留平局价值（0=旧行为：完全归零）。战例：f728一局A与C同45分同R同M，D556<1160，名次第3。
+        const double approach_utility =
+          (race_active || (effective_damage >= 500 && !need_damage && incoming == 0)) ?
+            parameters_.post_cap_combat_weight * contribution / (node.distance + 2) :
+            (combat_value(contribution) + (need_damage ? 0.5 : 0.0)) / (node.distance + 2);
+        consider(node.first, approach_utility, "approach_enemy", enemy.position);
+      }
+    }
+  }
+  if (!reverse_unknown_ && parameters_.explore_toward_resource_value > 0) {
+    // 已知资源尚未连通、或已知绕路比直线远很多时，只沿已探明边界向它试探，不把未知格当空地。
+    std::vector<std::pair<Cell,int>> boundary; // 有未知邻格的可达格及其BFS距离；用实际视野判断，不固定9×9。
+    boundary.reserve(order.size() / 4);
+    for (const auto &cell : order) {
+      const auto node = paths.at(cell);
+      if (node.first < 0) continue;
+      for (const auto &delta : steps) {
+        const Cell next{cell.first + delta.first, cell.second + delta.second}; // next用于检查未知边界。
+        if (next.first >= 0 && next.first < width && next.second >= 0 && next.second < height &&
+            !tiles_.count(next)) { boundary.push_back({cell, node.distance}); break; }
+      }
+    }
+    for (const auto &[cell, tile] : tiles_) {
+      if (tile.value <= 0 || tile.wall) continue;
+      const auto node = paths.find(cell);
+      const int straight = manhattan(start, cell); // 直线只是下界估计，未知地形仍逐格试探。
+      if (straight > remaining_ticks) continue; // 直线都来不及就不再向它探。
+      if (node != paths.end() && node->second.distance <= 3 * straight + 6) continue; // 绕路不远时直接采集更划算。
+      double benefit = tile.value;
+      if (stage_ == 2) {
+        benefit = rmtc::score_delta(resource_value, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
+        if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += parameters_.resource_mission_bonus;
+        if (need_value) benefit += tile.value * 0.1;
+      }
+      benefit *= 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen - parameters_.stale_grace_ticks) * parameters_.stale_resource_decay);
+      int best_cost = std::numeric_limits<int>::max(), best_first = -1;
+      for (const auto &[bcell, distance] : boundary) {
+        const int cost = distance + manhattan(bcell, cell);
+        if (cost < best_cost) { best_cost = cost; best_first = paths.at(bcell).first; }
+      }
+      if (best_first >= 0) {
+        // 已知绕路没远到值得试探时，继续直接采集；试探只用于“绕路过远/未连通”的资源。
+        if (node != paths.end() && best_cost * 2 >= node->second.distance) continue;
+        consider(best_first, benefit * parameters_.explore_toward_resource_value / (best_cost + 1),
+                 "explore_toward_resource", cell, benefit);
       }
     }
   }
@@ -874,28 +1111,208 @@ Json Strategy::decide(const Json &p) {
         direction_plan[plan.first]=plan.stops;
     }
   }
-  if (best_utility < 0 && remaining_ticks > 1) {
-    // 没有资源/任务等更明确目标时，前往能增加可见范围的已知落点；不假设未知格里有什么。
+  if (stage_ == 1 && !reverse_unknown_) {
+    // 第一阶段没有对手和事件：对全部已知资源做巡回排序，避免近邻顺序在死路分支间反复折返。
+    std::vector<Cell> tour_targets;
+    tour_targets.reserve(resource_options.size());
+    for (const auto &option : resource_options) if (option.second != start) tour_targets.push_back(option.second);
+    if (const auto tour = resource_tour(start, remaining_ticks, tour_targets, occupied))
+      if (consider(tour->first, tour->utility, "collect_resource_tour", tour->first_resource, tour->benefit))
+        direction_plan[tour->first]=tour->stops;
+  }
+  // 扫图候选：按BFS顺序评估能增加可见格的落点；不假设未知格里有什么。
+  // boundary_only只评有未知邻格的边界格（第二阶段公平竞争用）；false保留“所有能新增视野的格子”的旧语义。
+  const auto consider_frontier = [&](bool boundary_only, double value) {
+    const double max_visible = (2 * radius + 1) * (2 * radius + 1); // 视野半径内最多未知格数，仅作提前停止的上界。
+    // L-c（覆盖最大化探索方向）：把未探索格按4连通标成连通区；候选观察点按其视野包络触及的
+    // 最大未探索连通区大小获得额外权重——大空白区（更可能藏着远侧资源簇）优先于近处零碎口袋。
+    // 仅第二阶段生效：coverage-2026-10-30 轮测得第一阶段全负（score 33.33→30.3~31.2、R −10~15，
+    // 覆盖排序破坏第一阶段贪心扫图链），按 frontier_value 惯例把参数留给第二阶段。
+    // explore_component_value=0 时整段跳过（unseen_comp 保持空），冠军逐位一致。
+    std::vector<int> unseen_comp; // 平铺 y*width+x → 连通区编号；空 = 杠杆关闭。
+    std::vector<int> comp_sizes;
+    if (parameters_.explore_component_value > 0 && stage_ == 2) {
+      unseen_comp.assign(width * height, -1);
+      for (int y = 0; y < height; ++y)
+        for (int x = 0; x < width; ++x) {
+          if (unseen_comp[y * width + x] >= 0) continue;
+          const auto tile = tiles_.find({x, y});
+          if (tile != tiles_.end() && tile->second.seen) continue;
+          const int id = static_cast<int>(comp_sizes.size());
+          comp_sizes.push_back(0);
+          std::vector<Cell> stack{Cell{x, y}};
+          unseen_comp[y * width + x] = id;
+          while (!stack.empty()) {
+            const Cell cur = stack.back(); stack.pop_back();
+            ++comp_sizes[id];
+            for (const auto &delta : steps) {
+              const Cell next{cur.first + delta.first, cur.second + delta.second};
+              if (next.first < 0 || next.first >= width || next.second < 0 || next.second >= height ||
+                  unseen_comp[next.second * width + next.first] >= 0) continue;
+              const auto nt = tiles_.find(next);
+              if (nt != tiles_.end() && nt->second.seen) continue;
+              unseen_comp[next.second * width + next.first] = id;
+              stack.push_back(next);
+            }
+          }
+        }
+    }
+    const double comp_bound = comp_sizes.empty() ? 0.0 :
+        parameters_.explore_component_value * *std::max_element(comp_sizes.begin(), comp_sizes.end()); // 提前停止仍按最大可能收益。
+    double frontier_best = -1; // BFS距离不降；远处候选的最大收益低于已有近处候选时提前结束。
     for (const Cell &cell : order) {
       const auto node = paths.at(cell); // 到观察点的真实绕障距离和首方向。
       if (node.first < 0 || node.distance >= remaining_ticks) continue;
+      if (frontier_best >= 0 && (value * max_visible + comp_bound) / (node.distance + 1) < frontier_best) break;
+      if (boundary_only) {
+        bool boundary = false;
+        for (const auto &delta : steps) {
+          const Cell next{cell.first + delta.first, cell.second + delta.second};
+          if (next.first >= 0 && next.first < width && next.second >= 0 && next.second < height &&
+              !tiles_.count(next)) { boundary = true; break; }
+        }
+        if (!boundary) continue;
+      }
       int newly_visible = 0; // 用本帧实际视野半径计数，不固定写成9×9。
+      int largest_touched = 0; // L-c：视野包络触及的最大未探索连通区大小；杠杆关闭时保持0。
       for (int y = std::max(0, cell.second - radius); y <= std::min(height - 1, cell.second + radius); ++y) {
         for (int x = std::max(0, cell.first - radius); x <= std::min(width - 1, cell.first + radius); ++x) {
           const auto tile = tiles_.find({x, y}); // 只估计能多看多少格，未知内容仍然未知。
-          newly_visible += tile == tiles_.end() || !tile->second.seen;
+          if (tile == tiles_.end() || !tile->second.seen) {
+            newly_visible += 1;
+            if (!unseen_comp.empty()) largest_touched = std::max(largest_touched, comp_sizes[unseen_comp[y * width + x]]);
+          }
         }
       }
-      if (newly_visible > 0)
-        consider(node.first, parameters_.frontier_value * newly_visible / (node.distance + 1), "explore_frontier", cell);
+      if (newly_visible > 0) {
+        const double utility = (value * newly_visible +
+            (largest_touched > 0 ? parameters_.explore_component_value * largest_touched : 0.0)) / (node.distance + 1);
+        if (utility > frontier_best) frontier_best = utility;
+        consider(node.first, utility, "explore_frontier", cell);
+      }
+    }
+  };
+  if (best_utility < 0 && remaining_ticks > 1) {
+    // 没有资源/任务等更明确目标时，前往能增加可见范围的已知落点；不假设未知格里有什么。
+    if (stage_ == 1 && !reverse_unknown_ && parameters_.explore_tour_value > 0) {
+      // 近邻边界单格只是局部最优；把散布的边界观察点排成小巡回，系统扫过多个方向，减少同区反复。
+      std::vector<std::pair<int,Cell>> waypoints; // 观察收益与有未知邻格的已知格。
+      for (const Cell &cell : order) {
+        const auto node = paths.at(cell);
+        if (node.first < 0 || node.distance >= remaining_ticks) continue;
+        bool boundary = false;
+        for (const auto &delta : steps) {
+          const Cell next{cell.first + delta.first, cell.second + delta.second};
+          if (next.first >= 0 && next.first < width && next.second >= 0 && next.second < height &&
+              !tiles_.count(next)) { boundary = true; break; }
+        }
+        if (!boundary) continue;
+        int newly_visible = 0; // 用本帧实际视野半径计数，不固定写成9×9。
+        for (int y = std::max(0, cell.second - radius); y <= std::min(height - 1, cell.second + radius); ++y)
+          for (int x = std::max(0, cell.first - radius); x <= std::min(width - 1, cell.first + radius); ++x) {
+            const auto tile = tiles_.find({x, y}); // 只估计能多看多少格，未知内容仍然未知。
+            newly_visible += tile == tiles_.end() || !tile->second.seen;
+          }
+        if (newly_visible > 0) waypoints.push_back({newly_visible, cell});
+      }
+      // 近出生点完成覆盖：观察点增益加上距出生点越近越高的加成，优先揭示出生点附近的未探索格
+      // （rooms-195：左侧列30R口袋距出生点仅11-15，却因巡回先扫远侧直到t91-99才被揭示）。
+      const auto ring_bonus = [&](const Cell &cell) {
+        if (parameters_.stage1_ring_value <= 0 || !spawn_) return 0.0;
+        return parameters_.stage1_ring_value * 10.0 / (manhattan(cell, *spawn_) + 1); // 增益单位换算；1.0≈近出生点格+1~2增益。
+      };
+      std::sort(waypoints.begin(), waypoints.end(), [&](const auto &a, const auto &b) {
+        return a.first + ring_bonus(a.second) > b.first + ring_bonus(b.second);
+      });
+      // 上一帧巡回首停点仍在边界上就固定为本周起点，避免对称边界上首停点每帧来回翻转（原地抖动）。
+      const Cell hint = (previous_goal && previous_goal->kind == "explore_tour") ? previous_goal->position : Cell{-1, -1};
+      std::vector<Cell> picked; // 少而分散的观察点；只排序并执行首步，每帧重排。
+      std::map<Cell,double> values;
+      if (hint.first >= 0) {
+        const auto found = std::find_if(waypoints.begin(), waypoints.end(),
+            [&](const auto &entry) { return entry.second == hint; });
+        if (found != waypoints.end()) { picked.push_back(hint); values[hint] = static_cast<double>(found->first) + ring_bonus(hint); }
+      }
+      for (const auto &[gain, cell] : waypoints) {
+        if (picked.size() >= 8) break;
+        if (std::any_of(picked.begin(), picked.end(), [&](const Cell &other) { return manhattan(other, cell) <= 2; })) continue;
+        picked.push_back(cell);
+        values[cell] = static_cast<double>(gain) + ring_bonus(cell);
+      }
+      if (picked.size() >= 2) {
+        if (const auto tour = resource_tour(start, remaining_ticks, picked, occupied, &values, hint)) {
+          consider(tour->first, parameters_.explore_tour_value * tour->utility, "explore_tour",
+                   tour->first_resource, tour->benefit);
+        }
+      }
+    }
+    if (stage_ == 1 && parameters_.stage1_flood_value > 0) {
+      // 第一阶段是单人采集竞速：空档期按“最近未知邻接格”做洪泛式扫图，距离优先、同距离取更大新视野。
+      // 与散点巡回、frontier同场竞争：迷宫/车道里洪泛减少横穿走廊（maze-148 +20R），开阔图由巡回的系统覆盖取胜。
+      int nearest_distance = std::numeric_limits<int>::max(), nearest_gain = 0, nearest_first = -1;
+      Cell nearest_cell{-1, -1};
+      for (const Cell &cell : order) { // order按BFS距离升序；最近一层已有候选就不再评估更远格。
+        const auto node = paths.at(cell);
+        if (nearest_first >= 0 && node.distance > nearest_distance) break;
+        if (node.first < 0 || node.distance >= remaining_ticks) continue;
+        bool boundary = false;
+        for (const auto &delta : steps) {
+          const Cell next{cell.first + delta.first, cell.second + delta.second};
+          if (next.first >= 0 && next.first < width && next.second >= 0 && next.second < height &&
+              !tiles_.count(next)) { boundary = true; break; }
+        }
+        if (!boundary) continue;
+        int newly_visible = 0; // 用本帧实际视野半径计数，不固定写成9×9。
+        for (int y = std::max(0, cell.second - radius); y <= std::min(height - 1, cell.second + radius); ++y)
+          for (int x = std::max(0, cell.first - radius); x <= std::min(width - 1, cell.first + radius); ++x) {
+            const auto tile = tiles_.find({x, y}); // 只估计能多看多少格，未知内容仍然未知。
+            newly_visible += tile == tiles_.end() || !tile->second.seen;
+          }
+        if (newly_visible <= 0) continue;
+        if (nearest_first < 0 || newly_visible > nearest_gain) {
+          nearest_distance = node.distance; nearest_gain = newly_visible; nearest_first = node.first; nearest_cell = cell;
+        }
+      }
+      if (nearest_first >= 0)
+        consider(nearest_first, parameters_.stage1_flood_value * nearest_gain / (nearest_distance + 1), "flood_fill", nearest_cell);
+    }
+    if (stage_ == 1) consider_frontier(false, parameters_.stage1_frontier_value);
+  }
+  // 第二阶段资源饼通常在150Tick内被抢光：之后继续扫图没有收益，还把行动力从交火/据点/任务上抢走。
+  // 闸门双条件：Tick过闸且最近60Tick视野里没再出现过资源（他人捡走的资源不会从记忆里消失，只能靠“看不见”判断）。
+  bool explore_suppressed = stage_ == 2 && parameters_.stage2_explore_gate_tick > 0 &&
+      tick >= parameters_.stage2_explore_gate_tick && tick - last_resource_sighting_ >= 60;
+  // 第二阶段到点任务没有截止时间、资源先到先得：扫近处边界必须与任务/交战公平竞争，不能只在空档期生效。
+  if (stage_ == 2 && !reverse_unknown_ && remaining_ticks > 1 && !explore_suppressed) consider_frontier(true, parameters_.frontier_value);
+  // 影子跟踪：对手连续同向穿过我们已知区、朝未知区移动（forecast=两次连续相同位移的一步猜测），
+  // 其前方大概率还有资源簇；向投影前端的已知可走格探路，从我们一侧与对手在簇两侧合流共享。
+  // 只利用对手行为蕴含的信息，不把未知格假设成资源；近处对手交给攻击估值。
+  if (stage_ == 2 && !reverse_unknown_ && remaining_ticks > 1 && !explore_suppressed &&
+      parameters_.stage2_shadow_value > 0 && tick - last_resource_sighting_ < 60) {
+    for (const auto &enemy : enemies) {
+      if (!enemy.forecast || manhattan(enemy.position, start) < 4) continue;
+      const Cell delta{enemy.forecast->first - enemy.position.first, enemy.forecast->second - enemy.position.second};
+      Cell target{-1, -1};
+      for (int k = 2; k <= 6; ++k) { // k=1是对方本帧落点，不追；从第2格起只取我们已知可走的格。
+        const Cell next{enemy.position.first + delta.first * k, enemy.position.second + delta.second * k};
+        if (next.first < 0 || next.first >= width || next.second < 0 || next.second >= height) break;
+        const auto tile = tiles_.find(next);
+        if (tile == tiles_.end() || !tile->second.seen || tile->second.wall) break; // 到未知/墙为止。
+        target = next;
+      }
+      if (target.first < 0) continue;
+      const auto node = paths.find(target);
+      if (node == paths.end() || node->second.first < 0 || node->second.distance >= remaining_ticks) continue;
+      consider(node->second.first, parameters_.stage2_shadow_value * 8.0 / (node->second.distance + 1), "shadow_track", target);
     }
   }
-  if (best_utility < 0 && exploration >= 0) consider(exploration, 0.01, "explore");
+  if (best_utility < 0 && exploration >= 0 && !explore_suppressed) consider(exploration, 0.01, "explore");
 
   // 6. 用移动前站位评估ATTACK。普通攻击只取最近一辆，无双才取整个5×5。
   int attack_direction = -1; // 当前最好的攻击方向；-1表示没有有价值的攻击。
   double attack_utility = -1; // 与其他任务收益比较的攻击估值。
-  if (stage_ == 2 && !protected_spawn) {
+  // 竞速期间不主动开战；本Tick已被火力波及时的还手（incoming>0）不受限，不白挨打。
+  if (stage_ == 2 && !protected_spawn && !(race_active && incoming == 0)) {
     for (int direction = 0; direction < 4; ++direction) {
       std::vector<const Enemy *> targets; // 此方向实际可命中的敌车引用，不复制敌车数据。
       if (empowered_) {
@@ -912,13 +1329,40 @@ Json Strategy::decide(const Json &p) {
       double contribution = 0, reflected = 0; // 预计获得D、预计自己承受的反伤。
       for (const auto *enemy : targets) {
         if (enemy->protected_spawn) continue;
-        if (reflection && enemy->defending) { reflected += reflection_amount; continue; }
-        const double damage = enemy->defending ? defended_damage_ : attack_damage_; // 此目标预计受到的普通/防御伤害。
+        const bool predicted_defend = enemy->defending || enemy_will_defend(*enemy);
+        if (reflection && predicted_defend) { reflected += reflection_amount; continue; }
+        const double damage = predicted_defend ? defended_damage_ : attack_damage_; // 此目标预计受到的普通/防御伤害。
         // 按独自击杀估值；多人同时贡献时奖励会平分，所以只是机会估计。
         contribution += std::min(damage, enemy->hp) + (enemy->hp <= damage ? 60.0 : 0.0);
       }
       double utility = combat_value(contribution) + (need_damage && contribution > 0 ? 0.5 : 0.0); // 此攻击方向的最终机会分。
       utility -= reflected * 0.05;
+      // D已封顶且没有伤害任务时，不主动开战；本Tick已被火力波及时的还手不受限（不白挨打）。
+      // 封顶只封官方原始分；同分平局按D决胜，故按 post_cap_combat_weight 留平局价值（0=旧行为：完全归零）。
+      if (effective_damage >= 500 && !need_damage && incoming == 0)
+        utility = parameters_.post_cap_combat_weight * contribution;
+      // 派窗口刺杀：攻击正在扫资源簇的对手。击杀/击退令其重生移位，把本簇剩余资源留给我们——
+      // 这是对lap先到先得结构的唯一信息内干预；D收益上面已计（封顶归零），此处按目标脚边未收集资源估值加归属收益。
+      if (parameters_.stage2_assassin_value > 0 && tick - last_resource_sighting_ < 60) {
+        double contested = 0;
+        for (const auto *enemy : targets) {
+          if (enemy->protected_spawn || enemy->hp > attack_damage_) continue; // 只补刀一击必杀目标，不为一击打不死的对手放弃近处采集。
+          for (int dy = -2; dy <= 2; ++dy)
+            for (int dx = -2; dx <= 2; ++dx) {
+              const auto tile = tiles_.find({enemy->position.first + dx, enemy->position.second + dy});
+              if (tile != tiles_.end() && tile->second.seen && tile->second.value > 0) contested += tile->second.value;
+            }
+        }
+        if (contested > 0) utility += parameters_.stage2_assassin_value * contested;
+      }
+      // 饼窗口攻击折扣：竞速期攻击会把我们从抢饼线路吸走（clusters-495：t20-26攻击致死、错过中簇70R）；
+      // 还手（incoming>0）不折扣，不白挨打。与race gate不同：只压攻击估值，不动任务/接近等其他行为。
+      if (parameters_.stage2_pie_attack_discount > 0 && tick - last_resource_sighting_ < 60 && incoming == 0)
+        utility *= 1.0 - parameters_.stage2_pie_attack_discount;
+      // 低血量攻击折扣：hp<60时压缩攻击机会分（docs/33 T5：53死亡中40例最后动作为攻击且hp<60、8例可撤退）。
+      // 还手（incoming>0）不折扣，不白挨打；默认1.0=旧行为（冠军逐位一致）。
+      if (parameters_.low_hp_attack_discount < 1.0 && hp < 60 && incoming == 0)
+        utility *= parameters_.low_hp_attack_discount;
       if (reflected + pre_damage >= hp) continue;
       if (utility > attack_utility) { attack_utility = utility; attack_direction = direction; }
     }

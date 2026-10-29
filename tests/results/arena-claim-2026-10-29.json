@@ -1,0 +1,505 @@
+{
+  "date": "2026-10-29",
+  "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+  "settings": {
+    "version": 1,
+    "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+    "map_styles": [
+      "open",
+      "maze",
+      "rooms",
+      "lanes",
+      "clusters",
+      "crossroads"
+    ],
+    "opponent_styles": [
+      "collector",
+      "aggressive",
+      "defender",
+      "fortress",
+      "opportunist",
+      "wanderer"
+    ],
+    "train_seeds": [
+      101,
+      307
+    ],
+    "heldout_seeds": [
+      29003
+    ],
+    "baseline_parameters": {
+      "stale_resource_decay": 0.01,
+      "resource_mission_bonus": 5.0,
+      "reach_mission_value": 8.0,
+      "healing_below_hp": 70.0,
+      "fortress_hold_value": 20.0,
+      "fortress_capture_value": 12.0,
+      "hazard_lead_ticks": 2,
+      "goal_retention_bonus": 0.1,
+      "resource_plan_depth": 3,
+      "resource_beam_width": 5,
+      "resource_candidate_limit": 8,
+      "resource_plan_budget_ms": 10,
+      "frontier_value": 0.02,
+      "opponent_contest_cost": 1.0,
+      "opponent_pressure_cost": 0.25,
+      "opponent_claim_discount": 1.0,
+      "explore_toward_resource_value": 0.0,
+      "explore_tour_value": 0.0,
+      "mission_explore_value": 2.0,
+      "stage1_flood_value": 0.0,
+      "stage2_race_gate": false,
+      "stage2_explore_gate_tick": 0,
+      "stage2_mission_pull_stale_ticks": 0,
+      "tactical_search": false,
+      "tactical_risk": 0.35,
+      "tactical_hp_value": 0.015,
+      "tactical_death_cost": 1.0,
+      "tactical_future_discount": 0.65,
+      "tactical_goal_weight": 0.35,
+      "resource_refinement": false,
+      "resource_refinement_trials": 12,
+      "collision_replan": false,
+      "loop_recovery": false,
+      "loop_window_ticks": 12,
+      "recovery_ticks": 12,
+      "stalled_goal_cooldown_ticks": 24
+    },
+    "pilot_heldout_seeds": [
+      19001
+    ]
+  },
+  "selection": "opponent_claim_discount——0.3负/0.7与0.9惰性，均不敌s04，未提升，冠军参数0.5不变。",
+  "note": "opponent_claim_discount（敌车直线距离不比自己绕障距离长时的资源估值乘数）上/下沿独立探针，12训练阶段二场景。cl.03（0.3更避让）：R 60.0→59.2（crossroads-336 70→60）、deaths 4.67→5.08、score 41.25→41.04——折价0.5时仍被选中的争议资源值得抢，0.3使其弃权丢10R。cl.07/cl.09（0.7/0.9更争抢）：与s04逐局比特级相同（惰性）——没有任何资源的价值落在0.5V与V之间被误弃；折价后仍被选的资源，乘数提高不改变排序。家族闭合：0.5=当前冠军即局部最优（下沿负、上沿惰性）。",
+  "rounds": {
+    "ablation": {
+      "per_game": [
+        {
+          "scene": "open-101",
+          "s04": {
+            "R": 40.0,
+            "D": 625.0,
+            "score": 25.0,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "cl.03": {
+            "R": 40.0,
+            "D": 625.0,
+            "score": 25.0,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "cl.07": {
+            "R": 40.0,
+            "D": 625.0,
+            "score": 25.0,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "cl.09": {
+            "R": 40.0,
+            "D": 625.0,
+            "score": 25.0,
+            "deaths": 4,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "open-307",
+          "s04": {
+            "R": 100.0,
+            "D": 720.0,
+            "score": 55.0,
+            "deaths": 5,
+            "win_share": 1.0
+          },
+          "cl.03": {
+            "R": 100.0,
+            "D": 720.0,
+            "score": 55.0,
+            "deaths": 5,
+            "win_share": 1.0
+          },
+          "cl.07": {
+            "R": 100.0,
+            "D": 720.0,
+            "score": 55.0,
+            "deaths": 5,
+            "win_share": 1.0
+          },
+          "cl.09": {
+            "R": 100.0,
+            "D": 720.0,
+            "score": 55.0,
+            "deaths": 5,
+            "win_share": 1.0
+          }
+        },
+        {
+          "scene": "maze-148",
+          "s04": {
+            "R": 30.0,
+            "D": 500.0,
+            "score": 37.5,
+            "deaths": 5,
+            "win_share": 0.0
+          },
+          "cl.03": {
+            "R": 30.0,
+            "D": 500.0,
+            "score": 37.5,
+            "deaths": 5,
+            "win_share": 0.0
+          },
+          "cl.07": {
+            "R": 30.0,
+            "D": 500.0,
+            "score": 37.5,
+            "deaths": 5,
+            "win_share": 0.0
+          },
+          "cl.09": {
+            "R": 30.0,
+            "D": 500.0,
+            "score": 37.5,
+            "deaths": 5,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "maze-354",
+          "s04": {
+            "R": 90.0,
+            "D": 540.0,
+            "score": 52.5,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "cl.03": {
+            "R": 90.0,
+            "D": 540.0,
+            "score": 52.5,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "cl.07": {
+            "R": 90.0,
+            "D": 540.0,
+            "score": 52.5,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "cl.09": {
+            "R": 90.0,
+            "D": 540.0,
+            "score": 52.5,
+            "deaths": 4,
+            "win_share": 1.0
+          }
+        },
+        {
+          "scene": "rooms-195",
+          "s04": {
+            "R": 30.0,
+            "D": 600.0,
+            "score": 32.5,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "cl.03": {
+            "R": 30.0,
+            "D": 600.0,
+            "score": 32.5,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "cl.07": {
+            "R": 30.0,
+            "D": 600.0,
+            "score": 32.5,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "cl.09": {
+            "R": 30.0,
+            "D": 600.0,
+            "score": 32.5,
+            "deaths": 3,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "rooms-401",
+          "s04": {
+            "R": 60.0,
+            "D": 600.0,
+            "score": 45.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "cl.03": {
+            "R": 60.0,
+            "D": 600.0,
+            "score": 45.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "cl.07": {
+            "R": 60.0,
+            "D": 600.0,
+            "score": 45.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "cl.09": {
+            "R": 60.0,
+            "D": 600.0,
+            "score": 45.0,
+            "deaths": 7,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "lanes-242",
+          "s04": {
+            "R": 40.0,
+            "D": 600.0,
+            "score": 35.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "cl.03": {
+            "R": 40.0,
+            "D": 600.0,
+            "score": 35.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "cl.07": {
+            "R": 40.0,
+            "D": 600.0,
+            "score": 35.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "cl.09": {
+            "R": 40.0,
+            "D": 600.0,
+            "score": 35.0,
+            "deaths": 7,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "lanes-448",
+          "s04": {
+            "R": 60.0,
+            "D": 790.0,
+            "score": 45.0,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "cl.03": {
+            "R": 60.0,
+            "D": 790.0,
+            "score": 45.0,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "cl.07": {
+            "R": 60.0,
+            "D": 790.0,
+            "score": 45.0,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "cl.09": {
+            "R": 60.0,
+            "D": 790.0,
+            "score": 45.0,
+            "deaths": 3,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "clusters-289",
+          "s04": {
+            "R": 120.0,
+            "D": 630.0,
+            "score": 60.0,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "cl.03": {
+            "R": 120.0,
+            "D": 630.0,
+            "score": 60.0,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "cl.07": {
+            "R": 120.0,
+            "D": 630.0,
+            "score": 60.0,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "cl.09": {
+            "R": 120.0,
+            "D": 630.0,
+            "score": 60.0,
+            "deaths": 4,
+            "win_share": 1.0
+          }
+        },
+        {
+          "scene": "clusters-495",
+          "s04": {
+            "R": 30.0,
+            "D": 800.0,
+            "score": 22.5,
+            "deaths": 6,
+            "win_share": 0.0
+          },
+          "cl.03": {
+            "R": 30.0,
+            "D": 800.0,
+            "score": 22.5,
+            "deaths": 6,
+            "win_share": 0.0
+          },
+          "cl.07": {
+            "R": 30.0,
+            "D": 800.0,
+            "score": 22.5,
+            "deaths": 6,
+            "win_share": 0.0
+          },
+          "cl.09": {
+            "R": 30.0,
+            "D": 800.0,
+            "score": 22.5,
+            "deaths": 6,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "crossroads-336",
+          "s04": {
+            "R": 70.0,
+            "D": 520.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "cl.03": {
+            "R": 60.0,
+            "D": 520.0,
+            "score": 40.0,
+            "deaths": 9,
+            "win_share": 0.0
+          },
+          "cl.07": {
+            "R": 70.0,
+            "D": 520.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "cl.09": {
+            "R": 70.0,
+            "D": 520.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "crossroads-542",
+          "s04": {
+            "R": 50.0,
+            "D": 1155.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "cl.03": {
+            "R": 50.0,
+            "D": 1155.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "cl.07": {
+            "R": 50.0,
+            "D": 1155.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "cl.09": {
+            "R": 50.0,
+            "D": 1155.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          }
+        }
+      ],
+      "summary": {
+        "s04": {
+          "R_mean": 60.0,
+          "D_mean": 673.3333333333334,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.666666666666667
+        },
+        "cl.03": {
+          "R_mean": 59.166666666666664,
+          "D_mean": 673.3333333333334,
+          "score_mean": 41.041666666666664,
+          "win_share": 0.25,
+          "deaths_mean": 5.083333333333333
+        },
+        "cl.07": {
+          "R_mean": 60.0,
+          "D_mean": 673.3333333333334,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.666666666666667
+        },
+        "cl.09": {
+          "R_mean": 60.0,
+          "D_mean": 673.3333333333334,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.666666666666667
+        }
+      }
+    }
+  },
+  "selection_guard": "selection未变（s04），不重跑heldout；封存heldout复用：obj 0.8437（stage1 32.67/40, stage2 43.89/60）。",
+  "selected": "selected-parameters-claim-2026-10-29.json（s04, claim_discount=0.5）",
+  "heldout_scenes": "29003（封存复用，未重评）",
+  "heldout_results": "sealed reuse: obj 0.8437",
+  "heldout_summaries": {
+    "stage1_score_mean": 32.666666666666664,
+    "stage2_score_mean": 43.8875,
+    "R_mean": 69.58333333333333,
+    "D_mean": 590.1041666666666,
+    "M_mean": 2.8333333333333335,
+    "deaths_mean": 4.708333333333333,
+    "win_share": 0.5416666666666666
+  },
+  "source_sha256": {
+    "src/rmtc_bot/src/strategy.cpp": "69f6ae0706d002a867526091127785933a9bf09eaa4a449d8ba120ee02abcc20",
+    "src/rmtc_bot/src/tactics.cpp": "f890c4fce21335149a2f8e26a406c2dfc2cc05c92f942e3bf088d1f1a55c38b7",
+    "src/rmtc_bot/include/rmtc_bot/match_config.hpp": "0704b9d1c80dde4887cad447d952b9a8ffc47f202c86e4517321dabfb6c495d1",
+    "src/rmtc_bot/include/rmtc_bot/strategy_parameters.hpp": "7f9b814c1105566977587f87109e8df4f979066d1ebf51ebe8876ba931087e2d",
+    "tests/arena.cpp": "04007f7d60832ae6a5af334c1285705b5cf4e740ce385b81fc231b1d416b1d51",
+    "tests/arena_scenarios.cpp": "2ac359e30b46cff354f5cadb00fac9380eac260a883e90aa534f36254eac0e4a",
+    "tests/arena_opponents.cpp": "f07f9ed357388caece386609e1b1a12be80dd2a2b82225c7efd6f01e65f2480a",
+    "tests/arena_main.cpp": "da86923e2bf9fa1fe3eb0ad68136d4b1bf9b8f946b117e8bd01646cfd1317a6c"
+  }
+}

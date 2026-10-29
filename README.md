@@ -1,10 +1,10 @@
 # RoboMaster-Turing-Competition-BeyondControl
 
-历史版本对打见[LEAGUE.md](LEAGUE.md)：从固定提交冻结程序，任意初态/条件停止，生成分层地图并自动列出全部对照结果。
+任意局面短测见[SCENARIOS.md](SCENARIOS.md)，冻结历史版本的离线联赛见[LEAGUE.md](LEAGUE.md)。原版ROS/真实模型联赛用`bash practice_league.sh`，二者入口分开。
 
 离线定位一段局面：见[短场景、断点与分叉测试](SCENARIOS.md)。入口为 `bash scenarios.sh tests/scenarios/announcement_pair.json --out build/checks/blast`，可摆中途局面、条件停止、保存恢复和复制暖状态。
 
-RMTC C++17 / ROS 2 Humble选手工程。这里保留构建、配置、运行和代码接口说明。材料分析、方案比较及历史实测在[分析仓库](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/README.md)维护。
+RMTC C++17 / ROS 2 Humble选手工程。这里保留构建、配置、运行和代码接口说明。材料分析、方案比较及历史实测在[分析仓库](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/README.md)维护。
 
 赛前只改 [match_config.hpp](src/rmtc_bot/include/rmtc_bot/match_config.hpp)，改完重新编译。启动不需要输入参数或手工设置环境变量。
 
@@ -147,17 +147,17 @@ curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS \
   https://api.deepseek.com/models
 ```
 
-收到401等HTTP回复至少证明取得了HTTPS响应，未带Key的401不代表真实Key失效；`HTTP=000`且TLS时间为0则HTTPS尚未完成。curl与Python仍可能在地址选择、证书或实现上不同，此检查只是缩小范围。其他机器通过代理调用成功，也不能替代本机直连验证。[最新真实复测及环境差别](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/REAL_TEST.md#临时key再次实测明确代理路径与wsl边界)已单独记录。
+收到401等HTTP回复至少证明取得了HTTPS响应，未带Key的401不代表真实Key失效；`HTTP=000`且TLS时间为0则HTTPS尚未完成。curl与Python仍可能在地址选择、证书或实现上不同，此检查只是缩小范围。其他机器通过代理调用成功，也不能替代本机直连验证。[最新真实复测及环境差别](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/REAL_TEST.md#临时key再次实测明确代理路径与wsl边界)已单独记录。
 
 动作没有合适机会时，第二阶段存活车辆回退`DEFEND`；视野不足时可试探未知邻格。第一阶段或阵亡时不发送违法的防御动作。详细策略、源码注释和离线回归见[DEV.md](DEV.md)。
 
 如果网页上A看起来没动，先看自己日志：同一`session`的`pos`是否变化，下一帧`last_action.moved`是否为`true`。`sent=move`只代表发布意图，`moved=true`才是裁判确认移动；`direction`是提交方向，`effective_direction`是实际方向。你提供的日志已有连续`moved=true`，不能把那段记录解释为整场没有执行移动。再核对浏览器的场次、Tick及是否打开了另一个练习进程；这些网页数据只用于人工排查，不输入机器人策略。
 
-材料与修复对应关系见[MATERIALS_CHECK.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/MATERIALS_CHECK.md)。
+材料与修复对应关系见[MATERIALS_CHECK.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/MATERIALS_CHECK.md)。
 
 
 第一阶段采满200资源应为40分。若网页在38/40与30之间跳动，应按同一session、同一Tick同时核对stage；已发现原练习日志混有stage=1与stage=2计分消息。原版practice保持不动，30分不能据此理解为采集被扣分。
 
-模型回包时新增event_update日志，分别显示请求/采纳Tick、校验通过/拒绝、已过期事件和实际合并参数。每Tick还显示events_known、events_active、empowered。`bash run.sh`自动同时保存到项目log/bot_时间_进程号.log；与裁判日志目录分开。字段及研究结论见[公告利用分析](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/EVENT_USE.md)。
+模型回包时新增event_update日志，分别显示请求/采纳Tick、校验通过/拒绝、已过期事件和实际合并参数。每Tick还显示events_known、events_active、empowered。`bash run.sh`自动同时保存到项目log/bot_时间_进程号.log；与裁判日志目录分开。字段及研究结论见[公告利用分析](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/EVENT_USE.md)。
 
-第一阶段显示38/40回跳30的同场证据见[计分显示复核](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/SCOREBOARD.md)。
+第一阶段显示38/40回跳30的同场证据见[计分显示复核](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/SCOREBOARD.md)。

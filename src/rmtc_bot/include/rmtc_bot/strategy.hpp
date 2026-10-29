@@ -76,6 +76,11 @@ private:
       const std::vector<Cell> &targets, const std::set<Cell> &occupied,
       const std::array<bool, 4> &first_allowed, double current_r,
       bool need_normal, bool need_high, double value_target, const std::vector<Cell> &previous_plan) const;
+  // 第一阶段巡回：对已知可达资源做近邻+有界2-opt顺序，只估值并执行首步；不跨未知格、不缓存未来动作。
+  // values非空时用它替代地图资源价值（边界观察点巡回）；不写回tiles_。
+  std::optional<ResourcePlan> resource_tour(Cell start, Tick remaining_ticks,
+      const std::vector<Cell> &targets, const std::set<Cell> &occupied,
+      const std::map<Cell, double> *values = nullptr, Cell first_hint = {-1, -1}) const;
   std::optional<Cell> predict_opponent(const std::string &identity, Cell position, Tick tick);
   // 预测仅用同一敌车连续观测；断帧/瞬移重置，预测只降低候选收益，不当成必然占位。
   bool split_wall(Cell cell, Tick tick) const;
@@ -111,12 +116,14 @@ private:
   std::size_t navigation_known_ = 0, navigation_missions_ = 0; // 已观测格数、完成任务数。
   int navigation_capture_ = 0; // 已确认堡垒驻留进度之和。
   bool recovery_blocked_ = false; // 已验证当前循环区无安全出口时持续守住，每帧重查，不再反复启动空跑。
+  int lethal_defend_streak_ = 0; // 连续致命防御驻守tick计数（跨tick累计，新场清零）；用于驻守超时后脱离接触。
   unsigned recovery_count_ = 0; // 本场触发次数，换场清零。
   std::map<std::pair<std::string,Cell>,Tick> deferred_goals_; // 目标类别/坐标→暂缓截止，不改地图可走性。
   std::vector<Cell> planned_resources_; // 仅供下一帧重评的资源串；换场、断帧、失败和改目标后清空。
   bool model_reply_seen_ = false, resource_counts_known_ = false;
   int observed_normal_ = 0, observed_high_ = 0; // 连续完整历史下，从官方R增量确认的拾取次数。
   Tick previous_score_tick_ = -1;
+  Tick last_resource_sighting_ = -1; // 最近一次在视野里看到资源的Tick；第二阶段探索闸门以此判断资源饼是否清空。
   double previous_resource_total_ = 0;
   std::map<std::string, rmtc::Event> events_; // 稳定事件key→最后一次校验通过的解释。
   std::map<std::string, int> capture_progress_; // 堡垒key→当前已确认连续驻留Tick数。

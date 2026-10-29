@@ -92,15 +92,26 @@ def candidates(count):
     randomizer = random.Random(20261028)  # 固定搜索序列，不用赛场随机数或隐藏地图。
     base = SETTINGS["baseline_parameters"]
     result = [{"name": "baseline", "parameters": dict(base)},
-              {"name": "new_default", "parameters": dict(base, tactical_search=True, resource_refinement=True, collision_replan=True, loop_recovery=True)},
+              {"name": "new_default", "parameters": dict(base, tactical_search=True, resource_refinement=True, collision_replan=True, loop_recovery=True,
+                  explore_tour_value=0.06)},
               {"name": "collision_only", "parameters": dict(base, collision_replan=True, loop_recovery=True)},
               {"name": "aggressive", "parameters": dict(base, tactical_search=True, resource_refinement=True, collision_replan=True, loop_recovery=True,
+                  explore_tour_value=0.06,
                   tactical_risk=0.1, tactical_hp_value=0.005, tactical_death_cost=0.0, tactical_goal_weight=0.15,
                   resource_mission_bonus=2.5, reach_mission_value=6.0)}]
     ranges = {"resource_mission_bonus": [1.0, 2.5, 4.0, 5.0], "reach_mission_value": [4.0, 6.0, 8.0],
               "healing_below_hp": [40.0, 60.0, 80.0], "goal_retention_bonus": [0.0, 0.1, 0.25],
               "resource_plan_depth": [3, 4, 5], "tactical_risk": [0.1, 0.35, 0.6],
-              "tactical_hp_value": [0.005, 0.015, 0.03], "tactical_death_cost": [0.0, 0.25, 1.0], "tactical_goal_weight": [0.15, 0.35, 0.65]}
+              "explore_toward_resource_value": [0.0, 0.25, 0.5, 1.0],
+              "explore_tour_value": [0.0, 0.03, 0.06, 0.12],
+              "mission_explore_value": [0.0, 0.25, 0.5, 1.0, 2.0],
+              "frontier_value": [0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.1, 0.2],
+              "tactical_hp_value": [0.005, 0.015, 0.03], "tactical_death_cost": [0.0, 0.25, 1.0], "tactical_goal_weight": [0.15, 0.35, 0.65],
+              "opponent_claim_discount": [1.0, 0.75, 0.5, 0.25],
+              "stage1_flood_value": [0.0, 0.03, 0.05, 0.08, 0.12],
+              "stage2_race_gate": [True, False],
+              "stage2_explore_gate_tick": [0, 140, 160, 180, 200],
+              "stage2_mission_pull_stale_ticks": [0, 15, 20, 30, 40]}
     for i in range(max(0, count-4)):
         values = dict(base, tactical_search=i % 5 != 4, resource_refinement=True, collision_replan=True, loop_recovery=True)
         values.update({key: randomizer.choice(choices) for key, choices in ranges.items()})
@@ -113,6 +124,8 @@ def main():
     parser.add_argument("--tune", action="store_true", help="只在训练场景搜索，然后一次留出验证")
     parser.add_argument("--candidates", type=int, default=24)
     parser.add_argument("--json-include", help="仅测试构建时指定nlohmann/json.hpp目录，常规Ubuntu无需填写")
+    parser.add_argument("--report", required=True,
+                        help="本次报告名：写入arena-<report>.json与selected-parameters-<report>.json，绝不覆盖封存的arena-2026-10-28.json")
     args = parser.parse_args()
     binary = build(args.json_include)
     output = ROOT / "tests/results"
@@ -147,14 +160,18 @@ def main():
         report["selection_guard"] = {"stage1_min_score": baseline_stage1 - 1.0, "invalid_max": 0,
                                      "eligible": [p["name"] for p in eligible], "selected_name": selected["name"]}
     else:
-        selected_path = output / "selected-parameters.json"
-        selected = json.loads(selected_path.read_text()) if selected_path.is_file() else {"name": "competition", "parameters": {}}
+        # 非调参入口不再读取历史 selected-parameters.json（其中 4/4/0.1/0.25 与当前 match_config
+        # 5/8/0/0 不一致，静默冒充当前配置）：评估对象就是编译进二进制的 competition()，
+        # 生效参数由 arena --dump-competition 导出并写入报告，历史搜索产物保持历史身份。
+        selected = {"name": "competition", "parameters": {}}
     # 独立留出不参与选择。额外消融使用同一选定参数，仅关闭一个新增模块。
     selected = {"name": "selected", "parameters": selected["parameters"]}
     comparison = [{"name": "baseline", "parameters": SETTINGS["baseline_parameters"]}, selected,
                   {"name": "selected_without_tactics", "parameters": dict(selected["parameters"], tactical_search=False)},
                   {"name": "selected_without_refinement", "parameters": dict(selected["parameters"], resource_refinement=False)},
-                  {"name": "selected_without_collision_replan", "parameters": dict(selected["parameters"], collision_replan=False)}]
+                  {"name": "selected_without_collision_replan", "parameters": dict(selected["parameters"], collision_replan=False)},
+                  {"name": "selected_without_toward", "parameters": dict(selected["parameters"], explore_toward_resource_value=0.0)},
+                  {"name": "selected_without_tour", "parameters": dict(selected["parameters"], explore_tour_value=0.0)}]
     heldout = scenes(True)
     results = evaluate(binary, comparison, heldout)
     report.update(selected=selected, heldout_scenes=heldout, heldout_results=results,
@@ -163,9 +180,13 @@ def main():
     for path in ["src/rmtc_bot/src/strategy.cpp", "src/rmtc_bot/src/tactics.cpp", "src/rmtc_bot/include/rmtc_bot/match_config.hpp", "tests/arena.cpp", "tests/arena_scenarios.cpp", "tests/arena_opponents.cpp"]:
         hashes[path] = hashlib.sha256((ROOT/path).read_bytes()).hexdigest()
     report["source_sha256"] = hashes
-    destination = output / "arena-2026-10-28.json"
+    # 最终生效参数与二进制指纹：每份报告自证“测的就是当前比赛程序”，不依赖参数名推断。
+    dumped = subprocess.run([str(binary), "--dump-competition"], capture_output=True, text=True, check=True)
+    report["competition_parameters"] = json.loads(dumped.stdout)
+    report["binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
+    destination = output / f"arena-{args.report}.json"
     destination.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
-    (output / "selected-parameters.json").write_text(json.dumps(selected, ensure_ascii=False, indent=2) + "\n")
+    (output / f"selected-parameters-{args.report}.json").write_text(json.dumps(selected, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps({"report": str(destination), "heldout": report["heldout_summaries"]}, ensure_ascii=False), flush=True)
 
 

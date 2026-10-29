@@ -168,7 +168,7 @@ early_escape示例能区分“200先移动存活”与“先打再在201移已�
 | `tests/scenario_test.py` | 时序、随机流、状态恢复、迟到解释、输入隔离和故障产物回归 |
 | `tests/scenario_runner.cpp::oracle` | 在明示模型/期限/目标/候选集上穷举；完整与截断结果分开 |
 | `tests/oracle_test.py / tests/oracles/*.json` | 穷举完整性、权限、目标取舍与两个小决策题 |
-| `tests/scenarios/*.json` | 四个可复制修改的小场景 |
+| `tests/scenarios/*.json` | 13份JSON/15条run；包含可复制的起步例子、公告与DeepSeek现场 |
 
 ```bash
 python3 tests/scenario_test.py
@@ -176,3 +176,5 @@ python3 tests/scenario_test.py --sanitize
 ```
 
 普通改图不必重新开启sanitizer或重编译。代码/配置变更后才产生新的构建指纹与缓存程序。
+
+DeepSeek新增的`highd_death_penalty / death_floor_threshold / mutual_kill_order / lowhp_retreat_survives / lowhp_retreat_late`已保留。它们检查高D扣60与封底、互杀入账顺序和200/201撤离差异；连同旧探针共13份JSON场景，由`scenario_test.py`逐份运行。

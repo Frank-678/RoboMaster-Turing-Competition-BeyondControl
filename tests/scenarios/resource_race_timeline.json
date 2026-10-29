@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "name": "resource-race-timeline",
+  "stage": 2,
+  "tick_limit": 500,
+  "qualified": true,
+  "seed": 17,
+  "map": {
+    "width": 9,
+    "height": 9,
+    "vision_radius": 4,
+    "walls": [
+      [0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3], [8, 3],
+      [0, 5], [1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [6, 5], [7, 5], [8, 5]
+    ],
+    "spawns": [
+      [1, 4],
+      [7, 4],
+      [0, 0],
+      [8, 8]
+    ]
+  },
+  "initial": {
+    "tick": 195,
+    "resources": [
+      {
+        "position": [3, 4],
+        "value": 20
+      },
+      {
+        "position": [5, 4],
+        "value": 100
+      }
+    ],
+    "cars": {
+      "A": {
+        "position": [1, 4],
+        "hp": 100
+      },
+      "B": {
+        "position": [7, 4],
+        "hp": 100
+      }
+    }
+  },
+  "missions": [],
+  "events": [],
+  "agents": {
+    "A": {
+      "type": "strategy",
+      "event_delivery": "oracle"
+    },
+    "B": {
+      "type": "script",
+      "event_delivery": "oracle",
+      "actions": {
+        "195": { "action": "move", "direction": "left" },
+        "196": { "action": "move", "direction": "left" },
+        "197": { "action": "move", "direction": "left" },
+        "198": { "action": "move", "direction": "left" },
+        "199": { "action": "move", "direction": "left" },
+        "200": { "action": "move", "direction": "left" },
+        "201": { "action": "move", "direction": "left" }
+      },
+      "otherwise": { "action": "defend" }
+    }
+  },
+  "run": {
+    "until_tick": 210,
+    "expect": [
+      {
+        "path": "/world/cars/A/alive",
+        "op": "eq",
+        "value": true
+      },
+      {
+        "path": "/world/cars/A/R",
+        "op": "eq",
+        "value": 20
+      },
+      {
+        "path": "/world/cars/B/R",
+        "op": "eq",
+        "value": 100
+      },
+      {
+        "path": "/world/cars/A/D",
+        "op": "eq",
+        "value": 180
+      },
+      {
+        "path": "/world/cars/B/deaths",
+        "op": "eq",
+        "value": 1
+      },
+      {
+        "path": "/world/cars/A/position/0",
+        "op": "eq",
+        "value": 5
+      },
+      {
+        "path": "/world/cars/A/position/1",
+        "op": "eq",
+        "value": 4
+      },
+      {
+        "path": "/world/cars/B/hp",
+        "op": "eq",
+        "value": 80
+      }
+    ]
+  }
+}
