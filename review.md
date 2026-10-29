@@ -162,3 +162,29 @@ post_cap_combat_weight 杠杆：D≥500 封顶后增量 D 的平局估值权重�
 
 - `cd ~/cst && bash build.sh && python3 tests/eval_levers.py --levers race --report race-2026-10-29`
 - 结果：base_off objective 0.7970931712962963（冠军位元钉三报告一致）；rrh05 位元同 base_off（train 无决策差异）；rrh08 0.7959502（stage2 +0.83、deaths +2、D2 −100.4）；rrh10 0.7782442。无候选超冠军 → 按 docs/36 §3 预注册判据 train 关闭，race_reach_holdoff 保持 0.0，不作 heldout。封存：tests/results/levers-race-2026-10-29.json（eb321df）。
+
+## 2026-10-29 12:29:10 +0800 · ChatGPT · CG-C-20261029-03 · 已交付短场景与断点工具
+
+我是 ChatGPT。Frank要求继续落地“任意中途局面→指定状态结束”的测试。我已在现有PR #1补好第一版，分三次提交；只新增离线测试入口、测试世界快照和说明，本次未改参赛源码、参数或practice/。
+
+1. [3234a00](https://github.com/Frank-678/RoboMaster-Turing-Competition-BeyondControl/commit/3234a00f0dd711f3f53114f07cd3a0bf3628ce99)：完整世界快照与校验。
+2. [3c345b8](https://github.com/Frank-678/RoboMaster-Turing-Competition-BeyondControl/commit/3c345b8139a4aaec011145a6b7c44738a009b38a)：短段运行、条件断点、恢复、内存分叉。
+3. [65c8714](https://github.com/Frank-678/RoboMaster-Turing-Competition-BeyondControl/commit/65c87145ae3b15572c3b1674181a74677fe86770)：四个场景、12项回归、可编辑导出和使用说明。
+
+可只采纳这三次测试提交，不必合并两支不同的策略历史。已把同一工具叠在你固定的80e1648008f3afd39c0073eef2754435783deb01源码上编译，12项兼容回归通过；若本地又有新代码，采纳后请再跑一次。
+
+```bash
+git cherry-pick 3234a00f0dd711f3f53114f07cd3a0bf3628ce99 3c345b8139a4aaec011145a6b7c44738a009b38a 65c87145ae3b15572c3b1674181a74677fe86770
+bash scenarios.sh tests/scenarios/announcement_pair.json --out build/checks/blast
+python3 tests/scenario_test.py
+```
+
+[完整用法](https://github.com/Frank-678/RoboMaster-Turing-Competition-BeyondControl/blob/65c87145ae3b15572c3b1674181a74677fe86770/SCENARIOS.md)。可指定initial.tick、车辆坐标/HP/R/D/任务/效果/驻留/复活/保护、剩余资源、事件notice/start/end/delivery_tick；run支持until_tick、条件断点、持续/终点断言、save_at、warm_until和forks。0=通过，1=断言失败但保留现场，2=配置/构建/恢复错误。
+
+已验证：200→201的先攻击后移动反例；防御剩5HP；同状态有/无公告两支HP100/65；解释延迟一Tick后赶不上爆炸；复制暖状态保留策略和随机对手；恢复保留增益、回血、资源与复活；导出修改冷场景；拒绝损坏/不同构建回放包；策略输入不含隐藏全图。新场景资格与解释可用性已独立，旧run_arena的C6耦合仍需另改。
+
+正常版与ASan/UBSan的12项回归通过（宿主关闭LeakSanitizer），原arena规则和18地图检查通过。首次构建后，正常12项回归复用缓存约1.3秒；这不是所有大地图/机器的性能保证。没有新增付费模型请求或完整原版DDS对局。
+
+边界请保留：断点在Tick边界；内存fork完整复制对象，文件resume则重放公开输入并检查历史动作，不能冒称跨机器逐位序列化全部私有状态。HTTP在途任务以绝对delivery_tick模拟，不是保存真实连接。--export-scene明确清掉策略记忆，允许随意改摆世界；测已有无双/幻术记忆时要跑足够的公开前缀。真正的历史版本联赛与原版裁判差分验收仍待后续完成。
+
+请在这里追加采纳提交、实际运行命令和失败场景/回放包位置。后续先用最短反例定位，再复用相同断点做多分支，不要为每次假设都跑500Tick或反复调用真实模型。
