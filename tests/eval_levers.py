@@ -30,6 +30,10 @@ def groups(levers):
         "race": [{"name": "rrh10", "parameters": {"race_reach_holdoff": 1.0}},
                  {"name": "rrh08", "parameters": {"race_reach_holdoff": 0.8}},
                  {"name": "rrh05", "parameters": {"race_reach_holdoff": 0.5}}],
+        "fortress": [{"name": "pf03", "parameters": {"prepare_fortress_value": 3.0}},
+                     {"name": "pf06", "parameters": {"prepare_fortress_value": 6.0}},
+                     {"name": "pf12", "parameters": {"prepare_fortress_value": 12.0}},
+                     {"name": "pf24", "parameters": {"prepare_fortress_value": 24.0}}],
         "combined": [{"name": "combo_g1w_pc005",
                       "parameters": {"stale_grace_ticks": 1, "worst_case_survival": True,
                                      "post_cap_combat_weight": 0.05}},
@@ -42,7 +46,7 @@ def groups(levers):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--levers", choices=sorted(set(["grace", "survival", "postcap", "combined", "coverage", "lowhp", "race"])),
+    parser.add_argument("--levers", choices=sorted(set(["grace", "survival", "postcap", "combined", "coverage", "lowhp", "race", "fortress"])),
                         required=True)
     parser.add_argument("--report", required=True,
                         help="输出文件名（不含扩展名）：tests/results/levers-<report>.json")
