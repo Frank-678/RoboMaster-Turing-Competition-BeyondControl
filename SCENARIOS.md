@@ -132,6 +132,32 @@ bash scenarios.sh build/checks/editable.scene.json --out build/checks/edited
 
 这不是ROS Session或HTTP套接字的进程快照。异步解释在此用`delivery_tick`模拟，真实网络/旧session/重发/QoS仍由已有通信测试验证；自建裁判与原版裁判的一致性也需另验收。
 
+## 小局面的最优参照
+
+```bash
+bash scenarios.sh tests/oracles/early_escape.json --oracle --out build/checks/escape-best
+bash scenarios.sh tests/oracles/resource_chain.json --oracle --out build/checks/resource-best
+python3 tests/oracle_test.py
+```
+
+`--oracle`只供测试端。它使用完整摆局、固定脚本/NPC与随机种子，枚举我方每个合法动作序列，比较1–4Tick后的明确目标；不输入参赛程序。其余车不能用耗时搜索Strategy或外部worker，因为那样不能把转移当成确定函数。
+
+```json
+{
+  "seat":"A", "depth":3, "max_nodes":10000, "include_no_submission":false,
+  "objective":[
+    {"path":"/world/cars/A/deaths","sense":"min"},
+    {"path":"/world/cars/A/hp","sense":"max"}
+  ]
+}
+```
+
+这是场景顶层`oracle`字段。目标按列出的优先级作字典序比较；没有暗中加血量/死亡权重。也可只最大化D，故允许明确的以命换分目标。include_no_submission必须明写：false只搜本程序的移动/攻击/防御候选，true额外纳入明示的不提交（裁判等待），便于核对完整协议动作集；不是默认WAIT。此模式的终点由depth定义，普通run的until_tick/条件断点/断言不参与这个优化；普通场景仍由run控制。
+
+输出`前缀.oracle.json`，含各首动作的最好后续、目标值、完整终点、节点/叶子数。只有`complete=true`且`optimal_for_stated_fixture=true`才表示在该固定对手/种子/短期限/目标及声明的候选动作集下搜完所有序列；不纳入等待时不能声称协议全部动作最优。预算耗尽退出1，没到完整叶子时best_sequence为null。新叶子不覆盖初始世界。
+
+early_escape示例能区分“200先移动存活”与“先打再在201移已来不及”；resource_chain显示两步拿30优于先取右侧10。它是小样例最优参照，不是未知地图、未知对手、500Tick整局最优证明，也不能把裁判未来安排带进参赛输入。
+
 ## 文件与回归
 
 | 文件 | 主线职责 |
@@ -140,6 +166,8 @@ bash scenarios.sh build/checks/editable.scene.json --out build/checks/edited
 | `tests/scenario_runner.cpp` | `make_scene`读地图/事件；`Agent::act`只接本队输入；`Controller`管前缀/恢复/复制；`run`执行到条件并断言 |
 | `tests/run_scenarios.py` | `build`缓存源码指纹；`read_bundle/save_bundle`检查误改；main处理运行、导出与结果文件 |
 | `tests/scenario_test.py` | 时序、随机流、状态恢复、迟到解释、输入隔离和故障产物回归 |
+| `tests/scenario_runner.cpp::oracle` | 在明示模型/期限/目标/候选集上穷举；完整与截断结果分开 |
+| `tests/oracle_test.py / tests/oracles/*.json` | 穷举完整性、权限、目标取舍与两个小决策题 |
 | `tests/scenarios/*.json` | 四个可复制修改的小场景 |
 
 ```bash
