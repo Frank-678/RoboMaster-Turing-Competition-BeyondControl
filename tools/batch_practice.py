@@ -25,6 +25,9 @@ import urllib.request
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 CST = os.path.dirname(TOOLS)
+REFEREE_STARTUP_RETRIES = 3   # 原版 referee 12s 节点就绪竞态（practice.py:279）：背靠背开局偶发 → 静置重试
+REFEREE_STARTUP_SETTLE = 15   # 重试前静置秒数：让 ROS/DDS 与上一局残留节点完全退出
+INTER_BATTLE_SETTLE = 3      # 局间静置：stop_battle 后 ROS/DDS 异步拆除完成再开下一局
 WIDTH, HEIGHT = 18, 18
 SPAWNS = [(1, 1), (16, 1), (1, 16), (16, 16)]
 CENTER = (9, 9)
@@ -243,21 +246,48 @@ def run_battle(variant_id, cfg, cfg_path, log_dir, our_seats):
     stream = open(f"{log_dir}/referee_stdout.log", "w")
     try:
         referee_bots = ",".join(sorted(set("ABCD") - set(our_seats)))
-        ref = subprocess.Popen(
-            ["bash", f"{CST}/practice/start_referee.sh", "--stage", "2",
-             "--port", os.environ["RMTC_PRACTICE_PORT"], "--ai-mode", "real", "--bots", referee_bots,
-             "--config", cfg_path], cwd=CST, env=env_for_referee(), stdout=stream,
-            stderr=subprocess.STDOUT, start_new_session=True)
-        processes.append(ref)
-        deadline = time.monotonic() + 60
-        while True:
-            if ref.poll() is not None:
-                raise RuntimeError("referee exited before ready")
-            if "练习裁判已就绪" in Path(log_dir, "referee_stdout.log").read_text():
+        ref = None
+        for attempt in range(1, REFEREE_STARTUP_RETRIES + 1):
+            try:
+                ref = subprocess.Popen(
+                    ["bash", f"{CST}/practice/start_referee.sh", "--stage", "2",
+                     "--port", os.environ["RMTC_PRACTICE_PORT"], "--ai-mode", "real", "--bots", referee_bots,
+                     "--config", cfg_path], cwd=CST, env=env_for_referee(), stdout=stream,
+                    stderr=subprocess.STDOUT, start_new_session=True)
+                processes.append(ref)
+                deadline = time.monotonic() + 60
+                while True:
+                    if ref.poll() is not None:
+                        raise RuntimeError("referee exited before ready")
+                    if "练习裁判已就绪" in Path(log_dir, "referee_stdout.log").read_text():
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("referee not ready in 60s")
+                    time.sleep(0.5)
                 break
-            if time.monotonic() >= deadline:
-                raise RuntimeError("referee not ready in 60s")
-            time.sleep(0.5)
+            except RuntimeError as error:
+                last_error = error
+                log(f"battle {variant_id}: referee 启动失败（第 {attempt}/{REFEREE_STARTUP_RETRIES} 次）：{error}；"
+                    f"静置 {REFEREE_STARTUP_SETTLE}s 后重试")
+                if ref is not None and ref.poll() is None:
+                    try:
+                        os.killpg(ref.pid, signal.SIGTERM)  # start_new_session：整组收掉残留 ROS 节点
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        ref.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        try:
+                            os.killpg(ref.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                processes = [p for p in processes if p is not ref]
+                stream.write(f"\n[driver] referee 启动重试：第 {attempt} 次失败，静置后第 {attempt + 1} 次\n")
+                stream.flush()
+                time.sleep(REFEREE_STARTUP_SETTLE)
+                ref = None
+        else:
+            raise RuntimeError(f"referee 连续 {REFEREE_STARTUP_RETRIES} 次启动失败：{last_error}")
         code, state = http_request("/api/state")
         if code != 200:
             raise RuntimeError("cannot read referee state")
@@ -294,6 +324,7 @@ def run_battle(variant_id, cfg, cfg_path, log_dir, our_seats):
     finally:
         stop_battle(processes, session)
         stream.close()
+        time.sleep(INTER_BATTLE_SETTLE)
 
 
 def parse_our(arg):
