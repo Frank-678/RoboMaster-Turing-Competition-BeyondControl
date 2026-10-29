@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "name": "lowhp-retreat-survives",
+  "stage": 2,
+  "tick_limit": 500,
+  "qualified": true,
+  "seed": 17,
+  "map": {
+    "width": 9,
+    "height": 9,
+    "vision_radius": 4,
+    "walls": [],
+    "spawns": [
+      [4, 4],
+      [5, 4],
+      [0, 0],
+      [8, 8]
+    ]
+  },
+  "initial": {
+    "tick": 200,
+    "resources": [],
+    "cars": {
+      "A": {
+        "position": [4, 4],
+        "hp": 30
+      },
+      "B": {
+        "position": [5, 4],
+        "hp": 100
+      }
+    }
+  },
+  "missions": [],
+  "events": [],
+  "agents": {
+    "A": {
+      "type": "script",
+      "event_delivery": "oracle",
+      "actions": {
+        "200": { "action": "move", "direction": "up" },
+        "201": { "action": "move", "direction": "up" },
+        "202": { "action": "move", "direction": "up" },
+        "203": { "action": "move", "direction": "up" }
+      },
+      "otherwise": { "action": "defend" }
+    },
+    "B": {
+      "type": "script",
+      "event_delivery": "oracle",
+      "actions": {
+        "200": { "action": "attack", "direction": "left" },
+        "201": { "action": "attack", "direction": "left" },
+        "202": { "action": "attack", "direction": "left" },
+        "203": { "action": "attack", "direction": "left" },
+        "204": { "action": "attack", "direction": "left" }
+      },
+      "otherwise": { "action": "defend" }
+    }
+  },
+  "run": {
+    "until_tick": 205,
+    "expect": [
+      {
+        "path": "/world/cars/A/alive",
+        "op": "eq",
+        "value": true
+      },
+      {
+        "path": "/world/cars/A/deaths",
+        "op": "eq",
+        "value": 0
+      },
+      {
+        "path": "/world/cars/A/hp",
+        "op": "eq",
+        "value": 10
+      },
+      {
+        "path": "/world/cars/A/position/0",
+        "op": "eq",
+        "value": 4
+      },
+      {
+        "path": "/world/cars/A/position/1",
+        "op": "eq",
+        "value": 0
+      },
+      {
+        "path": "/world/cars/B/hp",
+        "op": "eq",
+        "value": 100
+      },
+      {
+        "path": "/world/cars/B/D",
+        "op": "eq",
+        "value": 20
+      }
+    ]
+  }
+}
