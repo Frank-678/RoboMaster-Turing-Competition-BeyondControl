@@ -1,5 +1,7 @@
 # 源码导读
 
+短场景工具的文件、函数、状态字段与起止Tick语义见[SCENARIOS.md](SCENARIOS.md)。它是独立测试入口，不被正式ROS机器人链接。
+
 先读比赛配置，再沿“收感知→管场次→作决策→发动作”阅读。变量的具体含义写在声明旁，关键规则写在判断旁。
 
 [规则状态机](STATE_MACHINE.md)将条款、权限状态、事件和对手轨迹转移对应到代码；[实测记录](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/REAL_TEST.md)区分真实模型与完整裁判对局。
