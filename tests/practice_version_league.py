@@ -6,8 +6,10 @@
   M2 自战·旧冠军：A=champion，B=old_champion（冻结席位变体），C/D=原版陪练。
   M3 自战·候选（对手位）：A=champion，B=candidate，C/D=原版陪练。
   M4 自战·候选（焦点位，docs/48 依 ChatGPT CG-C-20261029-HANDOFF-FINAL 第 1 条增）：
-     A=candidate，B=champion（席位变体），C/D=原版陪练——与 M1 同地图/同 A 席位/同对手池，
-     candidate 作为焦点版本的成对比较。
+     A=candidate，B=champion（席位变体），C/D=原版陪练。与 M1 同地图/同 A 席位，
+     但 B 位为 champion（非原版陪练）——对手池与 M1 不同，M3/M4 构成冠军×候选换位自战对。
+  M5 原版·候选（同池焦点对照，review_handoff_probe R1 后补）：A=candidate，B/C/D=原版陪练，
+     与 M1 完全同对手池；用于候选与冠军在同图同席位同池下的直接成对比较。
 冻结契约（U6 条款）：开赛前逐一校验参战二进制 sha256 与清单一致，不符即中止。
 用法：
   bash practice_league.sh --maps 20261201,20261202 --mixes M1,M2 [--out DIR]
@@ -27,6 +29,7 @@ MIXES = {
     "M2": {"A": "champion", "B": "old_champion"},
     "M3": {"A": "champion", "B": "candidate"},
     "M4": {"A": "candidate", "B": "champion"},
+    "M5": {"A": "candidate"},
 }
 
 
@@ -117,12 +120,12 @@ def main():
         mixes, seeds = [m0], [int(s0)]
 
     if not seeds or not mixes or any(m not in MIXES for m in mixes):
-        ap.error("地图seed和混合均不能为空，混合只能M1/M2/M3/M4")
+        ap.error("地图seed和混合均不能为空，混合只能M1/M2/M3/M4/M5")
     failed, planned_groups = 0, 0
     skipped = []
     all_battles = []
     for mix in mixes:
-        if mix in ("M3", "M4") and not manifest["versions"].get("candidate"):
+        if mix in ("M3", "M4", "M5") and not manifest["versions"].get("candidate"):
             log(f"{mix} 跳过：candidate 未就位；不计已完成场数")
             skipped.append(mix)
             continue

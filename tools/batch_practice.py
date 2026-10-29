@@ -31,10 +31,21 @@ INTER_BATTLE_SETTLE = 3      # 局间静置：stop_battle 后 ROS/DDS 异步拆�
 
 
 def referee_ready_since(log_dir, baseline):
-    """按尝试独立的就绪判定：本次输出的就绪行数必须超过基线；
-    日志被截断重开（计数低于基线）时，以本次已出现就绪行为准。"""
-    count = Path(log_dir, "referee_stdout.log").read_text().count("练习裁判已就绪")
-    return count > baseline or (count < baseline and count >= 1)
+    """按尝试独立的就绪判定：baseline 为 (就绪行数, 文件 mtime_ns)，每次尝试
+    启动前采集。就绪当且仅当自那以后文件新增了就绪行——追加增长（行数超过
+    基线）或截断重开（mtime 前进、行数回落/持平）时以当前已出现就绪行为准。
+    防上一尝试残留行误认，也防截断后同计数新行漏认（review_handoff_probe R2）。"""
+    count_before, mtime_before = baseline
+    path = Path(log_dir, "referee_stdout.log")
+    try:
+        text = path.read_text()
+        mtime = path.stat().st_mtime_ns
+    except FileNotFoundError:
+        return False
+    count = text.count("练习裁判已就绪")
+    if count > count_before:
+        return True
+    return mtime > mtime_before and count >= 1
 
 WIDTH, HEIGHT = 18, 18
 SPAWNS = [(1, 1), (16, 1), (1, 16), (16, 16)]
@@ -257,8 +268,15 @@ def run_battle(variant_id, cfg, cfg_path, log_dir, our_seats):
         ref = None
         for attempt in range(1, REFEREE_STARTUP_RETRIES + 1):
             try:
-                # 每次尝试独立就绪基线：防止上一尝试残留的 Ready 行让本次误判已就绪。
-                ready_baseline = Path(log_dir, "referee_stdout.log").read_text().count("练习裁判已就绪")
+                # 每次尝试独立就绪基线（行数 + mtime）：防止上一尝试残留的 Ready 行
+                # 误判本次已就绪，也防止裁判日志截断重开后同计数新行漏认。
+                _ref_path = Path(log_dir, "referee_stdout.log")
+                try:
+                    _ref_stat = _ref_path.stat()
+                    ready_baseline = (_ref_path.read_text().count("练习裁判已就绪"),
+                                      _ref_stat.st_mtime_ns)
+                except FileNotFoundError:
+                    ready_baseline = (0, 0)
                 ref = subprocess.Popen(
                     ["bash", f"{CST}/practice/start_referee.sh", "--stage", "2",
                      "--port", os.environ["RMTC_PRACTICE_PORT"], "--ai-mode", "real", "--bots", referee_bots,

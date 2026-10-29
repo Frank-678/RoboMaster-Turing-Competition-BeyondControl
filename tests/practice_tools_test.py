@@ -214,17 +214,21 @@ class PracticeTools(unittest.TestCase):
         self.assertEqual(practice_league.batch_exit_code(0, 0, 0, 0), 1)   # 空计划
 
     def test_referee_ready_requires_new_line_per_attempt(self):
-        # 每次尝试独立就绪基线：上一尝试残留的 Ready 行不能算本次就绪；
-        # 日志被截断重开后，以本次新出现的就绪行为准。
+        # 每次尝试独立就绪基线 (行数, mtime_ns)：上一尝试残留的 Ready 行不能算本次
+        # 就绪；日志被截断重开后（行数回落/持平、mtime 前进），以本次新出现的就绪行为准。
         logf = self.work / "referee_stdout.log"
         logf.write_text("练习裁判已就绪\n")
-        self.assertFalse(batch.referee_ready_since(self.work, 1))   # 旧行不算新就绪
+        baseline = (1, logf.stat().st_mtime_ns)
+        self.assertFalse(batch.referee_ready_since(self.work, baseline))   # 旧行不算新就绪
         logf.write_text("练习裁判已就绪\n练习裁判已就绪\n")
-        self.assertTrue(batch.referee_ready_since(self.work, 1))    # 本次新行
-        logf.write_text("练习裁判已就绪\n")                         # 截断重开后再就绪
-        self.assertTrue(batch.referee_ready_since(self.work, 3))
-        logf.write_text("")                                         # 截断后尚未就绪
-        self.assertFalse(batch.referee_ready_since(self.work, 3))
+        self.assertTrue(batch.referee_ready_since(self.work, baseline))    # 本次新行（行数增长）
+        logf.write_text("练习裁判已就绪\n")   # 截断重开，同计数 1==基线 1（probe R2 反例）
+        self.assertTrue(batch.referee_ready_since(self.work, baseline))
+        baseline = (3, logf.stat().st_mtime_ns)
+        logf.write_text("练习裁判已就绪\n")   # 截断重开，行数回落到基线以下
+        self.assertTrue(batch.referee_ready_since(self.work, baseline))
+        logf.write_text("")                    # 截断后尚未就绪
+        self.assertFalse(batch.referee_ready_since(self.work, baseline))
 
 
 if __name__ == "__main__":
