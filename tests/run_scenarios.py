@@ -73,9 +73,12 @@ def main():
     parser.add_argument("--out", required=True, help="报告文件名前缀，例如build/checks/duel")
     parser.add_argument("--json-include", help="仅用于非标准测试环境；Ubuntu安装nlohmann-json3-dev后不用填")
     parser.add_argument("--sanitize", action="store_true", help="独立构建ASan/UBSan版本")
+    parser.add_argument("--oracle", action="store_true", help="穷举场景中oracle指定的短段；完全信息测试参照，不是参赛策略")
     args = parser.parse_args()
     if sum(bool(x) for x in (args.scene, args.resume, args.export_scene)) != 1:
         parser.error("请三选一：场景JSON、--resume 回放包、--export-scene 回放包")
+    if args.oracle and (not args.scene or args.until_tick is not None or args.clear_breakpoints):
+        parser.error("--oracle只接场景JSON，深度/目标在场景oracle字段中明确设置")
     if args.export_scene:
         bundle = read_bundle(args.export_scene)
         scene = copy.deepcopy(bundle["scene"])
@@ -112,13 +115,19 @@ def main():
     if args.clear_breakpoints:
         control["break_when"] = []
     job["run"] = control
-    completed = subprocess.run([str(binary)], input=json.dumps(job, ensure_ascii=False),
+    completed = subprocess.run([str(binary)] + (["--oracle"] if args.oracle else []), input=json.dumps(job, ensure_ascii=False),
                                text=True, capture_output=True, timeout=120)
     if completed.returncode not in (0, 1):
         raise RuntimeError(completed.stderr.strip() or "scenario runner failed")
     report = json.loads(completed.stdout)
     prefix = Path(args.out)
     prefix.parent.mkdir(parents=True, exist_ok=True)
+    if args.oracle:
+        report["build"] = manifest
+        Path(str(prefix) + ".oracle.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+        print(json.dumps({"report": str(prefix) + ".oracle.json", "complete": report["complete"],
+                          "nodes": report["nodes"], "best_sequence": report["best_sequence"]}, ensure_ascii=False))
+        return completed.returncode
     for run in report["runs"]:
         name = run["name"]
         if not re.fullmatch(r"[A-Za-z0-9_-]+", name):

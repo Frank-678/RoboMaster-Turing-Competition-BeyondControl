@@ -208,13 +208,13 @@ stateDiagram-v2
 
 `turn_state_transitions`覆盖阵亡、采集、保护、保护解除及不可靠保护字段；`opponent_prediction`覆盖争格、未来射线、墙前预测失效、断帧、匿名、换场和当前致命攻击优先。其余已有用例覆盖任务、计分、八事件与场次。运行 `bash tests/run.sh`。
 
-当前没有校准轨迹延续概率，也未完成标准车胜率验证。多人精确分奖、裁判复活落点、暂停/重启后效果恢复和所有事件组合仍需原版裁判对局。练习方法与已观察限制见[实测记录](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/REAL_TEST.md)；完整赛后数据出来前不把合成场景通过写成实战成功。
+当前没有校准轨迹延续概率，也未完成标准车胜率验证。多人精确分奖、裁判复活落点、暂停/重启后效果恢复和所有事件组合仍需原版裁判对局。练习方法与已观察限制见[实测记录](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/REAL_TEST.md)；完整赛后数据出来前不把合成场景通过写成实战成功。
 
-状态机/轨迹版本按教程重试的两项原版运行结果见[结构化记录](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/checks/code-results/state-match-attempt-2026-10-28.json)：参考A和A对标准B/C/D均在启动阶段被DDS接口权限阻止，未产生有效对局。
+状态机/轨迹版本按教程重试的两项原版运行结果见[结构化记录](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/checks/code-results/state-match-attempt-2026-10-28.json)：参考A和A对标准B/C/D均在启动阶段被DDS接口权限阻止，未产生有效对局。
 
 ## 目标持续性与采集搜索
 
-新行为见[PLANNING.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/PLANNING.md)。目标迟滞只改变近似同分候选的排序，不能跳过既有危险与权限状态。
+新行为见[PLANNING.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/PLANNING.md)。目标迟滞只改变近似同分候选的排序，不能跳过既有危险与权限状态。
 
 ```mermaid
 stateDiagram-v2
@@ -253,7 +253,7 @@ stateDiagram-v2
 
 ## 成功往返也可能没有进展
 
-[复现与脱困](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/NAVIGATION.md)在原有失败MOVE改道之上增加一层真实进展状态：
+[复现与脱困](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/NAVIGATION.md)在原有失败MOVE改道之上增加一层真实进展状态：
 
 ```mermaid
 stateDiagram-v2
@@ -272,6 +272,6 @@ stateDiagram-v2
 
 确定危险和当前致命防御保持更高优先级；脱困不保证物理封死或危险包围时仍能移动。反伤有效时，不奖励接近预测正在防御的同一目标。默认期限、冷却和日志字段集中说明在NAVIGATION，具体用户地图仍待同场数据核对。
 
-假设火线不再作为BFS封路条件；相同距离优先低风险首步，正常收益用HP比例折扣。唯一出口虽有预测风险，也保留给确定公告避险。确定墙/占位/时序不变，详见[反例与取舍](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/LESSONS.md)。
+假设火线不再作为BFS封路条件；相同距离优先低风险首步，正常收益用HP比例折扣。唯一出口虽有预测风险，也保留给确定公告避险。确定墙/占位/时序不变，详见[反例与取舍](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/LESSONS.md)。
 
 已校验的未来堡垒可在激活前比较路程/等待/驻留成本，选择prepare_fortress；早到驻留不提前授予无双。生效后的原有路径不变。Session另记请求Tick、消费Tick、校验/拒绝及迟到计数；这些是诊断，不作为额外比赛信息输入。

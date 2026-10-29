@@ -1,131 +1,352 @@
 #!/usr/bin/env python3
-"""版本联赛调度器（docs/38 §2）：12 图 × 4 席位 × 3 混合 = 144 场/版本。
-每个 (图 seed, 混合) 跑一次驱动（--map-locked --count 4）：同图同事件日程，
-4 局仅轮换出生席位，消出生位置偏差。混合定义：
-  M1 原版：A=本版本（champion），B/C/D=原版陪练（裁判 spawn）。
-  M2 自战·旧冠军：A=champion，B=old_champion（冻结席位变体），C/D=原版陪练。
-  M3 自战·候选：candidate 就位后启用（当前跳过）。
-冻结契约（U6 条款）：开赛前逐一校验参战二进制 sha256 与清单一致，不符即中止。
-用法：
-  python3 tests/version_league.py --maps 20261201,20261202 --mixes M1,M2 [--out DIR]
-"""
+"""冻结真实旧版本→生成分层局面→同一清单对打→逐局归档和成对报告；零模型费用。"""
 import argparse
-import hashlib
+import copy
+import fnmatch
+import gzip
 import json
 import os
+from pathlib import Path
+import random
+import selectors
+import statistics
 import subprocess
 import sys
 import time
 
-CST = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import league_maps
+import run_scenarios
+import version_store
 
-MIXES = {
-    "M1": {"A": "champion"},
-    "M2": {"A": "champion", "B": "old_champion"},
-    "M3": {"A": "champion", "B": "candidate"},
-}
-
-
-def log(msg):
-    print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+ROOT = run_scenarios.ROOT
+SEATS = "ABCD"
 
 
-def resolve_base(base):
-    """install 底座：绝对路径原样；相对路径相对代码仓根（驱动 cwd）。"""
-    return base if os.path.isabs(base) else f"{CST}/{base}"
+class Lines:
+    """有截止时间的JSONL子进程；失败直接留错，不把超时冒充某个合法动作。"""
+    def __init__(self, command, error_path, timeout=5):
+        self.error_file = Path(error_path).open("wb")
+        self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.error_file)
+        os.set_blocking(self.process.stdout.fileno(), False)
+        self.selector = selectors.DefaultSelector()
+        self.selector.register(self.process.stdout, selectors.EVENT_READ)
+        self.buffer, self.timeout = b"", timeout
+
+    def call(self, request):
+        self.process.stdin.write((json.dumps(request, ensure_ascii=False, allow_nan=False) + "\n").encode())
+        self.process.stdin.flush()
+        deadline = time.monotonic() + self.timeout
+        while b"\n" not in self.buffer:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not self.selector.select(remaining):
+                raise TimeoutError("worker/engine response deadline exceeded")
+            chunk = os.read(self.process.stdout.fileno(), 65536)
+            if not chunk:
+                raise RuntimeError("worker/engine exited before complete response")
+            self.buffer += chunk
+            if len(self.buffer) > 16 * 1024 * 1024:
+                raise ValueError("JSONL response exceeds 16MiB")
+        line, self.buffer = self.buffer.split(b"\n", 1)
+        return json.loads(line)
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+        self.process.stdin.close()
+        self.process.stdout.close()
+        self.selector.close()
+        self.error_file.close()
 
 
-def seat_base(manifest, version, seat):
-    """(版本, 席位) 的 install 底座：champion-A 用冠军底座；其余用席位变体。"""
-    if version == "champion" and seat == "A":
-        return manifest["versions"]["champion"]["install_base"]
-    return manifest["seats"][version][seat]["install_base"]
+def condition(view, rule):
+    """和短场景相同的JSON Pointer断点；路径拼错报错，不能静默假通过。"""
+    if rule["path"] and not rule["path"].startswith("/"):
+        raise ValueError("condition path must be a JSON Pointer")
+    current, exists = view, True
+    for token in rule["path"].split("/")[1:]:
+        token = token.replace("~1", "/").replace("~0", "~")
+        try:
+            current = current[int(token)] if isinstance(current, list) else current[token]
+        except (KeyError, ValueError, IndexError, TypeError):
+            exists = False
+            break
+    op = rule["op"]
+    if op == "exists":
+        return exists
+    if not exists:
+        raise ValueError("condition path does not exist: " + rule["path"])
+    value = rule["value"]
+    if op == "eq": return current == value
+    if op == "ne": return current != value
+    if not isinstance(current, (float, int)) or isinstance(current, bool) or not isinstance(value, (float, int)) or isinstance(value, bool):
+        raise ValueError("ordered condition requires numbers")
+    operations = {"lt": lambda: current < value, "le": lambda: current <= value,
+                  "gt": lambda: current > value, "ge": lambda: current >= value}
+    if op not in operations:
+        raise ValueError("unknown condition operator: " + op)
+    return operations[op]()
 
 
-def verify_frozen(manifest):
-    """冻结契约：每个参战二进制 sha256 必须等于清单记录值。"""
-    checks = []
-    v = manifest["versions"]["champion"]
-    checks.append(("champion install bot",
-                   f"{resolve_base(v['install_base'])}/rmtc_bot/lib/rmtc_bot/bot",
-                   v["binary_sha256"]))
-    for version, seats in (manifest.get("seats") or {}).items():
-        for seat, rec in seats.items():
-            checks.append((f"{version}-{seat} bot",
-                           f"{resolve_base(rec['install_base'])}/rmtc_bot/lib/rmtc_bot/bot",
-                           rec["binary_sha256"]))
-    for label, path, want in checks:
-        if not os.path.isfile(path):
-            raise SystemExit(f"冻结校验失败：{label} 不存在：{path}")
-        got = hashlib.sha256(open(path, "rb").read()).hexdigest()
-        if got != want:
-            raise SystemExit(f"冻结校验失败：{label} sha256 {got[:12]}… != 清单 {want[:12]}…")
-        log(f"冻结校验通过：{label}")
+def rank(result, focal):
+    """正式比较键依次为分数、任务、R、D、较少无效动作；保留并列，不用HP破同分。"""
+    def key(row):
+        return tuple(row[k] for k in ("score", "qualified_M", "R", "D")) + (-row["invalid"],)
+    own = key(result[SEATS.index(focal)])
+    position = 1 + sum(key(row) > own for row in result)
+    ties = sum(key(row) == own for row in result)
+    return position, 1.0 / ties if position == 1 else 0.0
 
 
-def run_mix(seed, mix, our, out_dir, args):
-    """对一个 (图, 混合) 跑驱动 --map-locked --count 4，返回 (ok_battles, total)。"""
-    summary = os.path.join(out_dir, f"summary_{mix}_{seed}.json")
-    cmd = [sys.executable, f"{CST}/tools/batch_practice.py",
-           "--count", "4", "--seed", str(seed), "--map-locked",
-           "--summary", summary]
-    for seat, base in sorted(our.items()):
-        cmd += ["--our", f"{seat}:{base}"]
-    log(f"=== {mix} x seed {seed}：{len(our)} 个我方席位，4 局轮换席位 ===")
-    t0 = time.time()
-    p = subprocess.run(cmd, cwd=CST)
-    dt = time.time() - t0
-    battles = []
-    if os.path.exists(summary):
-        battles = json.load(open(summary))
-    okn = sum(1 for b in battles if b.get("ok"))
-    log(f"=== {mix} x seed {seed}：{okn}/4 完成，用时 {dt/60:.1f} min ===")
-    return p.returncode, battles
+def play(case, label, plan, versions, engine_binary, engine_build, directory, timeout):
+    """每场每个历史席位独立启动自己的worker，进程保留记忆；只有自己的input会出裁判。"""
+    directory.mkdir(parents=True, exist_ok=True)
+    scene, used = copy.deepcopy(case["scene"]), {}
+    if any(key in scene["run"] for key in ("forks", "warm_until")):
+        raise ValueError("league uses independent version processes; use scenarios.sh for in-memory forks, or write separate paired cases")
+    for seat, agent in scene["agents"].items():
+        if agent["type"] == "external":
+            name = agent["version"].replace("$focal", label).replace("$anchor", plan["anchor"])
+            if name not in versions:
+                raise ValueError("unknown frozen version: " + name)
+            agent["version"] = name
+            used[seat] = name
+    signature = run_scenarios.digest(dict(case=case, candidate=label,
+        versions={seat: versions[name][1]["binary_sha256"] for seat, name in used.items()}, engine=engine_build["build_id"]))
+    existing = directory / "result.json"
+    if existing.exists():
+        result = json.loads(existing.read_text())
+        if result["signature"] != signature:
+            raise ValueError("case output belongs to different sources/fixture; choose another --out")
+        if result["status"] == "passed":
+            return result
+    processes, workers = [], {}
+    report = dict(case_id=case["id"], map_id=case["map_id"], family=case["family"], mix=case["mix"],
+                  focal=case["focal"], candidate=label, signature=signature, scene=scene, versions=used,
+                  engine_build_id=engine_build["build_id"], status="failed", scope="offline; no live model/ROS")
+    state, previous = None, []
+    durations, delivered, stalled = {seat: [] for seat in used}, {seat: set() for seat in used}, 0
+    failures, stop = [], "until_tick"
+    tape_path = directory / "tape.jsonl.gz"
+    try:
+        engine = Lines([str(engine_binary), "--serve"], directory / "engine.stderr.log", timeout)
+        processes.append(engine)
+        for seat, name in used.items():
+            worker = Lines([str(versions[name][0])], directory / (seat + ".stderr.log"), timeout)
+            processes.append(worker)
+            hello = worker.call(dict(op="init", stage=scene["stage"]))
+            if not hello["ready"] or hello["parameters"] != versions[name][1]["parameters"]:
+                raise ValueError("worker differs from frozen parameter manifest")
+            workers[seat] = worker
+        state = engine.call(dict(scene=scene, build_id=engine_build["build_id"]))
+        begin = state["world"]["tick"]
+        until = scene["run"]["until_tick"]
+        if not isinstance(until, int) or isinstance(until, bool) or not begin <= until <= scene["tick_limit"]:
+            raise ValueError("until_tick outside fixture interval")
+        with gzip.open(tape_path, "wt", encoding="utf-8", compresslevel=1) as tape:
+            while True:
+                if state["world"]["tick"] in scene["run"].get("save_at", []):
+                    version_store.write_json(directory / ("tick-" + str(state["world"]["tick"]) + ".world.json"),
+                                             dict(world=state["world"], note="world only; private worker memory is in live process, not serialized"))
+                for rule in scene["run"].get("always", []):
+                    if not condition(state, rule): failures.append(rule)
+                if failures:
+                    stop = "assertion_failed"
+                    break
+                if state["world"]["tick"] >= until:
+                    break
+                if any(condition(state, rule) for rule in scene["run"].get("break_when", [])):
+                    stop = "breakpoint"
+                    break
+                answers = {}
+                for seat, worker in workers.items():
+                    message = state["inputs"][seat]
+                    # 这是唯一发送给worker的对象：没有world、他队感知、未公告安排或未来资源表。
+                    answer = worker.call(dict(op="act", input=message))
+                    if answer["tick"] != state["world"]["tick"] or answer["session_id"] != scene["name"]:
+                        raise ValueError("worker response tick/session mismatch")
+                    durations[seat].append(answer["decide_ms"])
+                    delivered[seat].update(event["key"] for event in message["events"])
+                    answers[seat] = answer
+                tape.write(json.dumps(dict(tick=state["world"]["tick"], inputs=state["inputs"], replies=answers), ensure_ascii=False) + "\n")
+                tape.flush()
+                state = engine.call(dict(op="step", actions={seat: answer["action"] for seat, answer in answers.items()}))
+                car = state["world"]["cars"][case["focal"]]
+                previous.append((tuple(car["position"]), car["R"], car["D"], tuple(car["completed"]), car["deaths"]))
+                previous = previous[-12:]
+                if len(previous) == 12 and car["alive"] and len({item[0] for item in previous}) <= 4 and len({item[1:] for item in previous}) == 1:
+                    stalled += 1  # 候选徘徊窗口，不等于已证明卡住；防守也可能合理。
+        for rule in scene["run"].get("expect", []):
+            if not condition(state, rule): failures.append(rule)
+        position, win = rank(state["result"], case["focal"])
+        focal_result = state["result"][SEATS.index(case["focal"])]
+        report.update(status="assertion_failed" if failures else "passed", stop=stop, failed_conditions=failures,
+                      start_tick=begin, end_tick=state["world"]["tick"], result=state["result"],
+                      focal_result=focal_result, rank=position, win_share=win, stationary_windows=stalled,
+                      world=state["world"], timing={seat: dict(max_ms=max(values, default=0),
+                        p95_ms=sorted(values)[max(0, (95 * len(values) + 99) // 100 - 1)] if values else 0,
+                        over_500ms=sum(value > 500 for value in values)) for seat, values in durations.items()},
+                      event_observations={seat: dict(unique_delivered=len(ids), delivered_ids=sorted(ids),
+                        gained_fortress=state["world"]["cars"][seat]["empowered"],
+                        gained_heal=state["world"]["cars"][seat]["heal_amount"] > 0,
+                        causal_effect="not established by a single rollout") for seat, ids in delivered.items()})
+    except (OSError, ValueError, KeyError, RuntimeError, TimeoutError) as error:
+        report.update(error=str(error), last_state=state)
+    finally:
+        for process in reversed(processes): process.close()
+    version_store.write_json(existing, report)
+    if report["status"] != "passed" and state is not None:
+        cold = copy.deepcopy(scene)
+        cold["initial"] = dict(tick=state["world"]["tick"], resources=state["world"]["resources"],
+                               cars={seat: state["world"]["cars"][seat] for seat in scene["agents"]})
+        # 故障现场是可编辑冷局面；原策略记忆在tape中，不声称这是进程热快照。
+        version_store.write_json(directory / "failure.cold.scene.json", cold)
+    return report
+
+
+def summarize(rows, plan):
+    """比较同case的差值，按map_id聚合再自助采样；四席位不当作四张独立地图。"""
+    summary = {}
+    for label in plan["candidates"]:
+        selected = [r for r in rows if r["candidate"] == label and r["status"] == "passed"]
+        summary[label] = dict(completed=len(selected), failures=sum(r["candidate"] == label and r["status"] != "passed" for r in rows))
+        if selected:
+            summary[label].update(mean_score=statistics.mean(r["focal_result"]["score"] for r in selected),
+                                  mean_rank=statistics.mean(r["rank"] for r in selected),
+                                  win_share=statistics.mean(r["win_share"] for r in selected),
+                                  mean_deaths=statistics.mean(r["focal_result"]["deaths"] for r in selected))
+    paired, baseline = {}, plan["candidates"][0]
+    valid = {(r["candidate"], r["case_id"]): r for r in rows if r["status"] == "passed"}
+    for label in plan["candidates"][1:]:
+        groups = {}
+        for (name, case), row in valid.items():
+            if name == label and (baseline, case) in valid:
+                groups.setdefault(row["map_id"], []).append(row["focal_result"]["score"] - valid[baseline, case]["focal_result"]["score"])
+        means = [statistics.mean(values) for values in groups.values()]
+        if means:
+            rng = random.Random(20261029)
+            draws = sorted(statistics.mean(rng.choices(means, k=len(means))) for _ in range(1000))
+            paired[label] = dict(reference=baseline, map_groups=len(means), paired_cases=sum(map(len, groups.values())),
+                                 mean_map_delta=statistics.mean(means), bootstrap95=[draws[24], draws[974]],
+                                 caution="descriptive; small fixture suite, not proof of official improvement")
+    return dict(versions=summary, paired=paired)
+
+
+def markdown(rows, summary, manifests, total_cases):
+    """每局都列，不只挑胜局；错误与未跑独立列出，表头固定便于DeepSeek追加讨论。"""
+    lines = ["# 冻结版本联赛", "", "范围：自建离线裁判；没有真实模型调用或原版DDS资格。", "",
+             f"计划 {total_cases} 个版本×局面组合；本报告记录 {len(rows)} 个。重复运行可复用已通过的相同签名；未跑不算胜负。", "",
+             "| 版本 | 源提交 | 二进制SHA256 |", "|---|---|---|"]
+    for label, manifest in manifests.items():
+        lines.append(f"| {label} | `{manifest['provenance']['commit'][:12]}` | `{manifest['binary_sha256'][:16]}…` |")
+    lines += ["", "完整SHA、编译信息与全部参数见versions.json；表中仅缩短显示。"]
+    lines += ["", "| 版本 | 完成 | 故障 | 均分 | 平均名次 | 第一份额 | 平均死亡 |", "|---|---:|---:|---:|---:|---:|---:|"]
+    for label, item in summary["versions"].items():
+        lines.append(f"| {label} | {item['completed']} | {item['failures']} | " + " | ".join(f"{item[k]:.3f}" if k in item else "—" for k in ("mean_score", "mean_rank", "win_share", "mean_deaths")) + " |")
+    lines += ["", "| 候选相对首版本 | 地图组 | 配对局面 | 地图均分差 | 分组自助95%区间 |", "|---|---:|---:|---:|---|"]
+    for label, item in summary["paired"].items():
+        lines.append(f"| {label} | {item['map_groups']} | {item['paired_cases']} | {item['mean_map_delta']:.3f} | {item['bootstrap95']} |")
+    lines += ["", "区间仅描述本夹具样本；同图席位/对手的相关性按地图聚合，少量地图不能证明泛化。"]
+    last_family = None
+    for row in rows:
+        if row["family"] != last_family:
+            last_family = row["family"]
+            lines += ["", "## " + last_family, "",
+                      "| 局面 | 版本 | 状态 | Tick止点 | 名次 | 分 | R | D | 任务 | 死亡 | 无效 | 徘徊窗口* |",
+                      "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+        result = row.get("focal_result", {})
+        values = [row["case_id"], row["candidate"], row["status"], row.get("end_tick", "—"), row.get("rank", "—"),
+                  *[result.get(k, "—") for k in ("score", "R", "D", "qualified_M", "deaths", "invalid")], row.get("stationary_windows", "—")]
+        lines.append("| " + " | ".join(map(str, values)) + " |")
+    lines += ["", "*徘徊窗口：连续12帧在≤4格、R/D/任务/死亡无进展的候选标签；合理防守也会触发，须看tape。", "",
+              "每局目录有result.json、tape.jsonl.gz和stderr；失败另存failure.cold.scene.json。完整参数在versions.json。",
+              "公告送达/授予只算观察记录；因果收益需同资格、同局面、同对手的有/无解释或动作机制配对。", ""]
+    return "\n".join(lines)
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--manifest", default=f"{CST}/tools/versions.json")
-    ap.add_argument("--maps", default=None, help="逗号分隔 seed 子集；缺省全部 12 图")
-    ap.add_argument("--mixes", default="M1,M2,M3",
-                    help="逗号分隔；M3 在 candidate 就位前自动跳过")
-    ap.add_argument("--out", default="/tmp/version_league")
-    ap.add_argument("--only", default=None,
-                    help="调试过滤：MIX:SEED（如 M2:20261201），只跑一项")
-    args = ap.parse_args()
-
-    manifest = json.load(open(args.manifest))
-    os.makedirs(args.out, exist_ok=True)
-    verify_frozen(manifest)
-
-    seeds = [int(x) for x in (args.maps or "").split(",") if x.strip()] \
-        if args.maps else manifest["seeds"]
-    mixes = [m for m in args.mixes.split(",") if m.strip()]
-    if args.only:
-        m0, _, s0 = args.only.partition(":")
-        mixes, seeds = [m0], [int(s0)]
-
-    failed = 0
-    all_battles = []
-    for mix in mixes:
-        if mix == "M3" and not manifest["versions"].get("candidate"):
-            log("M3 跳过：candidate 未就位（17 家族全关，无候选）")
-            continue
-        our = {seat: seat_base(manifest, version, seat)
-               for seat, version in MIXES[mix].items()}
-        for seat, base in our.items():
-            if not os.path.isfile(f"{resolve_base(base)}/setup.bash"):
-                raise SystemExit(f"{mix} 席位 {seat} 底座缺失：{resolve_base(base)}")
-        for seed in seeds:
-            rc, battles = run_mix(seed, mix, our, args.out, args)
-            all_battles.extend(battles)
-            if rc != 0:
-                failed += 1
-    total = len(all_battles)
-    okn = sum(1 for b in all_battles if b.get("ok"))
-    log(f"联赛批次完成：{okn}/{total} 局 ok；失败驱动运行 {failed} 个")
-    return 0 if (okn == total and failed == 0) else 1
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    freezing = commands.add_parser("freeze", help="从真实Git提交冻结历史worker")
+    freezing.add_argument("label")
+    freezing.add_argument("--ref", help="commit/tag/branch；解析后固定完整SHA")
+    freezing.add_argument("--repository", default=str(ROOT))
+    freezing.add_argument("--snapshot", help="替代git读取的已取得源码目录；必须同时给--lock")
+    freezing.add_argument("--lock", help="含repository/commit/git_blobs的快照清单")
+    freezing.add_argument("--store", default=str(ROOT / "build/league/versions"))
+    freezing.add_argument("--json-include")
+    suite = commands.add_parser("suite", help="写12局面×4席位×3组合的可编辑清单")
+    suite.add_argument("--versions", nargs="+", required=True, help="label=冻结目录")
+    suite.add_argument("--anchor", required=True)
+    suite.add_argument("--seed", type=int, default=20261029)
+    suite.add_argument("--out", required=True)
+    running = commands.add_parser("run", help="执行清单，可按case过滤/限制；同签名已通过项可续跑")
+    running.add_argument("plan")
+    running.add_argument("--out", required=True)
+    running.add_argument("--cases", default="*", help="case id通配符，例如bridge-*-pressure")
+    running.add_argument("--limit", type=int, help="最多多少个case；每个case运行全部候选")
+    running.add_argument("--json-include")
+    running.add_argument("--worker-timeout", type=float, default=5, help="进程硬时限秒；另报策略超过500ms数")
+    args = parser.parse_args()
+    if args.command == "freeze":
+        if bool(args.snapshot) != bool(args.lock) or bool(args.ref) == bool(args.snapshot):
+            parser.error("freeze二选一：--ref 或 --snapshot 加 --lock")
+        sources, provenance = version_store.locked_sources(args.snapshot, args.lock) if args.snapshot else version_store.git_sources(args.repository, args.ref)
+        folder, manifest = version_store.freeze(args.label, sources, provenance, args.store, args.json_include)
+        print(json.dumps(dict(version=str(folder), commit=manifest["provenance"]["commit"], binary_sha256=manifest["binary_sha256"])))
+        return 0
+    if args.command == "suite":
+        versions = dict(entry.split("=", 1) for entry in args.versions)
+        if args.anchor not in versions or len(versions) < 2:
+            raise ValueError("suite needs two frozen labels and an existing anchor")
+        versions = {label: str(Path(path).resolve()) for label, path in versions.items()}
+        plan = league_maps.make_suite(list(versions), args.anchor, versions, args.seed)
+        version_store.write_json(args.out, plan)
+        print(json.dumps(dict(plan=args.out, cases=len(plan["cases"]), combinations=len(plan["cases"]) * len(versions))))
+        return 0
+    if args.worker_timeout <= 0 or args.limit is not None and args.limit <= 0:
+        raise ValueError("positive timeout/limit required")
+    plan = json.loads(Path(args.plan).read_text())
+    if plan["schema"] != 1 or len(set(c["id"] for c in plan["cases"])) != len(plan["cases"]):
+        raise ValueError("plan schema/duplicate case id")
+    versions = {label: version_store.load_version(folder) for label, folder in plan["versions"].items()}
+    engine_binary, engine_build = run_scenarios.build(args.json_include)
+    destination = Path(args.out).resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+    manifests = {label: entry[1] for label, entry in versions.items()}
+    identity = dict(plan_sha256=run_scenarios.digest(plan), engine_build_id=engine_build["build_id"],
+                    binaries={label: manifest["binary_sha256"] for label, manifest in manifests.items()})
+    receipt = destination / "identity.json"
+    if receipt.exists() and json.loads(receipt.read_text()) != identity:
+        raise ValueError("output directory belongs to a different plan/build; choose another --out")
+    version_store.write_json(receipt, identity)
+    version_store.write_json(destination / "versions.json", manifests)
+    version_store.write_json(destination / "plan.json", plan)
+    version_store.write_json(destination / "engine.json", engine_build)
+    cases = [case for case in plan["cases"] if fnmatch.fnmatchcase(case["id"], args.cases)]
+    if args.limit: cases = cases[:args.limit]
+    if not cases: raise ValueError("no selected cases")
+    rows = []
+    for case in cases:
+        if not all(part and part.replace("-", "").replace("_", "").isalnum() for part in [case["id"], *plan["candidates"]]):
+            raise ValueError("unsafe case/version filename")
+        for label in plan["candidates"]:
+            row = play(case, label, plan, versions, engine_binary, engine_build, destination / case["id"] / label, args.worker_timeout)
+            rows.append(row)
+            summary = summarize(rows, plan)
+            version_store.write_json(destination / "summary.json", dict(summary=summary, rows=rows))
+            (destination / "report.md").write_text(markdown(rows, summary, manifests, len(plan["cases"]) * len(plan["candidates"])))
+            print(json.dumps(dict(case=case["id"], version=label, status=row["status"], score=row.get("focal_result", {}).get("score")), ensure_ascii=False), flush=True)
+    return 1 if any(row["status"] != "passed" for row in rows) else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+        print("版本联赛失败：" + str(error), file=sys.stderr)
+        sys.exit(2)

@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "name": "oracle-resource-chain",
+  "stage": 1,
+  "tick_limit": 500,
+  "qualified": true,
+  "seed": 17,
+  "map": {
+    "width": 9,
+    "height": 9,
+    "vision_radius": 4,
+    "walls": [],
+    "spawns": [
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        8,
+        8
+      ]
+    ]
+  },
+  "initial": {
+    "tick": 0,
+    "cars": {
+      "A": {
+        "position": [
+          1,
+          1
+        ],
+        "hp": 100
+      }
+    },
+    "resources": [
+      {
+        "position": [
+          2,
+          1
+        ],
+        "value": 10
+      },
+      {
+        "position": [
+          1,
+          2
+        ],
+        "value": 20
+      },
+      {
+        "position": [
+          1,
+          3
+        ],
+        "value": 10
+      }
+    ]
+  },
+  "missions": [],
+  "events": [],
+  "agents": {
+    "A": {
+      "type": "strategy",
+      "event_delivery": "none"
+    }
+  },
+  "run": {
+    "until_tick": 2
+  },
+  "oracle": {
+    "seat": "A",
+    "depth": 2,
+    "max_nodes": 1000,
+    "objective": [
+      {
+        "path": "/world/cars/A/R",
+        "sense": "max"
+      }
+    ],
+    "include_no_submission": false
+  }
+}
