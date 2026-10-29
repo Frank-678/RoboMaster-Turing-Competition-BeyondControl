@@ -28,6 +28,14 @@ CST = os.path.dirname(TOOLS)
 REFEREE_STARTUP_RETRIES = 3   # 原版 referee 12s 节点就绪竞态（practice.py:279）：背靠背开局偶发 → 静置重试
 REFEREE_STARTUP_SETTLE = 15   # 重试前静置秒数：让 ROS/DDS 与上一局残留节点完全退出
 INTER_BATTLE_SETTLE = 3      # 局间静置：stop_battle 后 ROS/DDS 异步拆除完成再开下一局
+
+
+def referee_ready_since(log_dir, baseline):
+    """按尝试独立的就绪判定：本次输出的就绪行数必须超过基线；
+    日志被截断重开（计数低于基线）时，以本次已出现就绪行为准。"""
+    count = Path(log_dir, "referee_stdout.log").read_text().count("练习裁判已就绪")
+    return count > baseline or (count < baseline and count >= 1)
+
 WIDTH, HEIGHT = 18, 18
 SPAWNS = [(1, 1), (16, 1), (1, 16), (16, 16)]
 CENTER = (9, 9)
@@ -249,6 +257,8 @@ def run_battle(variant_id, cfg, cfg_path, log_dir, our_seats):
         ref = None
         for attempt in range(1, REFEREE_STARTUP_RETRIES + 1):
             try:
+                # 每次尝试独立就绪基线：防止上一尝试残留的 Ready 行让本次误判已就绪。
+                ready_baseline = Path(log_dir, "referee_stdout.log").read_text().count("练习裁判已就绪")
                 ref = subprocess.Popen(
                     ["bash", f"{CST}/practice/start_referee.sh", "--stage", "2",
                      "--port", os.environ["RMTC_PRACTICE_PORT"], "--ai-mode", "real", "--bots", referee_bots,
@@ -259,7 +269,7 @@ def run_battle(variant_id, cfg, cfg_path, log_dir, our_seats):
                 while True:
                     if ref.poll() is not None:
                         raise RuntimeError("referee exited before ready")
-                    if "练习裁判已就绪" in Path(log_dir, "referee_stdout.log").read_text():
+                    if referee_ready_since(log_dir, ready_baseline):
                         break
                     if time.monotonic() >= deadline:
                         raise RuntimeError("referee not ready in 60s")

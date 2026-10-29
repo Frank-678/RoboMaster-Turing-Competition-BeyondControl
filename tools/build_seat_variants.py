@@ -16,6 +16,9 @@ def digest(path):
 def snapshot(source, destination, seat):
     """完整复制ROS包源码；只在副本改team和公开practice令牌，不转写正式令牌。"""
     shutil.copytree(source / "src", destination / "src")
+    # CMakeLists 在 BUILD_TESTING=ON（默认）下引用 ../../tests/*.cpp → 冻结树也带 tests（存在时）。
+    if (source / "tests").is_dir():
+        shutil.copytree(source / "tests", destination / "tests")
     header = destination / "src/rmtc_bot/include/rmtc_bot/match_config.hpp"
     original = digest(header)
     text, teams = re.subn(r'(\bteam\s*=\s*")[^"]*(")', lambda m: m[1] + seat + m[2], header.read_text())
@@ -48,10 +51,14 @@ def main():
         frozen = build / "source"
         frozen.mkdir(parents=True)
         record = snapshot(source, frozen, seat)
-        # base-paths和cwd都明确，不能从调用者的另一个工作空间误找源码。
-        completed = subprocess.run(["colcon", "--log-base", str(build / "logs"), "build", "--base-paths", str(frozen / "src"),
-                                    "--packages-select", "rmtc_bot", "--build-base", str(build / "packages"),
-                                    "--install-base", str(install)], cwd=source)
+        # base-paths和cwd都明确，不能从调用者的另一个工作空间误找源码；
+        # colcon 需要 ROS 环境（login shell 不保证 source，显式 source）。
+        completed = subprocess.run(
+            ["bash", "-c",
+             "source /opt/ros/humble/setup.bash && exec colcon --log-base " + str(build / "logs")
+             + " build --base-paths " + str(frozen / "src")
+             + " --packages-select rmtc_bot --build-base " + str(build / "packages")
+             + " --install-base " + str(install)], cwd=source)
         if completed.returncode:
             raise SystemExit(completed.returncode)
         binary = install / "rmtc_bot/lib/rmtc_bot/bot"
