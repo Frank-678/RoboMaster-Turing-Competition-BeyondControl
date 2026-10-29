@@ -49,6 +49,8 @@ public:
   const Scenario &scenario() const { return scenario_; }
   const std::array<Car,4> &cars() const { return cars_; }
   int tick() const { return tick_; }
+  Json checkpoint() const; // 测试端：保存“下一Tick尚未执行”的完整世界；不包含策略记忆。
+  void restore(const Json &state); // 测试端：校验后恢复世界、剩余资源、驻留/复活/增益状态。
   // 测试可以在初态写入精确边界，生产策略永远没有这个接口。
   std::array<Car,4> &fixture_cars() { return cars_; }
 private:
