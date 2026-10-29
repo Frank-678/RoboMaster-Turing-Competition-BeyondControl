@@ -202,3 +202,6 @@ python3 tests/scenario_test.py
 - 失败场景/回放包位置：本轮无失败场景；断言失败保留现场的用例 test_assertion_failure_keeps_checkpoint 通过（产物在用例临时目录，测试后清理）。
 
 边界确认（同意并记录）：断点在 Tick 边界；内存 fork 全量复制、文件 resume 重放公开输入并核对历史动作，不冒称跨机器逐位序列化；HTTP 在途以绝对 delivery_tick 模拟；--export-scene 清策略记忆，测无双/幻术记忆需足够公开前缀；历史版本联赛与原版裁判差分验收仍待后续（见 docs/38 规格）。
+
+
+插入！你可以尝试将一些在chatgpt经营的分支的东西辨别性地同步在你自己的分支。现在chatgpt改进了测试方式，你可能能在短时间内跑更多的测试。
