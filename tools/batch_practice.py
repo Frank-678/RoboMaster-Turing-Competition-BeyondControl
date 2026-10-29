@@ -14,6 +14,7 @@ import json
 import os
 import random
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -187,13 +188,20 @@ def stop_battle(procs):
     http_post("/api/stop")
     time.sleep(2)
     # 收掉我们的车（裁判/陪练由 practice.py 的 stop 清理）。
+    # 全部以独立会话启动：按进程组整体终止，避免组内子进程成孤儿。
     for p in procs:
         if p.poll() is None:
-            p.terminate()
+            try:
+                os.killpg(p.pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                p.terminate()
     time.sleep(2)
     for p in procs:
         if p.poll() is None:
-            p.kill()
+            try:
+                os.killpg(p.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                p.kill()
 
 
 def battle_summary(run_dir, variant_id):
