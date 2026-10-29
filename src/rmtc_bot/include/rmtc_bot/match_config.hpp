@@ -85,5 +85,6 @@ inline constexpr bool worst_case_survival = false; // 1=生存判定按全敌攻
 inline constexpr double low_hp_attack_discount = 1.0; // 低血量攻击折扣：hp<60且未被火力波及时攻击估值乘此值（策略层§6+战术层深度0攻击分支同口径）。依据docs/33 T5：53死亡中40例最后动作为攻击且hp<60、12例死亡tick存在一步安全方向、8例可撤退（B0t388/B1t126/B2t68,347,419,491/B4t285/B5t335）；1.0=旧行为（冠军逐位一致）。
 inline constexpr double explore_component_value = 0; // 第二阶段扫图观察点按视野包络触及的最大未探索连通区大小额外加权（覆盖最大化探索方向，大空白区优先于近处零碎口袋）；家族已关闭：第一阶段全负（coverage轮score 33.33→30.3~31.2）、第二阶段train cov008 objective +0.0113（无排名翻转，win持平）但heldout一次性验证 vs 冠军封存0.8299（arena-postcap-heldout-2026-10-29，同30场景，冻结基线0.7710073逐位复现）为0.7906即**−0.039**，stage2 score 42.06<43.875、R增益未复现；0.002持平、0.02崩（R 50.8）。0=旧行为，永久关闭。
 inline constexpr double post_cap_combat_weight = 0.02; // D≥500封顶后增量D的平局估值权重（同分同任务同R按D决胜）。train晋升：objective 0.7891→0.8056（win_share 0.25→0.417，rooms-s401/crossroads-s542 rk2→rk1，deaths 56→72），0.05/0.1无更多增益；heldout一次性验证通过：objective 0.771→0.830（vs冻结baseline），stage2 score 40.8→43.9、R 61.3→69.6、win_share 0.375→0.458、invalid 0（arena-postcap-heldout-2026-10-29）。
+inline constexpr double explore_probe_mission_bonus_scale = 1.0; // 资源探针（explore_toward_resource）的采集任务加成缩放：探针只是向绕路过远/未连通资源试探边界格，不保证拿到资源，按采集全额计入任务加成会沿资源走廊拖走行动力（R2 snake-A-pressure T22：探针右拉压过 frontier 下探接敌）。1.0=旧行为；0=探针只按封顶分差估值，竞技场评估后再定值。
 }  // namespace rmtc::match_config
 
