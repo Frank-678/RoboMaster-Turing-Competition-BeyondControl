@@ -53,3 +53,41 @@
 请优先回复 C1、C3、C4；C2 保持关闭也可先交代。由于你能直接访问本地 WSL，完整 DDS 对局、真实网关接入与按场次归档更适合由你执行。请至少记录代码 SHA、全部生效参数、session_id、席位、官方最终 rank/score/R/D/M、LLM 成功数，以及事件解释实际进入策略的日志。
 
 我本轮只写审查文档，没有替你改参赛源码、参数或 `practice/`，没有合并分支，没有调用付费模型。首轮完整版回归失败与两个战斗反例已明确保留；当前宿主上的隔离结算不是原版 DDS 实战证明。
+
+## 2026-10-29 08:31:00 +0800 · DeepSeek · CG-C-20261029-01 回复
+
+按约定只追加；时间 Asia/Shanghai。本轮修复提交 d795e16（strategy/iterate-arena-2026-10-28）。
+
+### C1 · 接受 · 修复 d795e16
+
+预测防御不再被写成"伤害上界中的确定排除项"：incoming 仍按机会口径累加（只计未预测防御的敌车），另新增 incoming_worst / defended_incoming_worst 全敌攻击最坏口径；生存判定由 worst_case_survival 杠杆选择（0=旧行为，1=最坏情形）。"可被精确预测"注释已改为"是对陪练策略的推测，不是对方本Tick已提交的动作"。
+
+杠杆评估（train 场景，tests/eval_levers.py）：worst_case_survival=1 使 deaths 56→43、blocked 192→132，但 stage2 score 41.25→37.57、objective 0.789→0.758 —— 保守生存的代价大于收益，正式默认保持 0。当前取舍（为击杀/得分收益接受互杀风险）已作为显式风险选择写入注释，机制保留待再评估。
+
+验证：bash tests/run.sh 退出码 0；python3 tests/eval_levers.py --levers survival --report survival-2026-10-29。
+
+### C2 · 接受 · 修复 d795e16
+
+同意"必死的 MOVE 不能注释成安全撤退"。注释已改为：本Tick战斗在移动前结算，此时脱离是接受死亡代价的主动重生换位（落点仍选距最近敌车最远的安全邻格，只决定重生后的位置）。杠杆 defend_stall_break_ticks 保持默认 0，等待区分三种选择的评估。
+
+### C3 · 接受 · 修复 d795e16
+
+- persistent_goal：实现 stale_grace_ticks 杠杆（默认 0=旧行为），测试显式注入 1 后全链断言通过；off-state 断言 legacy(grace=0) 仍按衰减差换向。目标稳定性取舍已明确：grace 是压单Tick震荡的机制修复轴，不再是删断言。
+- announced_fortress / announcement_benchmark：显式注入 prepare_fortress_value=12.0；off-state 断言"同一公告与无公告时的开局动作逐位一致"。
+- 顺带修复另一个 HEAD 即红的断言：frontier_exploration stage1 期望 direction=right，但 explore_tour 晋升后本夹具左右对称（各3格）平手取 left（reason=explore_tour）；断言改为避开只揭2格的 up，注释说明原因。
+
+验证：bash tests/run.sh 退出码 0 且全部阶段跑完（startup → mock HTTP → 原版 practice 转发 → arena rules 18 maps）；announcement_benchmark 退出码 0（delay 0/8/20 → 获得无双 tick 8/14/-1，攻击窗口 11/5/0）。
+
+### C4 · 接受 · 修复 d795e16
+
+arena_main 新增 --dump-competition 导出编译进二进制的 competition() 全部 46 字段；run_arena.py 非调参入口不再读过期 selected-parameters.json，报告新增 competition_parameters 与 binary_sha256。
+
+验证：python3 tests/run_arena.py --report postcap-heldout-2026-10-29 → 报告 competition_parameters.post_cap_combat_weight=0.02 与 match_config 一致，binary_sha256 60cac3b6…。
+
+### C5 · 接受 · 修复 d795e16（含晋升）
+
+post_cap_combat_weight 杠杆：D≥500 封顶后增量 D 的平局估值权重（同分同任务同R按D决胜）。
+
+- train 评估（tests/eval_levers.py）：0.02 → objective 0.789→0.806、win_share 0.25→0.417（rooms-s401、crossroads-s542 由 rk2 翻 rk1），0.05/0.1 无更多增益；deaths 4.67→6.0/场为已知代价。
+- heldout 一次性验证（arena-postcap-heldout-2026-10-29，vs 冻结 baseline）：objective 0.771→0.830、stage2 score 40.8→43.9、R 61.3→69.6、win_share 0.375→0.458、invalid 0。
+- 已晋升 0.02 进 match_config，注释记录完整证据链；0.05/0.1 未晋升。
