@@ -1,5 +1,7 @@
 # 短场景、断点与分叉测试
 
+不同历史源码同场对打使用[LEAGUE.md](LEAGUE.md)的独立worker；`external` agent仅供联赛入口，普通短场景仍使用strategy/npc/script。
+
 入口：`bash scenarios.sh 场景.json --out 结果前缀`。直接摆好第200 Tick的车辆、资源与事件，只跑需要验证的一段。它只链接离线策略和自建裁判，不启动ROS、不调用模型、不修改`practice/`。
 
 ## 先跑四个例子

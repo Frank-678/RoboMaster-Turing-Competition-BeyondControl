@@ -1,5 +1,7 @@
 # RoboMaster-Turing-Competition-BeyondControl
 
+历史版本对打见[LEAGUE.md](LEAGUE.md)：从固定提交冻结程序，任意初态/条件停止，生成分层地图并自动列出全部对照结果。
+
 离线定位一段局面：见[短场景、断点与分叉测试](SCENARIOS.md)。入口为 `bash scenarios.sh tests/scenarios/announcement_pair.json --out build/checks/blast`，可摆中途局面、条件停止、保存恢复和复制暖状态。
 
 RMTC C++17 / ROS 2 Humble选手工程。这里保留构建、配置、运行和代码接口说明。材料分析、方案比较及历史实测在[分析仓库](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/README.md)维护。
