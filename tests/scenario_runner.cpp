@@ -3,6 +3,7 @@
 #include "arena.hpp"
 #include "rmtc_bot/strategy.hpp"
 #include <algorithm>
+#include <functional>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
@@ -244,6 +245,88 @@ Json run(Controller controller,const Json &control) {
     {"trace",trace},{"checkpoint",controller.checkpoint()},{"saved",saved}});
   return result;
 }
+
+// 完全信息、固定对手/随机种子的短段穷举，只给测试端作参照，不是可部署的参赛决策器。
+// 最优仅指明示终点和字典序目标；预算耗尽就complete=false，绝不把已搜到的最好值冒充全局最优。
+Json oracle(Controller controller,const Json &control) {
+  const auto seat=control.at("seat").get<std::string>();
+  const auto found=std::find(seats.begin(),seats.end(),seat);
+  if(found==seats.end()) throw std::runtime_error("oracle seat must be A/B/C/D");
+  const int own=static_cast<int>(std::distance(seats.begin(),found));
+  if(!controller.agents[own]) throw std::runtime_error("oracle seat is disabled");
+  for(int i=0;i<4;++i) if(i!=own && controller.agents[i] &&
+      controller.agents[i]->spec.at("type")!="script" && controller.agents[i]->spec.at("type")!="npc")
+    throw std::runtime_error("exact oracle opponents must be script/NPC; clock-budget Strategy or external worker is not an exact transition");
+  controller.agents[own]->spec["type"]="external";
+  const int depth=integer(control.at("depth"),1,4),limit=integer(control.at("max_nodes"),1,1000000);
+  const bool include_none=control.at("include_no_submission").get<bool>(); // 测试可显式纳入等待；绝不当默认兜底。
+  const auto &objective=control.at("objective");
+  if(!objective.is_array() || objective.empty()) throw std::runtime_error("oracle needs explicit ordered objective");
+  const auto view=[](const Controller &c) {return Json{{"world",c.game.checkpoint()},{"result",c.game.result()}};};
+  const auto values=[&](const Json &state) {
+    std::vector<double> result;
+    for(const auto &goal:objective) {
+      const auto &value=state.at(Json::json_pointer(goal.at("path").get<std::string>()));
+      if(!value.is_number()) throw std::runtime_error("oracle objective path must be numeric");
+      const auto sense=goal.at("sense").get<std::string>();
+      if(sense!="max" && sense!="min") throw std::runtime_error("oracle objective sense must be max/min");
+      result.push_back(value.get<double>()*(sense=="max" ? 1 : -1));
+    }
+    return result;
+  };
+  const auto choices=[&](const Controller &c) {
+    Json actions=Json::array();const auto &fighter=c.game.cars()[own].fighter;
+    if(!fighter.alive) {actions.push_back(nullptr);return actions;} // 死车只能不提交；存活候选是否含不提交由配置明示。
+    if(include_none) actions.push_back(nullptr); // 明示候选集中的不提交，不是策略失败后的回退。
+    if(c.game.scenario().stage==2) actions.push_back({{"action","defend"}});
+    for(const auto *direction:rules::directions) actions.push_back({{"action","move"},{"direction",direction}});
+    if(c.game.scenario().stage==2 && !fighter.protected_spawn)
+      for(const auto *direction:rules::directions) actions.push_back({{"action","attack"},{"direction",direction}});
+    return actions;
+  };
+  // found表示至少算到一个完整叶子；value是统一成“越大越好”的目标向量；path/state保存对应动作串/终点。
+  struct Best {bool found=false;std::vector<double> value;Json path=nullptr,state=nullptr;};
+  Best best;int nodes=0,leaves=0;bool complete=true;
+  const auto consider=[&](const Controller &c,const Json &path,Best &local) {
+    const auto state=view(c);const auto score=values(state);++leaves;
+    const auto improve=[&](Best &target) {
+      if(!target.found || std::lexicographical_compare(target.value.begin(),target.value.end(),score.begin(),score.end())) {
+        target.found=true;target.value=score;target.path=path;target.state=state;
+      }
+    };
+    improve(local);improve(best);
+  };
+  values(view(controller)); // 起点先验证目标路径；不会等搜完才发现拼错。
+  std::function<void(const Controller&,int,const Json&,Best&)> search;
+  search=[&](const Controller &c,int left,const Json &path,Best &local) {
+    if(left==0 || c.game.tick()>=c.game.scenario().ticks) {consider(c,path,local);return;}
+    for(const auto &action:choices(c)) {
+      if(nodes>=limit) {complete=false;return;}
+      ++nodes;auto next=c;next.tick(Json{{seat,action}});auto route=path;route.push_back(action);
+      search(next,left-1,route,local);
+      if(!complete) return;
+    }
+  };
+  Json roots=Json::array();
+  const auto initial=view(controller);
+  if(controller.game.tick()>=controller.game.scenario().ticks) consider(controller,Json::array(),best);
+  else for(const auto &action:choices(controller)) {
+    Best local;bool examined=false;
+    if(nodes<limit && complete) {
+      ++nodes;examined=true;auto next=controller;next.tick(Json{{seat,action}});
+      search(next,depth-1,Json::array({action}),local);
+    } else complete=false;
+    roots.push_back({{"action",action},{"examined",examined},{"subtree_complete",examined && complete},
+                     {"best_value",local.found ? Json(local.value) : Json()},
+                     {"best_sequence",local.path},{"best_state",local.state}});
+  }
+  return {{"schema",1},{"scope","offline full-information fixed-opponent finite-horizon oracle; never contestant input"},
+    {"seat",seat},{"depth",depth},{"objective",objective},{"include_no_submission",include_none},
+    {"max_nodes",limit},{"nodes",nodes},{"leaves",leaves},
+    {"complete",complete},{"optimal_for_stated_fixture",complete && best.found},{"initial",initial},
+    {"best_sequence",best.path},{"best_value",best.found ? Json(best.value) : Json()},
+    {"best_state",best.state},{"root_actions",roots}};
+}
 } // namespace
 
 // 联赛用逐Tick裁判服务。全图只回调度器，调度器只将inputs[席位]交给对应版本。
@@ -277,6 +360,11 @@ int serve() {
 int main(int argc,char **argv) {
   try {
     if(argc==2 && std::string(argv[1])=="--serve") return serve();
+    if(argc==2 && std::string(argv[1])=="--oracle") {
+      const auto input=Json::parse(std::cin);Controller controller(input.at("scene"),input.at("build_id"));
+      const auto result=oracle(std::move(controller),input.at("scene").at("oracle"));
+      std::cout<<result.dump()<<'\n';return result.at("complete").get<bool>() ? 0 : 1;
+    }
     if(argc!=1) throw std::runtime_error("unknown scenario runner argument");
     const auto input=Json::parse(std::cin);const auto &spec=input.contains("resume") ? input.at("resume").at("scene") : input.at("scene");
     Controller controller(spec,input.at("build_id").get<std::string>());
