@@ -1,6 +1,12 @@
 # 源码导读
 
+历史版本联赛的冻结、逐帧输入与全部参数清单见[LEAGUE.md](LEAGUE.md)；原版ROS入口是`practice_league.sh`，实测工具函数见该文末。
+
+短场景工具的文件、函数、状态字段与起止Tick语义见[SCENARIOS.md](SCENARIOS.md)。它是独立测试入口，不被正式ROS机器人链接。
+
 先读比赛配置，再沿“收感知→管场次→作决策→发动作”阅读。变量的具体含义写在声明旁，关键规则写在判断旁。
+
+[规则状态机](STATE_MACHINE.md)将条款、权限状态、事件和对手轨迹转移对应到代码；[实测记录](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/REAL_TEST.md)区分真实模型与完整裁判对局。
 
 ## 主线从哪里开始
 
@@ -19,8 +25,18 @@
 | 文件 | 职责 |
 | --- | --- |
 | `README.md` | 先看这里：地址、令牌、模型分别填哪，两个终端如何启动，零次调用如何查 |
+| [LESSONS.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/LESSONS.md) | 七份字幕的借鉴/否决、假设风险逃路修复与验证边界 |
+| `tests/risk_benchmark.cpp`、`tests/run_risk.py` | 四席位×四旋转×两敌方动作的最小反例与可选旧工程配对 |
+| [NAVIGATION.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/NAVIGATION.md) | 无收益往返、争格、封闭区域的复现、脱困机制和日志说明 |
+| `tests/unstuck_benchmark.cpp` | 六个500Tick导航压力/正常路径夹具，与旧核心配对 |
+| `tests/run_unstuck.py` | 编译导航夹具，断言脱困与保留正常绕路，可只读比较旧工程 |
+| `ARENA.md` | 自建对手池、六类地图、规则模型、参数搜索和留出边界 |
+| `arena.sh` | 一键离线对战与调参；不改正式参数 |
 | `DEV.md` | 依赖、策略机制、事件表、测试方法和当前验证范围 |
 | `CODE_GUIDE.md` | 本文件：主线、文件、类型和函数索引 |
+| `STATE_MACHINE.md` | 全部编号规则对应、状态图、策略路径与预测边界 |
+| [REAL_TEST.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/REAL_TEST.md) | 真实模型调用及裁判启动结果 |
+| [MATERIALS_CHECK.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/MATERIALS_CHECK.md) | 原始材料和已有学习笔记具体对应哪些修复，以及验证范围 |
 | `LICENSE` | 本工程许可证 |
 | `.gitignore` | 排除构建、安装和日志等产物 |
 | `build.sh` | 在正确工作空间构建选手包，生成编辑器编译数据库 |
@@ -120,3 +136,102 @@
 | `practice/__pycache__/` | 原Python程序生成/附带的字节码缓存 |
 
 这些原文件从初始构建起保持不变。我们的`practice_launcher.cpp`只传启动参数/环境，没有写入、替换或修补原版裁判。
+
+
+## 新增目标与资源规划
+
+详细行为与实际结果见[PLANNING.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/PLANNING.md)。原通信与AI结构不变。
+
+| 类型或函数 | 用途 |
+| --- | --- |
+| `Goal` | `position`目标坐标、`kind`类别、`tick`选择时刻；`goal_`仅在选择MOVE时续签 |
+| `ResourcePlan` | `first`世界首方向，`first_resource`首次拾取点，`utility`收益/耗时，`benefit`整串收益，`stops`未执行目标串 |
+| `resource_plans` | 只在已知格比较有界资源串，不写回真实位置、地图或score |
+| `resource_plans`的参数 | `start/tick`本帧真值，`remaining_ticks`剩余动作数，`targets`少量资源候选，`occupied`当前敌车占位，`first_allowed`原BFS批准的首步，`current_r`官方R，`need_normal/high`任务机会，`value_target`资源任务门槛 |
+| 局部`State` | `position/elapsed`预计落点与耗时，`first/first_resource`首动作与首份资源，`virtual_r/benefit`预计资源与估值，`collected`防重复拾取，`mission_bonus`防重复支付同类任务机会 |
+| `route` | 单段BFS；`parent`保存前驱和步数，`pending`队列，`path`依序经过格，`action_tick`预计执行时间 |
+| `deadline/time_up` | 墙钟软预算，不改变逻辑Tick；超时保留已有基线或已完成的安全候选 |
+| `beam/expanded/selected` | 当前层、扩展层和剪枝后下一层；只存在于本帧 |
+| `best/used_direction/unique` | 按首方向保留资源串，给不同方向名额，以首步/落点/拾取集合/耗时去重 |
+| `ranked_before` | 严格排序，先比较收益/耗时，再比整串收益、耗时、方向和位置 |
+| `previous_goal/keep_goal/best_goal` | 上次目标、是否能给迟滞奖励、本帧候选；失败MOVE、断帧、复活不沿用奖励 |
+| `resource_options/targets/first_allowed` | 单目标排序得到的少量目标与可用首步；不重新放开占位或危险格 |
+| `best_benefit` | 同类资源单位收益近似打平时，比较实际计划兑现总量 |
+| `newly_visible` | 观察点按本帧实际视野半径可能新揭开的格数，未知内容仍未知 |
+| `tick_limit/remaining_ticks` | 配置给出的100/500动作窗口和本帧剩余步数，最终状态不发布动作 |
+
+新增配置：`goal_retention_bonus`迟滞余量，`resource_plan_depth`目标深度，`resource_beam_width`束宽，`resource_candidate_limit`候选数，`resource_plan_budget_ms`额外搜索预算，`frontier_value`信息权重；均是赛前明确取舍。`stage1_ticks/stage2_ticks`是规则时长配置，不作为优化器搜索参数。
+
+`tests/planning_benchmark.cpp`只有测试端持有完整合成地图，逐帧生成局部感知；`Fixture`保存场景，`entity`生成相对图，`run`执行独立策略并记录真实移动/拾取、覆盖格、受阻次数与决策耗时，`main`输出七例。`receipt`来自测试端已执行动作，`seen`只用于评测，不作为选手输入。
+
+## 上游出网诊断的主线
+
+`check_ai.sh → practice_launcher --check-ai → scripts/check_ai.py::main → probe`。仍只有`match_config.hpp`一处配置；进程环境只是启动器向Python传值，不要求用户输入。正常`practice.sh`入口不变。
+
+`check_ai`标志决定做诊断还是启动原裁判；`argc/argv`只接受这一内部选择。`build.sh`生成`ai_check.sha256`，记录启动器源码、诊断脚本、shell入口及已构建二进制的哈希。没有新记录或任一字节变化时拒绝执行，防止旧启动器忽略新参数后误启动裁判。
+
+Python的`probe`只发一次POST：`url/key/model/thinking/json_output/max_tokens`均由编译配置传入；`payload`是最小JSON请求，`started`是单调计时起点，`response/body/choice/content`是本地临时结果，`result`仅含错误分类、HTTP码和耗时。`ReadTimeoutError`处理requests把正文读取超时包装成连接错误的情况；其余连接错误不靠异常文本猜原因。
+
+`main`检查启动器交接变量，调用`probe`，再输出`upstream_proxy`是否明确配置、`upstream_host`主机及模型名；没有打印Key、URL查询参数、模型思考或响应正文。退出0只代表这个最小请求返回预期JSON，不代表完整公告或比赛资格。
+
+## 战术、规则和离线对战符号
+
+| 类型/命名空间 | 成员与职责 |
+| --- | --- |
+| `StrategyParameters` | 固定的一组权重/预算；`competition`从唯一配置复制，`validate`拒绝坏值；不含可调规则伤害 |
+| `rmtc::rules` | 确定规则函数的命名空间，`ActionKind/Action`表示动作及方向，none只表示不提交 |
+| `Fighter` | `position/hp`位置血量；`attack/defended`对普通/防御目标伤害；`vulnerability`受击倍率；`alive/protected_spawn/area_attack`三种权限/效果 |
+| `CombatResult` | `fighters`统一扣血后状态，`earned`本批普通D及击杀奖，`deaths`各车死亡次数；死亡扣除最后统一做 |
+| `TacticalMission` | 类型、门槛、到点坐标；只包含未完成任务 |
+| `TacticalInput` | 0号本车、1至3号可见敌车；地图/资源/事件、目标价值和目标坐标、首步安全、当前R/D、可信拾取次数及效果记录；字段旁逐项注释 |
+| `TacticalChoice` | 首动作、估值、情景数与模拟步数，不暴露必须执行的后续队列 |
+| 战术局部`State` | 四车副本、剩余资源、虚拟R/D、拾取次数、死亡数、任务标记/估值、堡垒进度、各车回血截止和数量 |
+| 战术局部`Branch` | 一个公共动作前缀在多个情景下的状态数组、各情景折扣收益与合计估值 |
+| `GoalDistance` | 战略目标、权重、起点距离和已知格反向BFS距离；末位置真实接近目标才有尾部估值 |
+| `MoveAttempt` | 已提交的起点、落点、Tick；`move_attempt_`等回执，`failed_destination_/failed_moves_`只计连续失败 |
+| 资源局部`State::stops` | 本分支显式资源目标；`planned_resources_`只保存最终选中方向的目标串 |
+| `route_cache` | 本帧`(起点,目标,已用Tick)`到路径的缓存，不跨帧保留 |
+| `direction_value/goal/benefit/plan` | 每个世界首方向的最好收益、目标、总收益和资源串，战术改选首步时保持对应 |
+| `rmtc::arena` | 仅离线测试裁判；`Scenario/Announcement`持有测试真值，`Car`持有实际结算；`Game`推进，`Opponent`只用局部输入 |
+
+| 函数/局部函数 | 直观用途 |
+| --- | --- |
+| `rules::decode_action/encode_action` | JSON和测试动作之间转换；不提交编码为null |
+| `rules::ray/manhattan` | 判断1–2格攻击方向、四向距离 |
+| `rules::combat/adjusted_damage` | 同时伤害与分奖；全部奖励后扣死亡60，最低0、不封顶累计D |
+| `rules::move/respawn` | 按存活起始占位统一移动；曼哈顿层/上右下左找合法复活落点 |
+| `tactical_choice` | 展开三Tick、按不同首动作保留束，输出首动作 |
+| `can_move/choices` | 已知地图内生成可移动和有实际目标的攻击，以及合法防御 |
+| `opponent_action` | 某个手写对手情景在该状态下的合法候选，不访问未来真值 |
+| `advance` | 复制状态推进一Tick；`fire`按受害者/来源积累辣椒贡献 |
+| `value/aggregate/tail_value` | 官方边际分+机会成本；情景均值/最差值；真正接近战略目标的尾部价值 |
+| 资源`extend/evaluate_stops/record` | 接一个资源目标、从真实起点重评一串、保存各首方向最好串 |
+| `Strategy::note_model_reply` | 本场见到非mock模型正文，仅作任务收益假设，换场清除 |
+| `Game::observe/interpreted_events` | 本队局部感知、公告后延迟交付的正确解释夹具；不是生产事件解析器 |
+| `Game::step/refresh_effects/resurrect/current_walls` | 整Tick结算、重建效果、按位复活、合成基础和临时墙 |
+| `Game::score/result` | 规则原始分及逐车R/D/M、死亡和动作统计 |
+| `relative_entity/make_scenario` | 生成89字符相对图、不同地图任务事件 |
+| `Opponent::act/grid_offset` | 只用本队感知作风格决策、解析自己的相对实体位置 |
+| `arena_main::configure/play/main` | 只改白名单策略权重、运行一局、读取离线JSON并逐局输出；无ROS参数入口 |
+| Python`scenes/build/evaluate/summarize` | 组场、编译/规则测试、跑指定参数与场景、汇总指标 |
+| Python`candidates/main` | 固定种子生成搜索候选、训练筛选并一次留出对照，保存源码哈希和结果 |
+
+循环索引约定：`player/seat/i`是车，0–3；战术0总是本车。`mode`是手写情景，`depth`是本地推演Tick，`trial`是路线修改次数，`direction/d`是上右下左。`source/target`在伤害矩阵中是贡献者/受害者；`state/child/branch`均是推演副本，不是裁判感知。`normal/high`为计划拾取次数，`r/d`为计划R/D；配置含义在`match_config.hpp`逐项注释。
+
+## 导航进展与脱困变量
+
+`observe_navigation`在本帧地图更新后读取官方R/D/任务、HP、新格子数量及真实堡垒进度。`NavigationSample`只记可信连续Tick、实际坐标和上一目标；`recent_navigation_`至多保留一个配置窗口。`navigation_tick_/progress_tick_`分别记录上次可信回合和最近进展；`navigation_r_/d_/hp_/known_/missions_/capture_`是上一帧的对照，不是预测。
+
+`loop_cells_`是触发时反复经过的格子；`recovery_goal_/until_`是脱困目的地与绝对截止。`recovery_blocked_`表示检查后没有安全出口，保留原循环区防止隔一会又空跑；`recovery_count_`记录本场真正触发次数。`deferred_goals_`把目标类别/坐标暂缓到指定Tick，不改变格子可走性。换场、断帧/不可信回执和复活的失效规则见NAVIGATION。
+
+`decide`中的`available`检查脱困目标在当前BFS内可达且能在期限内到达；`best_escape`按新视野、低访问、有限距离与公开席位选择目标。仍只调用原`move`发布首步并处理幻术。`navigation_diagnostics`生成只读日志，经Session传给Bot；`navigation`是其JSON文本，含无进展时长、次数、目标、暂缓数和无出口标志。
+
+导航夹具`fixture/run`只在测试端建场和推进；`positions/repeats/longest`统计无成绩进展的周期运动，`first_resource/first_task`记录首次实际达成Tick，`reasons/trace`保留行为证据。`run_unstuck.py`的`build/run/verify/main`依次编译同夹具、执行、检查六个500Tick结果、保存摘要；旧版生产核心只读，不被新版策略当输入。
+
+## 公告前置与诊断入口
+
+`Strategy::event_diagnostics(tick)`只读统计已校验事件的pending/active/expired及本车重建效果。`Session::EventFlow`记录本场回包、解释校验、合并/迟到和最近事件摘要；`Session::event_diagnostics()`合并两者。`AiWorker::Job/Result::request_tick`随后台任务保存来源逻辑Tick，不能用返回时刻重置事件。
+
+`Bot::event_session_`与`logged_event_replies_`让event_update只在换场/新回包时输出；逐Tick行保留事件数和无双标志。`run.sh`的rmtc_run_log是本次控制台输出文件，pipeline保留机器人失败退出码。模型原文、思考、令牌均不打印。
+
+未来堡垒路径使用arrival（本次规划到达Tick）、first_capture（开始驻留Tick）、needed（尚需结算次数）、finish（授予Tick）、wait（早到等待成本）。未激活不提前计算驻留，生效后继续原有capture_fortress/hold_fortress逻辑；prepare_fortress仅表示赶往已公告的未来堡垒。`tests/announcement_benchmark.cpp`是独立旧新核心配对夹具，解释由手工oracle延迟交付。

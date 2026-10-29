@@ -1,7 +1,13 @@
 # RoboMaster-Turing-Competition-BeyondControl
 RMTC 机甲大师图灵对决赛 C++17 / ROS 2 Humble 选手工程。
 
-基础策略覆盖采集、探索、任务、攻防，以及官方兼容 LLM 网关的异步事件解释与执行。
+任意局面短测见[SCENARIOS.md](SCENARIOS.md)，冻结历史版本的离线联赛见[LEAGUE.md](LEAGUE.md)。原版ROS/真实模型联赛用`bash practice_league.sh`，二者入口分开。
+
+离线定位一段局面：见[短场景、断点与分叉测试](SCENARIOS.md)。入口为 `bash scenarios.sh tests/scenarios/announcement_pair.json --out build/checks/blast`，可摆中途局面、条件停止、保存恢复和复制暖状态。
+
+RMTC C++17 / ROS 2 Humble选手工程。这里保留构建、配置、运行和代码接口说明。材料分析、方案比较及历史实测在[分析仓库](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/README.md)维护。
+
+赛前只改 [match_config.hpp](src/rmtc_bot/include/rmtc_bot/match_config.hpp)，改完重新编译。启动不需要输入参数或手工设置环境变量。
 
 逐文件、函数、类型和变量说明见[源码导读](CODE_GUIDE.md)，代码声明与关键判断旁也有中文注释。
 
