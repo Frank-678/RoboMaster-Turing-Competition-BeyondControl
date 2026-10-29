@@ -42,7 +42,7 @@ inline constexpr double reach_mission_value = 8.0;    // 到点任务权重，�
 inline constexpr double healing_below_hp = 40.0;     // 低于此血量才主动找治疗点。
 inline constexpr double fortress_hold_value = 20.0;  // 保住尚未完成的驻留进度。
 inline constexpr double fortress_capture_value = 12.0; // 前往堡垒的收益分子。
-inline constexpr double prepare_fortress_value = 0.0; // 堡垒预告提前占点（自visible-resource-bfs采纳的行为杠杆，默认关，待竞技场评估）。
+inline constexpr double prepare_fortress_value = 0.0; // 堡垒预告提前占点（自visible-resource-bfs采纳的行为杠杆，默认关）。家族已关闭：fortress轮（levers-fortress-2026-10-29）pf03/06/12/24 objective 0.7971→0.7889（各剂量持平为负），deaths 83→87-92，win_share 0.333→0.25；vrb 原版行为（直接用 fortress_capture_value=12.0）≡pf12，可复现地更差。
 inline constexpr int hazard_lead_ticks = 2;          // 比最短退出时间再提前几Tick。
 inline constexpr double goal_retention_bonus = 0.0; // 同一有效目标的排序余量；调参未发现正向作用，关闭。
 inline constexpr int stale_grace_ticks = 0; // 资源离开视野后前N个Tick不衰减（未观测≠消失），压目标震荡；0=离视野当Tick即衰减。默认关，待竞技场评估晋升。
@@ -81,7 +81,7 @@ inline constexpr double tactical_hp_value = 0.015;   // 每HP的未来机会估�
 inline constexpr double tactical_death_cost = 0.0;   // 除规则D扣除外，死亡丢失位置/行动窗口的估值；调参未发现正向作用。
 inline constexpr double tactical_future_discount = 0.65; // 第二Tick相对第一Tick的收益权重。
 inline constexpr double tactical_goal_weight = 0.65; // 原目标评价在战术比较中的尾部价值。
-inline constexpr bool worst_case_survival = false; // 1=生存判定按全敌攻击最坏情形（预测防御只作机会估值，不作伤害上界的确定排除项）；0=旧行为。默认关，待竞技场评估晋升。
+inline constexpr bool worst_case_survival = false; // 1=生存判定按全敌攻击最坏情形（预测防御只作机会估值，不作伤害上界的确定排除项）；0=旧行为。家族已关闭：survival轮（levers-survival-2026-10-29）objective 0.7971→0.7597，deaths 62↓但blocked 93→114、stage2 41.25→37.84、D 1026.7→677.1、win_share 0.333→0.25——过度求存把机器人压成挨打龟缩。
 inline constexpr double low_hp_attack_discount = 1.0; // 低血量攻击折扣：hp<60且未被火力波及时攻击估值乘此值（策略层§6+战术层深度0攻击分支同口径）。依据docs/33 T5：53死亡中40例最后动作为攻击且hp<60、12例死亡tick存在一步安全方向、8例可撤退（B0t388/B1t126/B2t68,347,419,491/B4t285/B5t335）；1.0=旧行为（冠军逐位一致）。
 inline constexpr double explore_component_value = 0; // 第二阶段扫图观察点按视野包络触及的最大未探索连通区大小额外加权（覆盖最大化探索方向，大空白区优先于近处零碎口袋）；家族已关闭：第一阶段全负（coverage轮score 33.33→30.3~31.2）、第二阶段train cov008 objective +0.0113（无排名翻转，win持平）但heldout一次性验证 vs 冠军封存0.8299（arena-postcap-heldout-2026-10-29，同30场景，冻结基线0.7710073逐位复现）为0.7906即**−0.039**，stage2 score 42.06<43.875、R增益未复现；0.002持平、0.02崩（R 50.8）。0=旧行为，永久关闭。
 inline constexpr double post_cap_combat_weight = 0.02; // D≥500封顶后增量D的平局估值权重（同分同任务同R按D决胜）。train晋升：objective 0.7891→0.8056（win_share 0.25→0.417，rooms-s401/crossroads-s542 rk2→rk1，deaths 56→72），0.05/0.1无更多增益；heldout一次性验证通过：objective 0.771→0.830（vs冻结baseline），stage2 score 40.8→43.9、R 61.3→69.6、win_share 0.375→0.458、invalid 0（arena-postcap-heldout-2026-10-29）。
