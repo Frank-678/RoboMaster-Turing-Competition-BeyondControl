@@ -16,7 +16,9 @@ Json run(int delay) { // delay是测试oracle交付解释的Tick，不是真实�
   scene.announcements={{event,0}};arena::Game game(scene);auto &cars=game.fixture_cars();
   cars[0].resource=120; // 已收集的历史资源；还剩左侧一份普通资源，R已封顶，D尚为0。
   for(int i=1;i<4;++i) {cars[i].fighter.alive=false;cars[i].respawn_in=1000;} // 夹具停用其他车，生产复活规则不变。
-  Strategy bot(2);int gained=-1,empowered_ticks=0;Json trace=Json::array();
+  // 显式注入开启参数：被测对象是堡垒预告提前占点链路，不是默认关闭态（默认0只测关闭行为）。
+  auto weights=StrategyParameters::competition();weights.prepare_fortress_value=12.0;
+  Strategy bot(2,weights);int gained=-1,empowered_ticks=0;Json trace=Json::array();
   while(game.tick()<scene.ticks) {
     const int tick=game.tick();bot.merge_events(game.interpreted_events()); // 公告后延迟交付，不提前泄漏未公告安排。
     std::array<rules::Action,4> actions{};const auto action=bot.decide(game.observe(0));actions[0]=rules::decode_action(action);

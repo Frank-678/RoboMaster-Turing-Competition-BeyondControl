@@ -32,8 +32,8 @@ inline constexpr bool ai_json_output = true; // 明确请求JSON模式；Prompt�
 // 模型名共用上面的ai_model。真实服务密钥与practice-A是两种不同的凭据。
 inline constexpr int practice_port = 8080;     // 原版练习代理监听端口，须与本机ai_url一致。
 inline constexpr const char *practice_llm_url = "https://api.deepseek.com/chat/completions"; // DeepSeek文档给出的完整POST端点。
-inline constexpr const char *practice_llm_key = "";
-inline constexpr const char *practice_llm_proxy = ""; // 上游出网代理；如确用WSL本机7890，填http://127.0.0.1:7890。
+inline constexpr const char *practice_llm_key = ""; // 临时验证用，用后即还原为空并重建，绝不提交。
+inline constexpr const char *practice_llm_proxy = ""; // 临时验证用：WSL出网代理；用后还原为空，不提交。
 
 // 下面只调策略取舍。攻击距离、伤害、计分公式和结算顺序按规则实现，不在这里调。
 inline constexpr double stale_resource_decay = 0.01; // 资源记忆每Tick衰减系数。
@@ -45,6 +45,7 @@ inline constexpr double fortress_capture_value = 12.0; // 前往堡垒的收益�
 inline constexpr double prepare_fortress_value = 0.0; // 堡垒预告提前占点（自visible-resource-bfs采纳的行为杠杆，默认关，待竞技场评估）。
 inline constexpr int hazard_lead_ticks = 2;          // 比最短退出时间再提前几Tick。
 inline constexpr double goal_retention_bonus = 0.0; // 同一有效目标的排序余量；调参未发现正向作用，关闭。
+inline constexpr int stale_grace_ticks = 0; // 资源离开视野后前N个Tick不衰减（未观测≠消失），压目标震荡；0=离视野当Tick即衰减。默认关，待竞技场评估晋升。
 inline constexpr int resource_plan_depth = 4;       // 资源串最多扩展4个目标，不是完整战斗树或3Tick。
 inline constexpr int resource_beam_width = 5;       // 每层最多保留5条未执行计划，优先保留不同首方向。
 inline constexpr int resource_candidate_limit = 8;  // 先按现有收益/距离挑8个资源；地图资源数不写死。
@@ -79,5 +80,7 @@ inline constexpr double tactical_hp_value = 0.015;   // 每HP的未来机会估�
 inline constexpr double tactical_death_cost = 0.0;   // 除规则D扣除外，死亡丢失位置/行动窗口的估值；调参未发现正向作用。
 inline constexpr double tactical_future_discount = 0.65; // 第二Tick相对第一Tick的收益权重。
 inline constexpr double tactical_goal_weight = 0.65; // 原目标评价在战术比较中的尾部价值。
+inline constexpr bool worst_case_survival = false; // 1=生存判定按全敌攻击最坏情形（预测防御只作机会估值，不作伤害上界的确定排除项）；0=旧行为。默认关，待竞技场评估晋升。
+inline constexpr double post_cap_combat_weight = 0.02; // D≥500封顶后增量D的平局估值权重（同分同任务同R按D决胜）。train晋升：objective 0.7891→0.8056（win_share 0.25→0.417，rooms-s401/crossroads-s542 rk2→rk1，deaths 56→72），0.05/0.1无更多增益；heldout一次性验证通过：objective 0.771→0.830（vs冻结baseline），stage2 score 40.8→43.9、R 61.3→69.6、win_share 0.375→0.458、invalid 0（arena-postcap-heldout-2026-10-29）。
 }  // namespace rmtc::match_config
 
