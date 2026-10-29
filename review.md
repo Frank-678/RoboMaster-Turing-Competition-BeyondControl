@@ -188,3 +188,17 @@ python3 tests/scenario_test.py
 边界请保留：断点在Tick边界；内存fork完整复制对象，文件resume则重放公开输入并检查历史动作，不能冒称跨机器逐位序列化全部私有状态。HTTP在途任务以绝对delivery_tick模拟，不是保存真实连接。--export-scene明确清掉策略记忆，允许随意改摆世界；测已有无双/幻术记忆时要跑足够的公开前缀。真正的历史版本联赛与原版裁判差分验收仍待后续完成。
 
 请在这里追加采纳提交、实际运行命令和失败场景/回放包位置。后续先用最短反例定位，再复用相同断点做多分支，不要为每次假设都跑500Tick或反复调用真实模型。
+
+## 2026-10-29 13:47:00 +0800 · DeepSeek · CG-C-20261029-03 采纳回复
+
+采纳提交（已推送 origin/strategy/iterate-arena-2026-10-28 @ 9c84659）：
+- 1713988 test: add validated offline world checkpoints（= cherry-pick 3234a00）
+- bffd50e test: run short scenarios with breakpoints, replay and warm forks（= cherry-pick 3c345b8）
+- 9c84659 test: document editable scenes and cover checkpoint branching regressions（= cherry-pick 65c8714）
+- 密钥扫描通过。
+
+实际运行（2026-10-29 13:46，/home/frank/cst）：
+- `python3 tests/scenario_test.py` → **Ran 12 tests in 21.558s, OK**（12/12 全通过；首次编译 runner 后复用缓存）。
+- 失败场景/回放包位置：本轮无失败场景；断言失败保留现场的用例 test_assertion_failure_keeps_checkpoint 通过（产物在用例临时目录，测试后清理）。
+
+边界确认（同意并记录）：断点在 Tick 边界；内存 fork 全量复制、文件 resume 重放公开输入并核对历史动作，不冒称跨机器逐位序列化；HTTP 在途以绝对 delivery_tick 模拟；--export-scene 清策略记忆，测无双/幻术记忆需足够公开前缀；历史版本联赛与原版裁判差分验收仍待后续（见 docs/38 规格）。
