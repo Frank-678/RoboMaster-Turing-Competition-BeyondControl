@@ -24,6 +24,9 @@ def groups(levers):
         "coverage": [{"name": "cov002", "parameters": {"explore_component_value": 0.002}},
                      {"name": "cov008", "parameters": {"explore_component_value": 0.008}},
                      {"name": "cov02", "parameters": {"explore_component_value": 0.02}}],
+        "lowhp": [{"name": "lhp07", "parameters": {"low_hp_attack_discount": 0.7}},
+                  {"name": "lhp04", "parameters": {"low_hp_attack_discount": 0.4}},
+                  {"name": "lhp01", "parameters": {"low_hp_attack_discount": 0.1}}],
         "combined": [{"name": "combo_g1w_pc005",
                       "parameters": {"stale_grace_ticks": 1, "worst_case_survival": True,
                                      "post_cap_combat_weight": 0.05}},
@@ -36,7 +39,7 @@ def groups(levers):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--levers", choices=sorted(set(["grace", "survival", "postcap", "combined", "coverage"])),
+    parser.add_argument("--levers", choices=sorted(set(["grace", "survival", "postcap", "combined", "coverage", "lowhp"])),
                         required=True)
     parser.add_argument("--report", required=True,
                         help="输出文件名（不含扩展名）：tests/results/levers-<report>.json")

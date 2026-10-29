@@ -1347,6 +1347,10 @@ Json Strategy::decide(const Json &p) {
       // 还手（incoming>0）不折扣，不白挨打。与race gate不同：只压攻击估值，不动任务/接近等其他行为。
       if (parameters_.stage2_pie_attack_discount > 0 && tick - last_resource_sighting_ < 60 && incoming == 0)
         utility *= 1.0 - parameters_.stage2_pie_attack_discount;
+      // 低血量攻击折扣：hp<60时压缩攻击机会分（docs/33 T5：53死亡中40例最后动作为攻击且hp<60、8例可撤退）。
+      // 还手（incoming>0）不折扣，不白挨打；默认1.0=旧行为（冠军逐位一致）。
+      if (parameters_.low_hp_attack_discount < 1.0 && hp < 60 && incoming == 0)
+        utility *= parameters_.low_hp_attack_discount;
       if (reflected + pre_damage >= hp) continue;
       if (utility > attack_utility) { attack_utility = utility; attack_direction = direction; }
     }

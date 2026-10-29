@@ -25,7 +25,7 @@ void configure(rmtc::StrategyParameters &p,const Json &values) {
   PARAMETER(collision_replan) PARAMETER(resource_refinement) PARAMETER(resource_refinement_trials)
   PARAMETER(tactical_search) PARAMETER(tactical_risk) PARAMETER(tactical_hp_value) PARAMETER(tactical_death_cost)
   PARAMETER(tactical_future_discount) PARAMETER(tactical_goal_weight)
-  PARAMETER(worst_case_survival) PARAMETER(post_cap_combat_weight) PARAMETER(explore_component_value)
+  PARAMETER(worst_case_survival) PARAMETER(post_cap_combat_weight) PARAMETER(explore_component_value) PARAMETER(low_hp_attack_discount)
 #undef PARAMETER
   for (const auto &entry:values.items()) if (!recognized.count(entry.key())) throw std::runtime_error("unknown arena parameter: "+entry.key());
   p.validate(); // 规则伤害、距离、D扣除等根本不在可写参数名单。
@@ -137,7 +137,7 @@ Json competition_dump() {
     {"tactical_search",p.tactical_search},{"tactical_risk",p.tactical_risk},{"tactical_hp_value",p.tactical_hp_value},
     {"tactical_death_cost",p.tactical_death_cost},{"tactical_future_discount",p.tactical_future_discount},
     {"tactical_goal_weight",p.tactical_goal_weight},
-    {"worst_case_survival",p.worst_case_survival},{"post_cap_combat_weight",p.post_cap_combat_weight},{"explore_component_value",p.explore_component_value}};
+    {"worst_case_survival",p.worst_case_survival},{"post_cap_combat_weight",p.post_cap_combat_weight},{"explore_component_value",p.explore_component_value},{"low_hp_attack_discount",p.low_hp_attack_discount}};
 }
 }
 int main(int argc,char **argv) {
