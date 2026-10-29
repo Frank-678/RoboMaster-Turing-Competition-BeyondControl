@@ -94,7 +94,7 @@ struct Agent {
     if(type=="strategy") strategy.emplace(stage);
     else if(type=="npc") {
       const auto style=spec.at("style").get<std::string>();
-      const std::set<std::string> styles={"collector","aggressive","defender","fortress","opportunist","wanderer"};
+      const std::set<std::string> styles={"collector","aggressive","defender","fortress","opportunist","wanderer","berserker","sentry","trickster"};
       if(!styles.count(style)) throw std::runtime_error("unknown NPC style");
       npc.emplace(style,seed,stage);
     } else if(type=="script") {
@@ -104,9 +104,10 @@ struct Agent {
         if(tick<0 || std::to_string(tick)!=entry.key()) throw std::runtime_error("script tick must be canonical nonnegative integer");
         legal_script_action(entry.value());
       }
-    } else throw std::runtime_error("agent type must be strategy/npc/script");
+    } else if(type!="external") throw std::runtime_error("agent type must be strategy/npc/script/external");
   }
   Json act(const Json &p,const std::vector<Event> &known,bool qualified) {
+    if(spec.at("type")=="external") throw std::runtime_error("external agent needs league worker action");
     if(strategy) {
       strategy->merge_events(known);if(qualified) strategy->note_model_reply();
       return strategy->decide(p);
@@ -154,12 +155,13 @@ struct Controller {
     for(const auto &a:deliveries) if(a.notice<=tick && a.tick<=tick) result.push_back(a.event);
     return result;
   }
-  Json tick() {
+  Json tick(const Json &external=Json::object()) {
     Json row={{"tick",game.tick()},{"perceptions",Json::object()},{"event_ids",Json::object()},{"actions",Json::object()}};
     std::array<rules::Action,4> actions{};decisions=Json::object();
     for(int i=0;i<4;++i) if(agents[i]) {
       const auto p=game.observe(i);const auto events=known(i,game.tick());
-      const auto action=agents[i]->act(p,events,game.scenario().simulated_ai_success);
+      const bool outside=agents[i]->spec.at("type")=="external";
+      const auto action=outside ? legal_script_action(external.at(seats[i])) : agents[i]->act(p,events,game.scenario().simulated_ai_success);
       Json ids=Json::array();for(const auto &e:events) ids.push_back(e.key);
       row["perceptions"][seats[i]]=p;row["event_ids"][seats[i]]=ids;row["actions"][seats[i]]=action;
       decisions[seats[i]]={{"chosen",action},{"reason",agents[i]->reason()}};
@@ -244,8 +246,38 @@ Json run(Controller controller,const Json &control) {
 }
 } // namespace
 
-int main() {
+// 联赛用逐Tick裁判服务。全图只回调度器，调度器只将inputs[席位]交给对应版本。
+// 每行请求/响应都是完整JSON；外部版本缺动作直接报错，不偷偷换成WAIT或DEFEND。
+int serve() {
+  std::string line;
+  if(!std::getline(std::cin,line)) throw std::runtime_error("engine needs initial scene");
+  const auto first=Json::parse(line);
+  Controller controller(first.at("scene"),first.at("build_id").get<std::string>());
+  while(true) {
+    Json inputs=Json::object();
+    for(int i=0;i<4;++i) if(controller.agents[i] && controller.agents[i]->spec.at("type")=="external") {
+      Json events=Json::array();
+      for(const auto &event:controller.known(i,controller.game.tick()))
+        events.push_back({{"key",event.key},{"event",event_summary(event)}});
+      inputs[seats[i]]={{"perception",controller.game.observe(i)},{"events",events},
+                       {"qualified",controller.game.scenario().simulated_ai_success}};
+    }
+    std::cout<<Json{{"world",controller.game.checkpoint()},{"result",controller.game.result()},
+                   {"decisions",controller.decisions},{"inputs",inputs}}.dump()<<std::endl;
+    if(!std::getline(std::cin,line)) break;
+    const auto request=Json::parse(line);
+    if(request.at("op")=="quit") break;
+    if(request.at("op")!="step" || controller.game.tick()>=controller.game.scenario().ticks)
+      throw std::runtime_error("engine expects step before final tick");
+    controller.tick(request.at("actions"));
+  }
+  return 0;
+}
+
+int main(int argc,char **argv) {
   try {
+    if(argc==2 && std::string(argv[1])=="--serve") return serve();
+    if(argc!=1) throw std::runtime_error("unknown scenario runner argument");
     const auto input=Json::parse(std::cin);const auto &spec=input.contains("resume") ? input.at("resume").at("scene") : input.at("scene");
     Controller controller(spec,input.at("build_id").get<std::string>());
     if(input.contains("resume")) controller.resume(input.at("resume"));
