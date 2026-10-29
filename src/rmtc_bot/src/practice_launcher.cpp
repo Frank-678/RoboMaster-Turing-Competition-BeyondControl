@@ -3,18 +3,20 @@
 #include <iostream>
 #include <string>
 #include <unistd.h>
+#include <vector>
 
 // 只给原版practice设置启动环境再执行它；不改practice中的任何文件。
 int main(int argc, char **argv) {
   namespace cfg = rmtc::match_config; // 与机器人共用的唯一配置。
   const bool check_ai = argc == 2 && std::string(argv[1]) == "--check-ai"; // 只由check_ai.sh选择；不是比赛运行开关。
-  if (argc != 1 && !check_ai) {
+  const bool batch = argc >= 2 && std::string(argv[1]) == "--batch"; // 批量测试也从这里取得同一份已编译网络配置。
+  if (argc != 1 && !check_ai && !batch) {
     std::cerr << "Use bash practice.sh or bash check_ai.sh; settings stay in match_config.hpp\n"; return 2;
   }
   if (cfg::stage != 1 && cfg::stage != 2) {
     std::cerr << "stage must be 1 or 2 in match_config.hpp\n"; return 2;
   }
-  const bool real = check_ai || cfg::stage == 2; // 出网检查要真实上游；正常第一阶段没有AI任务。
+  const bool real = check_ai || batch || cfg::stage == 2; // 批量对抗与出网检查均用真实上游。
   if (cfg::practice_port < 1 || cfg::practice_port > 65535) {
     std::cerr << "practice_port must be 1-65535\n"; return 2;
   }
@@ -40,6 +42,15 @@ int main(int argc, char **argv) {
     if (!set(key, cfg::practice_llm_proxy)) return 1;
   // 只让代理→上游出网走网络代理。陪练→本机8080必须直连，否则也会被送到出网代理。
   if (!set("NO_PROXY", "localhost,127.0.0.1,::1") || !set("no_proxy", "localhost,127.0.0.1,::1")) return 1;
+  if (batch) {
+    if (!set("RMTC_PRACTICE_PORT", std::to_string(cfg::practice_port).c_str())) return 1;
+    // 只转交测试场景/输出参数；模型、密钥、域、代理仍只有match_config.hpp这一处配置。
+    std::vector<char *> command{const_cast<char *>("python3"), const_cast<char *>("tools/batch_practice.py")};
+    for (int i = 2; i < argc; ++i) command.push_back(argv[i]);
+    command.push_back(nullptr);
+    ::execvp(command.front(), command.data());
+    std::cerr << "Cannot run tools/batch_practice.py\n"; return 1;
+  }
   if (check_ai) {
     // 用同一份已编译模型/密钥/代理，只请求一次最小JSON；不启动裁判、不读练习地图。
     if (!set("RMTC_CHECK_THINKING", cfg::ai_thinking) ||

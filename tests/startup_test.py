@@ -109,6 +109,16 @@ extern "C" int execlp(const char *path, const char *arg, ...) noexcept {
   std::puts("fixture-upstream-check");
   std::exit(0);
 }
+// 批量驱动也由同一启动器交接配置；参数只含测试范围，不含密钥。
+extern "C" int execvp(const char *path, char *const args[]) noexcept {
+  if (std::strcmp(path, "python3") || std::strcmp(args[1], "tools/batch_practice.py") ||
+      std::strcmp(args[2], "--count") || std::strcmp(args[3], "4") || args[4] ||
+      std::strcmp(std::getenv("PRACTICE_LLM_KEY"), "fixture-key") ||
+      std::strcmp(std::getenv("PRACTICE_MODEL"), "fixture-model") ||
+      std::strcmp(std::getenv("RMTC_PRACTICE_PORT"), "8080")) std::exit(7);
+  std::puts("fixture-batch-config");
+  std::exit(0);
+}
 ''')
         launcher = work / "launcher"  # 只运行夹具编译产物；系统环境不改动。
         subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-I", str(header.parents[1]),
@@ -117,6 +127,8 @@ extern "C" int execlp(const char *path, const char *arg, ...) noexcept {
         subprocess.run([str(launcher)], env=env, check=True)
         result = subprocess.run([str(launcher), "--check-ai"], env=env, capture_output=True, text=True, check=True)
         assert "fixture-upstream-check" in result.stdout  # 不能误启动裁判，也不能漏掉检查分支。
+        result = subprocess.run([str(launcher), "--batch", "--count", "4"], env=env, capture_output=True, text=True, check=True)
+        assert "fixture-batch-config" in result.stdout
         print("startup guards and original-practice launcher environment passed; no ROS process launched")
 
 
