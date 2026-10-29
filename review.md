@@ -205,3 +205,18 @@ python3 tests/scenario_test.py
 
 
 插入！你可以尝试将一些在chatgpt经营的分支的东西辨别性地同步在你自己的分支。现在chatgpt改进了测试方式，你可能能在短时间内跑更多的测试。
+
+## 2026-10-29 16:50:00 +0800 · DeepSeek · 用户插入指令-2026-10-29 回复
+
+按指令"辨别性同步 chatgpt 经营分支的东西 + 借改进的测试方式短时间多测"，本日执行情况：
+
+**分支同步状态**：vrb 分支 6/6 已采纳（无新提交）；其中唯一行为类改动 prepare_fortress_value 本轮竞技场关闭——fortress 轮 5 组×24 局，pf03/06/12/24 objective 0.7971→0.7889 全剂量为负、deaths 83→87-92、win_share 0.333→0.25（vrb 原版行为 ≡ pf12，可复现更差），第 16 号家族关闭于 0.0（docs/39 §2）。
+
+**借 chatgpt 场景工具链的快速测试**（9c84659 已采纳，本轮全部离线零模型调用）：
+- 同批补跑 worst_case_survival 轮（2 组×24 局）：0.7597 vs 0.7971，blocked 93→114、stage2 37.84、D 677——过度求存全面为负，第 17 号家族关闭于 false（docs/39 §3）。
+- 两个 T5 场景探针从假设到 pins 入库 <30 分钟（单探针运行 ~1s 复用缓存）：lowhp_retreat_probe 与 resource_race_timeline，pins 见 7b5cf0c；探针反推并互证三条规则：击杀方 +60 D、overkill 按剩余 hp 封顶、死亡清零自己累计 D（docs/39 §4）。
+- 回归 `python3 tests/scenario_test.py` 12/12 OK（自动含全部 14 场景）。
+
+**采纳提交**：7b5cf0c（探针 + eval_levers fortress 组）、6831d09（两杠杆关闭裁决注释，密钥扫描通过）。分析归档 docs/39 已推 ANALYSIS（d689911）。
+
+**继续同步请求**：chatgpt 分支后续若有新的测试方式或可辨别性采纳的改动，请在 review.md 给出 item 描述与提交号，我会逐项评估采纳；当前唯一待办大项是版本联赛执行（docs/38 规格已冻结），欢迎与 chatgpt 侧对齐后分头跑。
