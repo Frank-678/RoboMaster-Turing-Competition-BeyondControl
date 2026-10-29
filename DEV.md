@@ -118,7 +118,7 @@ tests/mock_gateway.py 仅在本机临时端口提供固定模拟模型响应，�
 
 回归覆盖采集/绕路/地图边界/缩小视野/重叠与畸形图、任务完成去重、攻防/保护/反伤、八类事件执行、跨死亡保留与到期、暂停/漏帧/换场，以及异步 HTTP、429 限流与额度耗尽、401、非 JSON 503、坏模型响应、超时与跨场取消。合成迷宫中 18 Tick 收集 3 个资源，移动未撞墙或越界。
 
-独立核心使用 C++17、nlohmann/json 3.10.5 和 -Werror 检查。当前主机未标准安装ROS/colcon；已通过隔离Humble依赖手动链接实际节点，真实DeepSeek链路此前有两次成功。完整裁判因DDS接口权限未能开局，WSL/colcon和正式资格仍须实测，详见[REAL_TEST.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/REAL_TEST.md)。该环境的 ptrace 限制不支持 LeakSanitizer，执行 AddressSanitizer/UndefinedBehaviorSanitizer 时单独关闭了泄漏检测。
+独立核心使用 C++17、nlohmann/json 3.10.5 和 -Werror 检查。当前主机未标准安装ROS/colcon；已通过隔离Humble依赖手动链接实际节点，真实DeepSeek链路此前有两次成功。完整裁判因DDS接口权限未能开局，WSL/colcon和正式资格仍须实测，详见[REAL_TEST.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/REAL_TEST.md)。该环境的 ptrace 限制不支持 LeakSanitizer，执行 AddressSanitizer/UndefinedBehaviorSanitizer 时单独关闭了泄漏检测。
 
 ## 当前边界
 
@@ -128,11 +128,11 @@ tests/mock_gateway.py 仅在本机临时端口提供固定模拟模型响应，�
 
 ## 新增短期规划
 
-目标迟滞、资源串Beam、动态视野探索、剩余Tick边界和配对夹具见[PLANNING.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/PLANNING.md)。深度3表示资源目标数，未实现完整多车攻防联合推演。所有新增取舍仍集中在match_config.hpp，正式伤害与计分规则不调参。
+目标迟滞、资源串Beam、动态视野探索、剩余Tick边界和配对夹具见[PLANNING.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/PLANNING.md)。深度3表示资源目标数，未实现完整多车攻防联合推演。所有新增取舍仍集中在match_config.hpp，正式伤害与计分规则不调参。
 
 
 ## 2026-10-28多风格对战与当前比赛选项
 
 [ARENA.md](ARENA.md)记录六地图/六陪练、两轮训练与独立留出。当前封存参数在`match_config.hpp`：资源任务4、到点4、治疗阈值40HP、目标深度4；连续两次受阻后改道。三Tick战术虽然实现并有规则回归，本轮训练选择关闭，不能把功能数当成绩。路线反转/插入/删除没有在本批消融中带来成绩变化。
 
-`bash arena.sh --tune`是赛前工具，不读密钥、不改practice、不热更新参数；`bash tests/run.sh`和CTest也包含本地裁判规则边界。规则常量不参加搜索。模拟AI资格/延迟解释不是实际模型调用；完整标准车验收仍受当前DDS环境限制。参数与成绩详见[结构化结果](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/checks/code-results/arena-2026-10-28.json)。
+`bash arena.sh --tune`是赛前工具，不读密钥、不改practice、不热更新参数；`bash tests/run.sh`和CTest也包含本地裁判规则边界。规则常量不参加搜索。模拟AI资格/延迟解释不是实际模型调用；完整标准车验收仍受当前DDS环境限制。参数与成绩详见[结构化结果](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/checks/code-results/arena-2026-10-28.json)。

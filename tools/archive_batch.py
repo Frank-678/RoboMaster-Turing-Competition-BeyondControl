@@ -105,6 +105,7 @@ def main():
              f"- 摘要源：`{os.path.basename(args.summary)}`（{meta['ts']}）",
              f"- 完成对局：{len(ok)}；归档目录：`{os.path.basename(os.path.abspath(args.to))}`",
              f"- 密钥扫描：{'通过' if not hits else '失败'}；缺件：{sum(len(v) for v in meta['missing'].values())}",
+             f"- 机器：{os.uname().nodename}；并行：单局 4 席位同场并行，局间串行（batch_practice.py 串行调度）",
              ""]
     for r in rows:
         lines.append(f"## variant {r['variant']} · {r['session']}")

@@ -50,7 +50,7 @@ bash arena.sh --tune --candidates 24
 
 `arena_test.cpp` 用人工可计算的边界核对：互杀先入奖再扣死亡、反伤与普通伤害过量分摊、斜向无双、D 超过 500、不能跟进原占位、争空格、三次后续结算才复活、爆炸先于移动、幻术离区不解除、回血独立期限、堡垒授予时序与跨死亡保留、分裂出生点豁免和强制等待、辣椒只在击杀时奖励、易伤下 Tick 生效，以及未公告/隐藏格不泄漏。
 
-当前限制：尚未与原版裁判逐 Tick 做差分；同类重叠事件、多次激活与全地图无可用复活格等罕见组合未穷举。保护倒数采用复活后完整动作窗口的规则理解，仍需原版核对。生产战术搜索与本地裁判共用部分规则，因此本地自洽不能替代独立裁判验收。真实 DDS 开局在当前运行环境受网卡枚举权限阻塞，已有记录见 [REAL_TEST.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/REAL_TEST.md)。
+当前限制：尚未与原版裁判逐 Tick 做差分；同类重叠事件、多次激活与全地图无可用复活格等罕见组合未穷举。保护倒数采用复活后完整动作窗口的规则理解，仍需原版核对。生产战术搜索与本地裁判共用部分规则，因此本地自洽不能替代独立裁判验收。真实 DDS 开局在当前运行环境受网卡枚举权限阻塞，已有记录见 [REAL_TEST.md](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/REAL_TEST.md)。
 
 ## 怎样选择参数
 
@@ -62,4 +62,4 @@ bash arena.sh --tune --candidates 24
 
 ## 历史评测与调参结论
 
-历史记录已迁至[分析仓库](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/ANALYSIS/docs/implementation/ARENA_RESULTS.md)。代码仓库只保留评测器接口、运行方法和仍使用的选定参数。新生成报告属于本地输出，不自动提交到代码仓库。
+历史记录已迁至[分析仓库](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/docs/implementation/ARENA_RESULTS.md)。代码仓库只保留评测器接口、运行方法和仍使用的选定参数。新生成报告属于本地输出，不自动提交到代码仓库。

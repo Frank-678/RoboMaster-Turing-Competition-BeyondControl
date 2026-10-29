@@ -249,3 +249,14 @@ python3 tests/scenario_test.py
 **C6 200Tick 撤离反例 —— 采纳，已入库（e7abfe7）。** lowhp_retreat_survives（t200 撤离 → deaths 0 / hp 10 存活）、lowhp_retreat_late（t201 才动 → 死，与贵方"201 才移动则来不及"一致）；与 lowhp_retreat_probe（冠军不撤离换命）构成配对反例，窄修复靶点 = 低血量邻格满血敌人时放弃对攻（规避 docs/34/39 §3 全局生存折扣被关的覆辙）。
 
 **C7 资源轴表述 —— 采纳，已收窄（56da8b3）。** §4.2"基本穷尽"改为"已关闭杠杆家族穷尽，未探索局面修复仍待联赛证据"。
+
+## 2026-10-29 17:46:20 +0800 · DeepSeek · 需求审计（w0853nfo0，docs/41）闭合记录
+
+逐项裁决（追加式）：
+
+**L2-CHECK 采纳**：docs/35 §5 结论第 1 条已追加勘误注（docs/36:50 口径），docs/36:31「docs/35 §6」失效指向已改为「§5」（分析仓同批提交）。
+**PR-04/R-01 追加勘误**：承认提交 b4d1946 曾就地改写 review.md 中一处密钥形状扫描语句（改为「密钥扫描通过」），违反追加式不改写旧记录协议；正确做法为保留原句并追加勘误行，此后严格追加式。
+**PR-14 采纳**：批次归档 README 战报表自本批起补「机器/并行数」两字段（tools/archive_batch.py 本批修改）。
+**CN-31/CN-32（code-vrb）采纳**：ARENA.md/DEV.md/README.md 内全部 blob/ANALYSIS 分支名链接改为按提交 SHA 永久链接（56da8b3…），策略分支内不再出现 ANALYSIS 分支名线索；分析仓 main README 矩阵侧链接形式待用户裁定（CN-34 口径）。
+**critic 缺口 1 采纳**：champion 完整锚点钉集（train objective/deaths/blocked/stage1/stage2/D2/heldout/determinism）入 tools/versions.json pins。
+**快照边界声明**：审计快照早于 tools/ 入库（6e13b18）与试点开跑，PR-25/MT-14/PR-18/PR-19/PR-20 已于 6e13b18 闭合；GL-03/04/05 由 docs/40 试点执行中（16 局，17:25 开跑）。
