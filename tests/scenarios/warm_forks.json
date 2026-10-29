@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "name": "warm-memory-and-random-opponent",
+  "stage": 2,
+  "tick_limit": 500,
+  "qualified": true,
+  "seed": 17,
+  "map": {
+    "width": 9,
+    "height": 9,
+    "vision_radius": 4,
+    "walls": [],
+    "spawns": [
+      [
+        4,
+        4
+      ],
+      [
+        8,
+        8
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        8,
+        0
+      ]
+    ]
+  },
+  "initial": {
+    "tick": 0,
+    "resources": [],
+    "cars": {
+      "A": {
+        "position": [
+          4,
+          4
+        ],
+        "hp": 100
+      },
+      "B": {
+        "position": [
+          8,
+          8
+        ],
+        "hp": 100
+      }
+    }
+  },
+  "missions": [],
+  "events": [],
+  "agents": {
+    "A": {
+      "type": "strategy",
+      "event_delivery": "oracle"
+    },
+    "B": {
+      "type": "npc",
+      "style": "wanderer",
+      "event_delivery": "none"
+    }
+  },
+  "run": {
+    "warm_until": 3,
+    "until_tick": 8,
+    "save_at": [
+      5
+    ],
+    "forks": [
+      {
+        "name": "left"
+      },
+      {
+        "name": "identical"
+      }
+    ],
+    "expect": [
+      {
+        "path": "/world/tick",
+        "op": "eq",
+        "value": 8
+      }
+    ]
+  }
+}
