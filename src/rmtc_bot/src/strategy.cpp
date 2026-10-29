@@ -1073,7 +1073,8 @@ Json Strategy::decide(const Json &p) {
       double benefit = tile.value;
       if (stage_ == 2) {
         benefit = rmtc::score_delta(resource_value, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
-        if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += parameters_.resource_mission_bonus;
+        if ((tile.high && need_high) || (!tile.high && need_normal))
+          benefit += parameters_.resource_mission_bonus * parameters_.explore_probe_mission_bonus_scale;
         if (need_value) benefit += tile.value * 0.1;
       }
       benefit *= 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen - parameters_.stale_grace_ticks) * parameters_.stale_resource_decay);

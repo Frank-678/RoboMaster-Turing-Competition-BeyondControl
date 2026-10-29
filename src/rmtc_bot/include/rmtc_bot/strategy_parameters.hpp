@@ -35,6 +35,7 @@ struct StrategyParameters {
   double post_cap_combat_weight; // D≥500封顶后增量D的平局估值权重（同分同任务同R按D决胜）；0=旧行为（封顶后归零）。
   double explore_component_value; // 第二阶段扫图观察点覆盖最大化加权：按视野触及的最大未探索连通区大小加成；0=旧行为。
   double low_hp_attack_discount; // 低血量攻击折扣：hp<60且未被火力波及时攻击估值乘此值（策略层§6+战术层深度0攻击分支同口径）；1.0=旧行为。
+  double explore_probe_mission_bonus_scale; // 资源探针的任务加成缩放；1.0=旧行为（探针与采集同额计入任务加成）。
   static StrategyParameters competition() {
     namespace c=match_config;
     return {c::stale_resource_decay,c::resource_mission_bonus,c::reach_mission_value,c::healing_below_hp,
@@ -46,7 +47,7 @@ struct StrategyParameters {
       c::collision_replan,c::resource_refinement,c::resource_refinement_trials,c::tactical_search,
       c::tactical_risk,c::tactical_hp_value,c::tactical_death_cost,c::tactical_future_discount,c::tactical_goal_weight,
       c::loop_recovery,c::loop_window_ticks,c::recovery_ticks,c::stalled_goal_cooldown_ticks,
-      c::worst_case_survival,c::post_cap_combat_weight,c::explore_component_value,c::low_hp_attack_discount};
+      c::worst_case_survival,c::post_cap_combat_weight,c::explore_component_value,c::low_hp_attack_discount,c::explore_probe_mission_bonus_scale};
   }
   void validate() const {
     for (double value:{stale_resource_decay,resource_mission_bonus,reach_mission_value,healing_below_hp,
@@ -55,7 +56,7 @@ struct StrategyParameters {
          explore_toward_resource_value,explore_tour_value,mission_explore_value,stage1_flood_value,stage1_ring_value,stage2_assassin_value,stage2_shadow_value,tactical_risk,tactical_hp_value,tactical_death_cost,tactical_future_discount,tactical_goal_weight,
          post_cap_combat_weight,explore_component_value,low_hp_attack_discount})
       if (!std::isfinite(value) || value<0 || value>1000) throw std::runtime_error("invalid strategy weight");
-    if (healing_below_hp>100 || tactical_risk>1 || tactical_future_discount>1 || stage2_pie_attack_discount<0 || stage2_pie_attack_discount>1 || low_hp_attack_discount<0 || low_hp_attack_discount>1 || race_reach_holdoff<0 || race_reach_holdoff>1 || stage2_explore_gate_tick<0 || stage2_explore_gate_tick>500 || stage2_mission_pull_stale_ticks<0 || stage2_mission_pull_stale_ticks>500 || defend_stall_break_ticks<0 || defend_stall_break_ticks>100 || hazard_lead_ticks<0 || hazard_lead_ticks>20 || resource_plan_depth<1 || resource_plan_depth>8 ||
+    if (healing_below_hp>100 || tactical_risk>1 || tactical_future_discount>1 || stage2_pie_attack_discount<0 || stage2_pie_attack_discount>1 || low_hp_attack_discount<0 || low_hp_attack_discount>1 || race_reach_holdoff<0 || race_reach_holdoff>1 || explore_probe_mission_bonus_scale<0 || explore_probe_mission_bonus_scale>1 || stage2_explore_gate_tick<0 || stage2_explore_gate_tick>500 || stage2_mission_pull_stale_ticks<0 || stage2_mission_pull_stale_ticks>500 || defend_stall_break_ticks<0 || defend_stall_break_ticks>100 || hazard_lead_ticks<0 || hazard_lead_ticks>20 || resource_plan_depth<1 || resource_plan_depth>8 ||
         stale_grace_ticks<0 || stale_grace_ticks>20 ||
         resource_beam_width<1 || resource_beam_width>32 || resource_candidate_limit<1 || resource_candidate_limit>32 ||
         resource_refinement_trials<0 || resource_refinement_trials>32 || resource_plan_budget_ms<1 || resource_plan_budget_ms>30 || loop_window_ticks<6 || loop_window_ticks>32 ||
