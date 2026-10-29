@@ -667,9 +667,11 @@ Json Strategy::decide(const Json &p) {
     if (e.kind == Kind::split && e.start == tick && split_wall(start, tick)) return wait("split_forced_wait");
   }
   if (pre_damage >= hp) return skip("lethal_activation_before_action");
-  double incoming = 0, defended_incoming = 0; // 不防御/防御时的本Tick可能受伤总量。
-  // 敌车通用的防御规则只看公开信息（各射线内可见车辆的伤害与自身生命），可被精确预测；
-  // 预测本Tick会防御的敌车不再计入伤害，避免双方在低血量下互相空防站死。
+  double incoming = 0, defended_incoming = 0; // 不防御/防御时的本Tick可能受伤总量（机会口径：预测防御的敌车不计入）。
+  double incoming_worst = 0, defended_incoming_worst = 0; // 全敌攻击的最坏情形（生存口径：防御预测不是对方已提交动作）。
+  // 敌车通用的防御规则只看公开信息（各射线内可见车辆的伤害与自身生命），是对陪练策略的推测，
+  // 不是对方本Tick已提交的动作：只用于机会估值，不能作为伤害上界里的确定排除项。
+  // 生存判定按全敌攻击的最坏情形算，避免低血量互杀里把预测防御当成免伤承诺而白送一命。
   const auto enemy_will_defend = [&](const Enemy &enemy) {
     if (enemy.protected_spawn) return false;
     double incoming_e = 0;
@@ -689,14 +691,42 @@ Json Strategy::decide(const Json &p) {
     if (nearest) for (const auto &other : enemies)
       if (other.position != enemy.position && ray(enemy.position, other.position) == ray(enemy.position, start) &&
           manhattan(enemy.position, other.position) < manhattan(enemy.position, start)) nearest = false;
-    if (nearest && !enemy_will_defend(enemy)) {
+    if (nearest) {
       // 未观测确认的敌方无双只进入后面的不确定情景，不能把所有敌车一律当50伤害强制原地防御。
-      incoming += 20 * vulnerability_;
-      defended_incoming += reflection ? 0 : 10 * vulnerability_;
+      incoming_worst += 20 * vulnerability_;
+      defended_incoming_worst += reflection ? 0 : 10 * vulnerability_;
+      if (!enemy_will_defend(enemy)) {
+        incoming += 20 * vulnerability_;
+        defended_incoming += reflection ? 0 : 10 * vulnerability_;
+      }
     }
   }
   // MOVE 无法躲开本 Tick 已经先结算的战斗；防御可能保命时先防御。
-  if (stage_ == 2 && incoming >= hp - pre_damage && defended_incoming < hp - pre_damage) {
+  // worst_case_survival=1 时按全敌攻击的最坏情形判定；0 保留旧行为（预测防御的敌车不计入）。
+  const double survival_incoming = parameters_.worst_case_survival ? incoming_worst : incoming;
+  const double survival_defended = parameters_.worst_case_survival ? defended_incoming_worst : defended_incoming;
+  if (stage_ == 2 && survival_incoming >= hp - pre_damage && survival_defended < hp - pre_damage) {
+    // 连续致命防御=对手蹲守连击，驻守无进展（crossroads-542曾连续49Tick站防、R仅50）。
+    // 超过阈值后脱离接触：本Tick战斗在移动前结算，此时脱离是接受死亡代价的主动重生换位
+    // （落点仍选距最近敌车最远的安全邻格，只决定重生后的位置）；无路可退才继续防御保命。
+    if (parameters_.defend_stall_break_ticks > 0 && lethal_defend_streak_ >= parameters_.defend_stall_break_ticks) {
+      int retreat = -1, retreat_gain = 0;
+      for (int direction = 0; direction < 4; ++direction) {
+        const Cell next{start.first + steps[direction].first, start.second + steps[direction].second};
+        const auto tile = tiles_.find(next);
+        if (tile == tiles_.end() || !tile->second.seen || tile->second.wall) continue;
+        if (occupied.count(next) || dangerous(next, tick + 1)) continue;
+        int nearest = 1 << 30;
+        for (const auto &enemy : enemies)
+          if (!enemy.protected_spawn) nearest = std::min(nearest, manhattan(enemy.position, next));
+        if (nearest > retreat_gain) { retreat_gain = nearest; retreat = direction; }
+      }
+      if (retreat >= 0) {
+        lethal_defend_streak_ = 0; // 脱离后重新计数，避免一步脱离又立刻回防的振荡。
+        return move(retreat, "break_defend_stall");
+      }
+    }
+    ++lethal_defend_streak_;
     reason_ = "defend_lethal_threat";
     return {{"action", "defend"}};
   }
@@ -878,7 +908,9 @@ Json Strategy::decide(const Json &p) {
     const auto &tile = tiles_.at(cell);
     if (node.first >= 0 && tile.visits < least_visits) { least_visits = tile.visits; exploration = node.first; }
     if (tile.value > 0) {
-      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * parameters_.stale_resource_decay); // 旧资源记忆可信权重。
+      // 资源离开视野的第 stale_grace_ticks 个Tick不衰减：未观测≠消失，别为单Tick视野缩小反复换方向。
+      // 0=旧行为：离视野当Tick即开始衰减。
+      const double freshness = 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen - parameters_.stale_grace_ticks) * parameters_.stale_resource_decay); // 旧资源记忆可信权重。
       double benefit = tile.value; // 第一阶段按资源价值；第二阶段改用封顶分差和任务机会。
       if (stage_ == 2) {
         benefit = rmtc::score_delta(resource_value, tile.value, 120, 30) + std::min(tile.value, 20.0) * 0.001;
@@ -936,9 +968,13 @@ Json Strategy::decide(const Json &p) {
           !(reflection && (enemy.defending || enemy_will_defend(enemy)))) { // 当前预测攻击只会反伤，就不奖励反复接近同一防御目标。
         const double damage = (enemy.defending || enemy_will_defend(enemy)) ? defended_damage_ : attack_damage_; // 接近后按当前可见状态估计伤害。
         const double contribution = std::min(damage, enemy.hp) + (enemy.hp <= damage ? 60.0 : 0.0); // 实际损血加可能击杀奖励。
-        // D已封顶且没有伤害任务时不再主动接近敌车开战；被本Tick火力波及时的还手不受限。
-        const double approach_utility = (effective_damage >= 500 && !need_damage && incoming == 0) ? 0.0 :
-          (combat_value(contribution) + (need_damage ? 0.5 : 0.0)) / (node.distance + 2);
+        // 竞速期间或D已封顶且没有伤害任务时，不再主动接近敌车开战；被本Tick火力波及时的还手不受限。
+        // D封顶只表示官方原始分不再增加；同分同任务同R时裁判按D决胜，故封顶后按 post_cap_combat_weight
+        // 给增量D留平局价值（0=旧行为：完全归零）。战例：f728一局A与C同45分同R同M，D556<1160，名次第3。
+        const double approach_utility =
+          (race_active || (effective_damage >= 500 && !need_damage && incoming == 0)) ?
+            parameters_.post_cap_combat_weight * contribution / (node.distance + 2) :
+            (combat_value(contribution) + (need_damage ? 0.5 : 0.0)) / (node.distance + 2);
         consider(node.first, approach_utility, "approach_enemy", enemy.position);
       }
     }
@@ -968,7 +1004,7 @@ Json Strategy::decide(const Json &p) {
         if ((tile.high && need_high) || (!tile.high && need_normal)) benefit += parameters_.resource_mission_bonus;
         if (need_value) benefit += tile.value * 0.1;
       }
-      benefit *= 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen) * parameters_.stale_resource_decay);
+      benefit *= 1.0 / (1.0 + std::max<Tick>(0, tick - tile.last_seen - parameters_.stale_grace_ticks) * parameters_.stale_resource_decay);
       int best_cost = std::numeric_limits<int>::max(), best_first = -1;
       for (const auto &[bcell, distance] : boundary) {
         const int cost = distance + manhattan(bcell, cell);
@@ -1124,7 +1160,27 @@ Json Strategy::decide(const Json &p) {
       double utility = combat_value(contribution) + (need_damage && contribution > 0 ? 0.5 : 0.0);
       utility -= reflected * 0.05;
       // D已封顶且没有伤害任务时，不主动开战；本Tick已被火力波及时的还手不受限（不白挨打）。
-      if (effective_damage >= 500 && !need_damage && incoming == 0) utility = 0;
+      // 封顶只封官方原始分；同分平局按D决胜，故按 post_cap_combat_weight 留平局价值（0=旧行为：完全归零）。
+      if (effective_damage >= 500 && !need_damage && incoming == 0)
+        utility = parameters_.post_cap_combat_weight * contribution;
+      // 派窗口刺杀：攻击正在扫资源簇的对手。击杀/击退令其重生移位，把本簇剩余资源留给我们——
+      // 这是对lap先到先得结构的唯一信息内干预；D收益上面已计（封顶归零），此处按目标脚边未收集资源估值加归属收益。
+      if (parameters_.stage2_assassin_value > 0 && tick - last_resource_sighting_ < 60) {
+        double contested = 0;
+        for (const auto *enemy : targets) {
+          if (enemy->protected_spawn || enemy->hp > attack_damage_) continue; // 只补刀一击必杀目标，不为一击打不死的对手放弃近处采集。
+          for (int dy = -2; dy <= 2; ++dy)
+            for (int dx = -2; dx <= 2; ++dx) {
+              const auto tile = tiles_.find({enemy->position.first + dx, enemy->position.second + dy});
+              if (tile != tiles_.end() && tile->second.seen && tile->second.value > 0) contested += tile->second.value;
+            }
+        }
+        if (contested > 0) utility += parameters_.stage2_assassin_value * contested;
+      }
+      // 饼窗口攻击折扣：竞速期攻击会把我们从抢饼线路吸走（clusters-495：t20-26攻击致死、错过中簇70R）；
+      // 还手（incoming>0）不折扣，不白挨打。与race gate不同：只压攻击估值，不动任务/接近等其他行为。
+      if (parameters_.stage2_pie_attack_discount > 0 && tick - last_resource_sighting_ < 60 && incoming == 0)
+        utility *= 1.0 - parameters_.stage2_pie_attack_discount;
       if (reflected + pre_damage >= hp) continue;
       if (utility > attack_utility) { attack_utility = utility; attack_direction = direction; }
     }

@@ -126,11 +126,14 @@ void opponent_prediction() {
   check(lethal.decide(hurt)["action"] == "defend", "future prediction overrode current lethal combat");
 }
 // 视野缩小时旧资源只过时1Tick；别为了1%的新鲜度差反复换方向。
+// 开启 stale_grace_ticks=1 显式注入：离视野第1个Tick不衰减（未观测≠消失）。
+// off-state（比赛默认0）行为在最后单独断言：当前取舍是接受单Tick换向，待竞技场评估晋升。
 void persistent_goal() {
   auto opening = fresh(); // 两份20价值资源都在已知视野，等距时先选上方。
   opening["vision_radius"] = 2;
   opening["visible_entities"] = {entity("resource_high", 0, -2), entity("resource_high", 1, 1)};
-  Strategy strategy(2);
+  auto weights = rmtc::StrategyParameters::competition(); weights.stale_grace_ticks = 1;
+  Strategy strategy(2, weights);
   check(strategy.decide(opening)["direction"] == "up", "goal fixture did not begin upward");
   auto next = fresh(1); // 上次未执行移动；位置取本帧真值，不按意图推进。
   next["vision_radius"] = 1;
@@ -141,6 +144,9 @@ void persistent_goal() {
   check(strategy.decide(gone)["direction"] == "right", "commitment retained a vanished resource");
   strategy.reset();
   check(strategy.decide(next)["direction"] == "right", "new match inherited a previous goal");
+  // off-state：比赛默认 stale_grace_ticks=0 时，单Tick视野缩小会按衰减差换向（显式记录的旧行为，不是新目标）。
+  Strategy legacy(2); legacy.decide(opening);
+  check(legacy.decide(next)["direction"] == "right", "default grace=0 unexpectedly retained a stale goal");
   auto terminal = fresh(500); // 正式第二阶段最终状态，已没有动作窗口。
   rmtc::Session stage2(2);
   check(!stage2.act(terminal), "terminal stage2 frame emitted an action");
@@ -220,7 +226,10 @@ void navigation_recovery() {
 void frontier_exploration() {
   auto p = fresh(0, 4, 1); p["vision_radius"] = 1;
   check(choose(p)["direction"] == "right", "explorer revisited the edge instead of revealing unknown cells");
-  check(choose(p, 1)["direction"] == "right", "stage1 ignored frontier information gain");
+  // 第一阶段空档探索由竞技场轮次晋升的 explore_tour 主导：本夹具左右信息增益对称（各3格），
+  // 巡回平手取 left（reason=explore_tour）同样揭开未知格。不变式是避开只揭2格的上边界，
+  // 而不是与第二阶段锁定同一方向（vision_radius=1 下 up 只揭2格，left/right/down 各3格）。
+  check(choose(p, 1)["direction"] != "up", "stage1 ignored frontier information gain");
   auto blast = specification("explosion", 1, 2); // 右侧虽然信息多，下一Tick爆炸也必须绕开。
   blast["area"] = {5, 0, 5, 2}; blast["amount"] = 80;
   Strategy guarded(2); guarded.merge_events(events(blast));
@@ -417,6 +426,35 @@ void uncertain_fire_escape() {
   check(prompt.find("never to this request's tick")!=std::string::npos &&
         prompt.find("another triggered point can still hit it")!=std::string::npos,
         "event prompt lost original notice time or overlapping-fire semantics");
+}
+// 已校验的未来堡垒可以提前赶路/驻留；不会在生效前授予无双，也不追比赛结束后的增益。
+// prepare_fortress_value 显式注入12开启被测开关；off-state（比赛默认0）单独断言返回探索。
+void announced_fortress() {
+  auto fortress=specification("fortress",5,18);fortress["area"]={8,4,8,4};
+  fortress["capture_ticks"]=4;fortress["amount"]=35;fortress["defended_damage"]=7;
+  auto weights=rmtc::StrategyParameters::competition();weights.prepare_fortress_value=12.0;
+  Strategy bot(2,weights);bot.merge_events(events(fortress));
+  for(int tick=0;tick<=9;++tick) {
+    const int x=std::min(8,4+tick);auto p=fresh(tick,x,4); // 四次成功右移后站住；位置/回执均由夹具明确给出。
+    if(tick>0) p["self"]["last_action"]={{"tick",tick-1},{"action",tick<=4 ? "move" : "defend"},{"moved",tick<=4}};
+    const auto action=bot.decide(p);
+    if(tick==0) check(action["action"]=="move" && action["direction"]=="right" && bot.reason()=="prepare_fortress",
+                      "future fortress did not influence the pre-activation route");
+    if(tick==4) check(action["action"]=="defend" && bot.reason()=="hold_fortress",
+                      "early arrival wandered away before fortress activation");
+    check(bot.event_diagnostics(tick)["empowered"]==(tick>=9),"fortress buff was awarded before actual capture settlement");
+  }
+  auto terminal=fortress;terminal["start"]=500;terminal["end"]=520;
+  Strategy late(2,weights);late.merge_events(events(terminal));late.decide(fresh(498));
+  check(late.reason()!="prepare_fortress" && late.reason()!="hold_fortress","fortress after the game consumed remaining actions");
+  // off-state：比赛默认 prepare_fortress_value=0 时，同一公告必须与无公告时的开局动作完全一致（0 保持旧行为）。
+  Strategy off(2);off.merge_events(events(fortress));
+  Strategy silent(2);
+  check(off.decide(fresh())==silent.decide(fresh()) && off.reason()!="prepare_fortress",
+        "prepare_fortress off-state changed the opening action");
+  Strategy threatened(2);threatened.merge_events(events(fortress));auto p=fresh();p["self"]["hp"]=15;
+  p["visible_entities"]={robot(1,0)};
+  check(threatened.decide(p)["action"]=="defend","future reward bypassed current lethal attack guard");
 }
 // 验证新Tick、同Tick、旧Tick、换场和坏输入回退。
 void session_contract() {

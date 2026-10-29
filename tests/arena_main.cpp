@@ -13,8 +13,8 @@ void configure(rmtc::StrategyParameters &p,const Json &values) {
   std::set<std::string> recognized;
 #define PARAMETER(name) if(values.contains(#name)){p.name=values.at(#name).get<decltype(p.name)>();recognized.insert(#name);}
   PARAMETER(stale_resource_decay) PARAMETER(resource_mission_bonus) PARAMETER(reach_mission_value)
-  PARAMETER(healing_below_hp) PARAMETER(fortress_hold_value) PARAMETER(fortress_capture_value)
-  PARAMETER(goal_retention_bonus) PARAMETER(frontier_value) PARAMETER(opponent_contest_cost) PARAMETER(opponent_pressure_cost)
+  PARAMETER(healing_below_hp) PARAMETER(fortress_hold_value) PARAMETER(fortress_capture_value) PARAMETER(prepare_fortress_value)
+  PARAMETER(goal_retention_bonus) PARAMETER(stale_grace_ticks) PARAMETER(frontier_value) PARAMETER(stage1_frontier_value) PARAMETER(opponent_contest_cost) PARAMETER(opponent_pressure_cost)
   PARAMETER(opponent_claim_discount)
   PARAMETER(explore_toward_resource_value) PARAMETER(explore_tour_value) PARAMETER(mission_explore_value)
   PARAMETER(hazard_lead_ticks) PARAMETER(resource_plan_depth) PARAMETER(resource_beam_width)
@@ -22,6 +22,7 @@ void configure(rmtc::StrategyParameters &p,const Json &values) {
   PARAMETER(collision_replan) PARAMETER(resource_refinement) PARAMETER(resource_refinement_trials)
   PARAMETER(tactical_search) PARAMETER(tactical_risk) PARAMETER(tactical_hp_value) PARAMETER(tactical_death_cost)
   PARAMETER(tactical_future_discount) PARAMETER(tactical_goal_weight)
+  PARAMETER(worst_case_survival) PARAMETER(post_cap_combat_weight)
 #undef PARAMETER
   for (const auto &entry:values.items()) if (!recognized.count(entry.key())) throw std::runtime_error("unknown arena parameter: "+entry.key());
   p.validate(); // 规则伤害、距离、D扣除等根本不在可写参数名单。
@@ -103,9 +104,44 @@ Json play(const Json &spec,const rmtc::StrategyParameters &parameters,const rmtc
   }
   return output;
 }
+// --dump-competition：把编译进二进制的比赛参数（match_config→competition()）原样导出为JSON。
+// 供 run_arena.py 在每份报告里记录最终生效参数，避免把历史 selected-parameters.json 误当当前配置。
+Json competition_dump() {
+  const auto p=rmtc::StrategyParameters::competition();
+  return Json{
+    {"stale_resource_decay",p.stale_resource_decay},{"resource_mission_bonus",p.resource_mission_bonus},
+    {"reach_mission_value",p.reach_mission_value},{"healing_below_hp",p.healing_below_hp},
+    {"fortress_hold_value",p.fortress_hold_value},{"fortress_capture_value",p.fortress_capture_value},
+    {"prepare_fortress_value",p.prepare_fortress_value},{"goal_retention_bonus",p.goal_retention_bonus},
+    {"stale_grace_ticks",p.stale_grace_ticks},
+    {"frontier_value",p.frontier_value},{"stage1_frontier_value",p.stage1_frontier_value},
+    {"opponent_contest_cost",p.opponent_contest_cost},{"opponent_pressure_cost",p.opponent_pressure_cost},
+    {"opponent_claim_discount",p.opponent_claim_discount},
+    {"explore_toward_resource_value",p.explore_toward_resource_value},{"explore_tour_value",p.explore_tour_value},
+    {"mission_explore_value",p.mission_explore_value},
+    {"stage1_flood_value",p.stage1_flood_value},{"stage1_ring_value",p.stage1_ring_value},
+    {"stage2_race_gate",p.stage2_race_gate},{"stage2_explore_gate_tick",p.stage2_explore_gate_tick},
+    {"stage2_mission_pull_stale_ticks",p.stage2_mission_pull_stale_ticks},
+    {"stage2_assassin_value",p.stage2_assassin_value},{"stage2_pie_attack_discount",p.stage2_pie_attack_discount},
+    {"stage2_shadow_value",p.stage2_shadow_value},{"defend_stall_break_ticks",p.defend_stall_break_ticks},
+    {"hazard_lead_ticks",p.hazard_lead_ticks},{"resource_plan_depth",p.resource_plan_depth},
+    {"resource_beam_width",p.resource_beam_width},{"resource_candidate_limit",p.resource_candidate_limit},
+    {"resource_plan_budget_ms",p.resource_plan_budget_ms},
+    {"loop_recovery",p.loop_recovery},{"loop_window_ticks",p.loop_window_ticks},{"recovery_ticks",p.recovery_ticks},
+    {"stalled_goal_cooldown_ticks",p.stalled_goal_cooldown_ticks},
+    {"collision_replan",p.collision_replan},{"resource_refinement",p.resource_refinement},
+    {"resource_refinement_trials",p.resource_refinement_trials},
+    {"tactical_search",p.tactical_search},{"tactical_risk",p.tactical_risk},{"tactical_hp_value",p.tactical_hp_value},
+    {"tactical_death_cost",p.tactical_death_cost},{"tactical_future_discount",p.tactical_future_discount},
+    {"tactical_goal_weight",p.tactical_goal_weight},
+    {"worst_case_survival",p.worst_case_survival},{"post_cap_combat_weight",p.post_cap_combat_weight}};
 }
-int main() {
+}
+int main(int argc,char **argv) {
   try {
+    if (argc>1 && std::string(argv[1])=="--dump-competition") {
+      std::cout<<competition_dump().dump()<<'\n';return 0;
+    }
     const Json input=Json::parse(std::cin);
     auto baseline=rmtc::StrategyParameters::competition();configure(baseline,input.at("baseline_parameters"));
     std::map<std::string,rmtc::StrategyParameters> named; // profile: 对手按名字解析到同一份已校验参数。

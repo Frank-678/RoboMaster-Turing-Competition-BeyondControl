@@ -156,8 +156,10 @@ def main():
         report["selection_guard"] = {"stage1_min_score": baseline_stage1 - 1.0, "invalid_max": 0,
                                      "eligible": [p["name"] for p in eligible], "selected_name": selected["name"]}
     else:
-        selected_path = output / "selected-parameters.json"
-        selected = json.loads(selected_path.read_text()) if selected_path.is_file() else {"name": "competition", "parameters": {}}
+        # 非调参入口不再读取历史 selected-parameters.json（其中 4/4/0.1/0.25 与当前 match_config
+        # 5/8/0/0 不一致，静默冒充当前配置）：评估对象就是编译进二进制的 competition()，
+        # 生效参数由 arena --dump-competition 导出并写入报告，历史搜索产物保持历史身份。
+        selected = {"name": "competition", "parameters": {}}
     # 独立留出不参与选择。额外消融使用同一选定参数，仅关闭一个新增模块。
     selected = {"name": "selected", "parameters": selected["parameters"]}
     comparison = [{"name": "baseline", "parameters": SETTINGS["baseline_parameters"]}, selected,
@@ -174,6 +176,10 @@ def main():
     for path in ["src/rmtc_bot/src/strategy.cpp", "src/rmtc_bot/src/tactics.cpp", "src/rmtc_bot/include/rmtc_bot/match_config.hpp", "tests/arena.cpp", "tests/arena_scenarios.cpp", "tests/arena_opponents.cpp"]:
         hashes[path] = hashlib.sha256((ROOT/path).read_bytes()).hexdigest()
     report["source_sha256"] = hashes
+    # 最终生效参数与二进制指纹：每份报告自证“测的就是当前比赛程序”，不依赖参数名推断。
+    dumped = subprocess.run([str(binary), "--dump-competition"], capture_output=True, text=True, check=True)
+    report["competition_parameters"] = json.loads(dumped.stdout)
+    report["binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
     destination = output / f"arena-{args.report}.json"
     destination.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     (output / f"selected-parameters-{args.report}.json").write_text(json.dumps(selected, ensure_ascii=False, indent=2) + "\n")
