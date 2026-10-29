@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 import re
 import shutil
-import shlex
 import subprocess
 
 
@@ -54,13 +53,15 @@ def main():
         record = snapshot(source, frozen, seat)
         # base-paths和cwd都明确，不能从调用者的另一个工作空间误找源码；
         # colcon 需要 ROS 环境（login shell 不保证 source，显式 source）。
-        # 路径含空格时不能裸拼进 bash -c（review_handoff_probe R3）：逐个 shlex.quote。
-        command = ("source /opt/ros/humble/setup.bash && exec colcon --log-base "
-                   + shlex.quote(str(build / "logs"))
-                   + " build --base-paths " + shlex.quote(str(frozen / "src"))
-                   + " --packages-select rmtc_bot --build-base " + shlex.quote(str(build / "packages"))
-                   + " --install-base " + shlex.quote(str(install)))
-        completed = subprocess.run(["bash", "-c", command], cwd=source)
+        # 固定 ROS 初始化与真实 colcon 参数分开：参数走数组原样传递，
+        # 含空格路径不再经过 bash -c 字符串词法拆分（review_handoff_probe R3）。
+        completed = subprocess.run(
+            ["bash", "-c", 'source /opt/ros/humble/setup.bash && exec "$@"',
+             "rmtc-seat-build",
+             "colcon", "--log-base", str(build / "logs"),
+             "build", "--base-paths", str(frozen / "src"),
+             "--packages-select", "rmtc_bot", "--build-base", str(build / "packages"),
+             "--install-base", str(install)], cwd=source)
         if completed.returncode:
             raise SystemExit(completed.returncode)
         binary = install / "rmtc_bot/lib/rmtc_bot/bot"

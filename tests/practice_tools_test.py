@@ -2,6 +2,7 @@
 """实测工具回归：补跑同图、逐局日志、异常回收与配置副本；不启动ROS/真实模型。"""
 import contextlib
 import copy
+import hashlib
 import importlib.util
 import io
 import json
@@ -194,8 +195,10 @@ class PracticeTools(unittest.TestCase):
         self.assertEqual(error.exception.code, 7)
         self.assertEqual(header.read_bytes(), original)
         self.assertEqual(build.call_args.kwargs["cwd"], source)
-        # colcon 经 bash -c 调用（显式 source ROS）：整条命令串必须指向冻结副本路径。
-        self.assertIn(str(source / "build-v-fixture-B/source/src"), build.call_args.args[0][2])
+        # colcon 经 bash -c 调用（显式 source ROS）：真实参数走数组，必须指向冻结副本路径。
+        args_after_c = build.call_args.args[0][3:]
+        i = args_after_c.index("--base-paths")
+        self.assertEqual(args_after_c[i + 1], str(source / "build-v-fixture-B/source/src"))
 
     def test_empty_practice_run_is_not_zero_of_zero_success(self):
         args = SimpleNamespace()
@@ -229,6 +232,60 @@ class PracticeTools(unittest.TestCase):
         self.assertTrue(batch.referee_ready_since(self.work, baseline))
         logf.write_text("")                    # 截断后尚未就绪
         self.assertFalse(batch.referee_ready_since(self.work, baseline))
+
+
+    def test_build_with_spaces_in_source_path_preserves_args_and_source(self):
+        # 源目录含空格：真实 colcon 参数必须作为数组元素原样传递，不能经 bash -c
+        # 字符串词法拆分（review_handoff_probe R3）；构建失败后源文件保持原样。
+        source = self.work / "source with spaces"
+        header = source / "src/rmtc_bot/include/rmtc_bot/match_config.hpp"
+        header.parent.mkdir(parents=True)
+        header.write_text('const char *team = "A"; const char *ai_token = "practice-A";\n')
+        with patch.object(sys, "argv", ["build_seat_variants", str(source), "fixture", "B"]), \
+             patch.object(seats.subprocess, "run",
+                          return_value=SimpleNamespace(returncode=7)) as invoked:
+            with self.assertRaises(SystemExit) as ctx:
+                seats.main()
+            self.assertEqual(ctx.exception.code, 7)
+        argv_list = invoked.call_args.args[0]
+        self.assertEqual(argv_list[:2], ["bash", "-c"])
+        args_after_c = argv_list[3:]
+        i = args_after_c.index("--log-base")
+        self.assertEqual(args_after_c[i + 1], str(source / "build-v-fixture-B/logs"))
+        i = args_after_c.index("--install-base")
+        self.assertEqual(args_after_c[i + 1], str(source / "install-v-fixture-B"))
+        self.assertEqual(header.read_text(),
+                         'const char *team = "A"; const char *ai_token = "practice-A";\n')
+
+    def test_league_entry_exit_code_with_injected_group_failure(self):
+        # 从实际入口注入子进程失败/缺局：main() → run_mix 循环 → batch_exit_code，
+        # 最外层返回码必须非零；纯函数断言不覆盖入口路径（review_handoff_probe R4）。
+        install = self.work / "install-champion"
+        bot = install / "rmtc_bot/lib/rmtc_bot/bot"
+        bot.parent.mkdir(parents=True)
+        bot.write_bytes(b"champion-bot-bytes")
+        (install / "setup.bash").write_text("")
+        manifest = self.work / "versions.json"
+        manifest.write_text(json.dumps({
+            "versions": {"champion": {
+                "install_base": str(install),
+                "binary_sha256": hashlib.sha256(bot.read_bytes()).hexdigest()}},
+            "seeds": [20261201],
+        }))
+        out = self.work / "league-out"
+        argv = ["practice_version_league", "--manifest", str(manifest),
+                "--maps", "20261201", "--mixes", "M1", "--out", str(out)]
+        with patch.object(sys, "argv", argv), \
+             patch.object(practice_league, "run_mix", return_value=(1, [])):
+            self.assertEqual(practice_league.main(), 1)
+        summary = json.loads((out / "league_summary.json").read_text())
+        self.assertEqual(summary["failed_groups"], 1)
+        self.assertEqual(summary["completed"], 0)
+        # 全完成入口 → 0。
+        ok_battles = [{"ok": True, "variant": v} for v in range(4)]
+        with patch.object(sys, "argv", argv), \
+             patch.object(practice_league, "run_mix", return_value=(0, ok_battles)):
+            self.assertEqual(practice_league.main(), 0)
 
 
 if __name__ == "__main__":
