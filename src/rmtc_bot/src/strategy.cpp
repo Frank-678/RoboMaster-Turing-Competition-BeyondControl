@@ -1112,11 +1112,46 @@ Json Strategy::decide(const Json &p) {
   // boundary_only只评有未知邻格的边界格（第二阶段公平竞争用）；false保留“所有能新增视野的格子”的旧语义。
   const auto consider_frontier = [&](bool boundary_only, double value) {
     const double max_visible = (2 * radius + 1) * (2 * radius + 1); // 视野半径内最多未知格数，仅作提前停止的上界。
+    // L-c（覆盖最大化探索方向）：把未探索格按4连通标成连通区；候选观察点按其视野包络触及的
+    // 最大未探索连通区大小获得额外权重——大空白区（更可能藏着远侧资源簇）优先于近处零碎口袋。
+    // 仅第二阶段生效：coverage-2026-10-30 轮测得第一阶段全负（score 33.33→30.3~31.2、R −10~15，
+    // 覆盖排序破坏第一阶段贪心扫图链），按 frontier_value 惯例把参数留给第二阶段。
+    // explore_component_value=0 时整段跳过（unseen_comp 保持空），冠军逐位一致。
+    std::vector<int> unseen_comp; // 平铺 y*width+x → 连通区编号；空 = 杠杆关闭。
+    std::vector<int> comp_sizes;
+    if (parameters_.explore_component_value > 0 && stage_ == 2) {
+      unseen_comp.assign(width * height, -1);
+      for (int y = 0; y < height; ++y)
+        for (int x = 0; x < width; ++x) {
+          if (unseen_comp[y * width + x] >= 0) continue;
+          const auto tile = tiles_.find({x, y});
+          if (tile != tiles_.end() && tile->second.seen) continue;
+          const int id = static_cast<int>(comp_sizes.size());
+          comp_sizes.push_back(0);
+          std::vector<Cell> stack{Cell{x, y}};
+          unseen_comp[y * width + x] = id;
+          while (!stack.empty()) {
+            const Cell cur = stack.back(); stack.pop_back();
+            ++comp_sizes[id];
+            for (const auto &delta : steps) {
+              const Cell next{cur.first + delta.first, cur.second + delta.second};
+              if (next.first < 0 || next.first >= width || next.second < 0 || next.second >= height ||
+                  unseen_comp[next.second * width + next.first] >= 0) continue;
+              const auto nt = tiles_.find(next);
+              if (nt != tiles_.end() && nt->second.seen) continue;
+              unseen_comp[next.second * width + next.first] = id;
+              stack.push_back(next);
+            }
+          }
+        }
+    }
+    const double comp_bound = comp_sizes.empty() ? 0.0 :
+        parameters_.explore_component_value * *std::max_element(comp_sizes.begin(), comp_sizes.end()); // 提前停止仍按最大可能收益。
     double frontier_best = -1; // BFS距离不降；远处候选的最大收益低于已有近处候选时提前结束。
     for (const Cell &cell : order) {
       const auto node = paths.at(cell); // 到观察点的真实绕障距离和首方向。
       if (node.first < 0 || node.distance >= remaining_ticks) continue;
-      if (frontier_best >= 0 && value * max_visible / (node.distance + 1) < frontier_best) break;
+      if (frontier_best >= 0 && (value * max_visible + comp_bound) / (node.distance + 1) < frontier_best) break;
       if (boundary_only) {
         bool boundary = false;
         for (const auto &delta : steps) {
@@ -1127,14 +1162,19 @@ Json Strategy::decide(const Json &p) {
         if (!boundary) continue;
       }
       int newly_visible = 0; // 用本帧实际视野半径计数，不固定写成9×9。
+      int largest_touched = 0; // L-c：视野包络触及的最大未探索连通区大小；杠杆关闭时保持0。
       for (int y = std::max(0, cell.second - radius); y <= std::min(height - 1, cell.second + radius); ++y) {
         for (int x = std::max(0, cell.first - radius); x <= std::min(width - 1, cell.first + radius); ++x) {
           const auto tile = tiles_.find({x, y}); // 只估计能多看多少格，未知内容仍然未知。
-          newly_visible += tile == tiles_.end() || !tile->second.seen;
+          if (tile == tiles_.end() || !tile->second.seen) {
+            newly_visible += 1;
+            if (!unseen_comp.empty()) largest_touched = std::max(largest_touched, comp_sizes[unseen_comp[y * width + x]]);
+          }
         }
       }
       if (newly_visible > 0) {
-        const double utility = value * newly_visible / (node.distance + 1);
+        const double utility = (value * newly_visible +
+            (largest_touched > 0 ? parameters_.explore_component_value * largest_touched : 0.0)) / (node.distance + 1);
         if (utility > frontier_best) frontier_best = utility;
         consider(node.first, utility, "explore_frontier", cell);
       }

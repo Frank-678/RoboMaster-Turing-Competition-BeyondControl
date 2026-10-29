@@ -81,6 +81,7 @@ inline constexpr double tactical_death_cost = 0.0;   // 除规则D扣除外，�
 inline constexpr double tactical_future_discount = 0.65; // 第二Tick相对第一Tick的收益权重。
 inline constexpr double tactical_goal_weight = 0.65; // 原目标评价在战术比较中的尾部价值。
 inline constexpr bool worst_case_survival = false; // 1=生存判定按全敌攻击最坏情形（预测防御只作机会估值，不作伤害上界的确定排除项）；0=旧行为。默认关，待竞技场评估晋升。
+inline constexpr double explore_component_value = 0; // 第二阶段扫图观察点按视野包络触及的最大未探索连通区大小额外加权（覆盖最大化探索方向，大空白区优先于近处零碎口袋）；家族已关闭：第一阶段全负（coverage轮score 33.33→30.3~31.2）、第二阶段train cov008 objective +0.0113（无排名翻转，win持平）但heldout一次性验证 vs 冠军封存0.8299（arena-postcap-heldout-2026-10-29，同30场景，冻结基线0.7710073逐位复现）为0.7906即**−0.039**，stage2 score 42.06<43.875、R增益未复现；0.002持平、0.02崩（R 50.8）。0=旧行为，永久关闭。
 inline constexpr double post_cap_combat_weight = 0.02; // D≥500封顶后增量D的平局估值权重（同分同任务同R按D决胜）。train晋升：objective 0.7891→0.8056（win_share 0.25→0.417，rooms-s401/crossroads-s542 rk2→rk1，deaths 56→72），0.05/0.1无更多增益；heldout一次性验证通过：objective 0.771→0.830（vs冻结baseline），stage2 score 40.8→43.9、R 61.3→69.6、win_share 0.375→0.458、invalid 0（arena-postcap-heldout-2026-10-29）。
 }  // namespace rmtc::match_config
 
