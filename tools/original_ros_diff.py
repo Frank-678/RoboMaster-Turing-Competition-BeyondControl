@@ -67,6 +67,11 @@ class DiffAdapter(Node):
                 if act is None:
                     self.get_logger().warn("no tape action for tick %d" % tick)
                     return
+                # 原样回填当前感知的 session_id/tick（协议要求），决策字段保留磁带值。
+                act = dict(act)
+                act["tick"] = tick
+                if "session_id" in p:
+                    act["session_id"] = p["session_id"]
                 self.action_pub.publish(String(data=json.dumps(act)))
             except Exception as e:
                 self.get_logger().error("drive error: %s" % e)
