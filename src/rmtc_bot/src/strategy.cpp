@@ -938,6 +938,17 @@ Json Strategy::decide(const Json &p) {
       if (node != paths.end() && node->second.first >= 0) { race_active = true; break; }
     }
   }
+  // docs/35 损失路径（首分钟资源争抢）：任务链完成后，已知资源仍会被 reach_mission(8/(d+1)) 压过
+  // （V1 t62 弃 [7,4]+[6,2] 20R、V4 t14 弃 10R；V0/V2 冻结时已知资源为 0，本杠杆 no-op——发现力是另一轴）。
+  // race_reach_holdoff>0 时，只要还有已知可达资源，到点任务按 (1-holdoff) 打折；资源清空后恢复（M 点晚拿不丢）。
+  bool known_resource_race = false;
+  if (stage_ == 2 && parameters_.race_reach_holdoff > 0 && resource_value < 120) {
+    for (const auto &[cell, tile] : tiles_) {
+      if (tile.value <= 0 || tile.wall) continue;
+      const auto node = paths.find(cell);
+      if (node != paths.end() && node->second.first >= 0) { known_resource_race = true; break; }
+    }
+  }
   unsigned least_visits = std::numeric_limits<unsigned>::max(); // 已知路线候选中最少访问次数。
   int exploration = -1; // 没有更高收益时采用的探索第一步。
   for (const auto &cell : order) {
@@ -969,7 +980,8 @@ Json Strategy::decide(const Json &p) {
         tick - last_resource_sighting_ >= parameters_.stage2_mission_pull_stale_ticks;
     if (!race_active) {
       for (const auto &target : reach) {
-        if (cell == target) consider(node.first, parameters_.reach_mission_value / (node.distance + 1), "reach_mission", target);
+        const double reach_scale = known_resource_race ? 1.0 - parameters_.race_reach_holdoff : 1.0;
+        if (cell == target) consider(node.first, parameters_.reach_mission_value * reach_scale / (node.distance + 1), "reach_mission", target);
         else if (node.first >= 0) {
           // 目标尚未探明时只走已知路线中靠近目标的格子，不穿过未知墙。
           int unknown_neighbors = 0; // 这个格子旁有多少尚未探明的地图内邻格。
