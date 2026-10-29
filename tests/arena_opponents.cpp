@@ -57,7 +57,16 @@ rules::Action Opponent::act(const Json &p,const std::vector<Event> &known) {
       if (value>attack_value) { attack_value=value;best_attack=d; }
     }
   }
-  if (!stage1 && incoming>=self.at("hp").get<double>() && incoming/2<self.at("hp").get<double>()) return {K::defend,-1};
+  // 这些是专门挑错的手写对手：不共用“低血必防”的假设，防止我方只学会打同一种对手。
+  if (!stage1 && style_=="sentry") {
+    if (!protected_spawn && best_attack>=0 && reflection==0) return {K::attack,best_attack};
+    return {K::defend,-1}; // 原地占路，不会因为旁边有资源而让开。
+  }
+  if (!stage1 && style_=="berserker" && !protected_spawn && best_attack>=0)
+    return {K::attack,best_attack}; // 即使15HP也可能攻击；允许反伤，专测错误的敌人必防预测。
+  if (!stage1 && style_=="trickster" && !protected_spawn && best_attack>=0)
+    return tick%2==0 ? rules::Action{K::defend,-1} : rules::Action{K::attack,best_attack};
+  if (!stage1 && style_!="berserker" && incoming>=self.at("hp").get<double>() && incoming/2<self.at("hp").get<double>()) return {K::defend,-1};
   if (!stage1 && !protected_spawn && best_attack>=0 && reflection==0 &&
       (style_=="aggressive" || style_=="fortress" || attack_value>=60 || (style_=="opportunist" && self.at("hp").get<double>()>35))) return {K::attack,best_attack};
   struct Route {int distance,first;};std::map<Cell,Route> paths;std::queue<Cell> pending;paths[start]={0,-1};pending.push(start);
@@ -86,7 +95,7 @@ rules::Action Opponent::act(const Json &p,const std::vector<Event> &known) {
         if (!done) utility+=5.0/(path.distance+1);
       }
     }
-    if (style_=="aggressive") for (const auto &enemy:enemies)
+    if (style_=="aggressive" || style_=="berserker" || style_=="trickster") for (const auto &enemy:enemies)
       if (!enemy.protected_spawn && rules::ray(cell,enemy.position)>=0) utility+=6.0/(path.distance+1);
     if (style_=="fortress") for (const auto &e:known)
       if (e.kind==EventKind::fortress && e.active(tick) && e.contains(cell)) utility+=20.0/(path.distance+1);
