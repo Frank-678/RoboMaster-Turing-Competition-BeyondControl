@@ -102,7 +102,7 @@ def main():
     ap.add_argument("--manifest", default=f"{CST}/tools/versions.json")
     ap.add_argument("--maps", default=None, help="逗号分隔 seed 子集；缺省全部 12 图")
     ap.add_argument("--mixes", default="M1,M2,M3",
-                    help="逗号分隔；M3 在 candidate 就位前自动跳过")
+                    help="逗号分隔；M3/M4/M5 在 candidate 就位前自动跳过")
     ap.add_argument("--out", default="/tmp/version_league")
     ap.add_argument("--only", default=None,
                     help="调试过滤：MIX:SEED（如 M2:20261201），只跑一项")
