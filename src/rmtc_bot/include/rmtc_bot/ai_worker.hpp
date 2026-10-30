@@ -21,6 +21,7 @@ struct AiConfig {
   long connect_timeout_ms = 0; // 连接阶段上限；必须明确填写且不超过整次请求上限。
   std::string thinking; // enabled/disabled，或空串表示不发送这个服务商扩展字段。
   bool json_output = false; // 是否明确发送response_format=json_object；生产值来自统一配置。
+  int max_calls = 0; // 本场最多发起请求次数；0=不限。现场配额公布后在调整窗口内改参数。
 };
 
 // 主线程负责observe/poll，后台线程负责perform；等待网络不阻塞选动作。

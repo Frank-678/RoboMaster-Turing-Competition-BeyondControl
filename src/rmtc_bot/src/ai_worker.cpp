@@ -110,6 +110,10 @@ void AiWorker::observe(const Json &p, const Json &known_events) {
   // 开局understood_=false：即使公告为空，首帧也排一次请求；不用等随机事件才调用。
   if (busy_ || pending_ || ready_ || std::chrono::steady_clock::now() < retry_after_ ||
       invalid_replies_ >= 3 || (understood_ && source == understood_source_)) return;
+  // 本场调用预算：0=不限。预算耗尽不再发新请求，本地策略与动作照常生成；日志状态可见。
+  if (config_.max_calls > 0 && started_ >= static_cast<unsigned>(config_.max_calls)) {
+    status_ = "budget_exhausted"; return;
+  }
   // tick给模型定位公告时间，不要求模型在该Tick内返回。每Tick动作由本地策略独立生成。
   Json context = {{"session_id", session_}, {"tick", p.at("tick")}, {"map", p.at("map")}, // 用户消息内容。
                   {"announcements", source}, {"known_events", known_events}};

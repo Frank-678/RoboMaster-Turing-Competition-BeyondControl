@@ -27,6 +27,7 @@ inline constexpr const char *ai_http_proxy = ""; // 机器人→网关的网络�
 // 必须在请求JSON顶层明确disabled；不是改URL，也不是只改练习裁判配置。
 inline constexpr const char *ai_thinking = "disabled";
 inline constexpr bool ai_json_output = true; // 明确请求JSON模式；Prompt也要求JSON，仍需本地校验。
+inline constexpr int ai_max_calls_per_match = 0; // 本场每席最多AI请求次数；0=不限。正式赛配额公布后在阶段间调整窗口内修改。
 
 // 只供 bash practice.sh 使用：练习代理→真实模型。正式赛不使用这组上游配置。
 // 模型名共用上面的ai_model。真实服务密钥与practice-A是两种不同的凭据。
@@ -54,7 +55,7 @@ inline constexpr double frontier_value = 0.02;      // 第二阶段每份潜在�
 inline constexpr double stage1_frontier_value = 0.02; // 第一阶段边界信息权重；与阶段二分离——arena-frontier-2026-10-29轮证实探索权重对两阶段影响相反（阶段二受益/阶段一受害），共享会互相绑架。
 inline constexpr double explore_toward_resource_value = 0.5; // 已知资源绕行过远/未连通时，向它试探边界格的机会权重。只影响排序，不把未知格当空地；gate-frontier调参在组合中验证为正。
 inline constexpr double mission_explore_value = 0.0; // 沿到点任务方向探路的权重（除以距离+1）；到点任务没有截止时间，拉拽会在资源比赛早期拖离采集线，关闭。
-inline constexpr double explore_tour_value = 0.03; // 第一阶段空档期，把散布的边界观察点排成小巡回的机会权重；0为关闭。
+inline constexpr double explore_tour_value = 0.06; // 第一阶段空档期，把散布的边界观察点排成小巡回的机会权重；0为关闭。0.03→0.06 晋升（10-31 relaxed 31 图：w12-uniform-23 170→200 且 ×3 复验，其余 30 图逐位一致、零损失；ring 1.0 与 flood 0.1/0.05/0.02 均未过晋升线）。
 inline constexpr double stage1_flood_value = 0.0; // 第一阶段空档探索的最近边界洪泛权重（距离优先、同距离取更大新视野）；与巡回/frontier同场竞争，0为关闭。
 inline constexpr double stage1_ring_value = 0.0; // 第一阶段“近出生点完成覆盖”权重：巡回观察点按增益+近出生点加成排序，优先揭示距出生点近的未探索格（rooms-195左侧列30R口袋滞留t91-99的修复轴）；0为关闭。
 inline constexpr bool stage2_race_gate = false; // 第二阶段竞速闸门：两轮实验均显示早期主动交火有压制对手扫资源的价值，关闭。

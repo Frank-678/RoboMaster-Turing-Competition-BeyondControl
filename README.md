@@ -19,7 +19,8 @@ RMTC C++17 / ROS 2 Humble选手工程。这里保留构建、配置、运行和�
 | `ai_url` | 官方完整网关地址 | `http://127.0.0.1:8080/v1/chat/completions` |
 | `ai_token` | 本场席位令牌 | A席位填`practice-A`，其他席位相应修改 |
 | `ai_model` | 新公告统一`deepseek-flash` | 真实模型服务支持的模型名，必须填 |
-| `ai_timeout_ms` / `ai_connect_timeout_ms` / `ai_max_tokens` | 本场超时和输出限制 | 当前明确为35000ms/5000ms/2200；HTTP在后台等待 |
+| `ai_timeout_ms` / `ai_connect_timeout_ms` / `ai_max_tokens` | 本场超时和输出限制 | 当前明确为35000ms/5000ms/512（2026-10-30参赛手册：官方请求max_tokens=512）；HTTP在后台等待 |
+| `ai_max_calls_per_match` | 本场每席最多AI请求次数；0=不限。配额公布后在阶段间调整窗口内修改 | 练习通常保持0（不限） |
 | `ai_thinking` / `ai_json_output` | 新公告允许直接转发，明确`"disabled"` / `true` | 同样填写；不省略thinking以免默认开启 |
 | `ai_http_proxy` | 机器人访问网关的网络代理；空串为直连 | 通常空串，机器人直连本机代理 |
 | `practice_llm_url` | 不使用 | 真实模型服务的完整`/chat/completions`地址 |
@@ -91,11 +92,22 @@ bash practice.sh
 bash run.sh
 ```
 
-打开练习页面`http://127.0.0.1:8080`，确认自己的席位没有陪练占用，再开始比赛。第一阶段只需把头文件`stage`改为1并重新编译；不调用LLM。正式比赛只运行自己的`bash run.sh`，裁判由主办方启动。
+打开练习页面`http://127.0.0.1:8080`，确认自己的席位没有陪练占用，再开始比赛。第一阶段不调用LLM；阶段切换见下节[两阶段切换](#两阶段切换)。正式比赛只运行自己的`bash run.sh`，裁判由主办方启动。
 
 `practice.sh`通过我们自己的启动器传入原版程序需要的配置，**不修改`practice/`任何文件**。点击开始前先确认页面的模式是`real`、席位A留给自己的程序。按裁判教程先只接自己的程序，确认后再勾B/C/D陪练，减少同席位冲突与其他调用干扰。
 
 启动器也关闭Python字节码写入，避免测试刷新原版`__pycache__`。排查时同时保留选手终端的`ai_calls`日志；练习包里的陪练日志不能代替自己的C++选手日志。
+
+## 两阶段切换（正式比赛）
+
+`stage`在[match_config.hpp](src/rmtc_bot/include/rmtc_bot/match_config.hpp)里是编译期值；协议感知不携带阶段字段，哪个阶段比赛就编译哪个值。切换用统一脚本，不需要手改头文件：
+
+```bash
+bash tools/build_stage.sh 1   # 第一阶段：stage=1，不接LLM；日志应出现 mode=collecting
+bash tools/build_stage.sh 2   # 第二阶段：stage=2，启用对抗/事件/AI；缺凭证拒绝启动
+```
+
+官方流程：每个正式阶段开始前确认代码版本；第一阶段全部结束后进入统一调整窗口（可修改参数、Prompt和任务解析逻辑），窗口结束后重新确认第二阶段版本。窗口内执行`bash tools/build_stage.sh 2`重建即可，比赛期间不再改源码。`build.sh`每次构建都把`match_config.hpp`摘要写入`build/rmtc_bot/match_config.sha256`，可用于阶段版本确认；启动始终只需`bash run.sh`，裁判由主办方按`--stage`启动。
 
 ## 第二阶段LLM成功为零，先看什么
 
