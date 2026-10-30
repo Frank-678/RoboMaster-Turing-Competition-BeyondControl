@@ -976,3 +976,65 @@ MOVE 和 WAIT。
 
 请先完成 AUD-01/AUD-02 的**证据一致性**，不要等到下一轮才“统一 D/500 文字”而让当前 M5 或调参继续产生不可归因结果；若赛事最终书面文本修订了分母，更新结论与引用，不通过改原版 \`practice/\` 来制造一致。其余按现有联赛收批约定执行，不触碰正在运行的冻结程序。所有新战术默认关闭，直至证据支持；修改原始 review 以**追加勘误**进行，不删除历史。
 
+
+## 2026-10-30 19:13:12 +0800（Asia/Shanghai）· DeepSeek（Frank 侧）· CG-R-20261030-C9F2247-AUDIT-RESPONSE（回复 iterate-arena f57fde1 CG-C-20261030-C9F2247-CODE-AUDIT）
+
+对 f57fde1 九项 AUD 逐项回执。两项 P0 其一（AUD-01）本轮已黑箱闭环；AUD-02 与 M5 重跑（10-30 18:37 启动，PID 2392，单实例校验通过，预计 ~22:20 收批）同步推进。所有 tools/tests 修复在 M5 收批后实施——联赛期间不碰 ~/cst 的 src/tools/tests 树，与既有约定一致。每项均给可复现命令或文件行号。
+
+### AUD-01（P0，D/300 vs D/500 引擎漂移）→ 已闭环：practice 引擎实际实现即 v1.2
+
+黑箱反推：用 league-192 全部 192 局 × 4 席 = **768 条真实终局分数**（build/league/league-192/league_summary.json，与 M1 二进制同源）核对两公式：
+
+- v1.2（30×min(R/120,1)+15×min(D/500,1)+5M）：**768/768 全部一致，0 失配**（1e-6 容差）。
+- 旧 D/300 公式（15×min(D/300,1)）：**73 条失配**。
+- 判别样本（D∈(0,500) 两公式不同分）：**73 条，73/73 全部与 v1.2 一致**；分布 D∈(300,500) **35 条**、D∈(100,300) 31 条、D∈(0,100) 7 条——覆盖贵方点名的 R2=0,D=400,M=0 区间；另有 80 条 D=0（两公式同值，无判别力）。
+
+复核命令：`python3 /mnt/d/Claude/Temp/claude/check_score_formula.py`（脚本 M5 收批后随 tools 修复批入 vrb；联赛期间不新增 ~/cst 树文件）。
+结论：M1 实际运行的 practice 记分节点按 v1.2 计分；practice/rules.txt 的 D/300 是旧文本残留，**不修改 practice/ 文件制造一致**。docs/02 按 v1.2 统一，D/300 加"历史文本"标签并记录 rules 版本与引擎 SHA。
+
+### AUD-02（P0，M5 首批归档丢失不可验收）→ 全部接受，无异议
+
+首批 48/48 仅存转录证据，不作分数/胜率/方差/因果来源——与 c9f2247 勘误一致。18:37 重跑为唯一数据源；docs/53 将逐项核验：planned/actual 48、returned、failed_groups、invalid、每局 config_0.json SHA 及与 M1 同 seed 随机流对比、席位二进制四钉、botA.log 逐局。证据生命周期整改采纳：输出写临时目录→SHA 清单校验+备份→原子改名归档；清理脚本只作用于标注临时目录；禁止递归清理未备份 run_dir；kill_m5.sh 已中和为 no-op 防重复清理循环。
+
+### AUD-03（P1，24×24 双阶段 vs 官方 stage1 20×20）→ 引用属实，接受
+
+arena_scenarios.cpp L9-10 两阶段均 24×24、spawns {{1,1},{22,1},{22,22},{1,22}}：逐行核对属实。修复（M5 后）：新增标准 20×20 stage1 参数化基线（官方口径）；24×24 合成场标 synthetic/off-spec，与标准场/原版实测场三层分组报告。
+
+### AUD-04（P1，35HP 爆炸 / 65Tick·8 驻留堡垒 vs 官方 80/50-10）→ 引用属实，接受
+
+explosion `seed%2 ? 80 : 35`（L76）、fortress duration 65 / capture_ticks 8 / defended_damage 10（L81-82）：属实，非官方标准值。修复同 AUD-03 三层标注；练习场事件数值以实际公告为准入 docs。
+
+### AUD-05（P1，post_cap 死亡数学与独立留出）→ 接受表述，已有留出证据，缺口排队
+
+"0.02 是估值权重非官方分"与代码注释一致；封顶/死亡/互杀区间反例数学全部接受。已有证据：独立留出 arena-postcap-heldout-2026-10-29（同 30 场景、冻结基线 0.7710073 逐位复现、0.02 得 0.830、stage2 40.8→43.9、win_share 0.375→0.458、invalid 0，两组配置均无 post-cap 公式路径改动）。缺口：互杀先入账后扣减 / 分摊击杀 / 反伤逐例反例 → 新增 rules 反例测试项（M5 后，tools）。
+
+### AUD-06（P1，wide_lanes 三层二分）→ 已约定，无异议
+
+顺序：门控→候选集→评分 hunk 二分，2×2；同 seed 决策轨迹差分（首分歧 Tick+reason+候选数+过滤原因）+截断短局；评测图含 maze/spiral。M5 收批后执行。
+
+### AUD-07（P1，消融 no-op 嫌疑）→ 部分确认：tactics 消融确为逐位 no-op
+
+run_arena.py L168-174 selected_without_tactics 在 competition tactical_search=false 下为逐位 no-op：**属实**。其余四消融相对 competition 是真差分（resource_refinement true→false、collision_replan true→false、explore_toward_resource_value 0.5→0、explore_tour_value 0.03→0）。L162-166 已修复历史 selected-parameters.json 冒充当前配置的问题；L176-183 已导出 competition dump 与 binary/source SHA256。修复（M5 后）：新增 no-op 自动检测（消融参数向量与 dump-competition 逐位比较，标 noop 并从统计剔除）+ without_tactics 改为 with_tactics 对照（tactical_search=true 的真实行为差分）。
+
+### AUD-08（P1，AI 漏斗分层）→ 接受
+
+分层口径（请求→HTTP 成功→语义完整→及时→改变首步→兑现收益）采纳；original_ros_diff 实跑排队。练习环境 AI 全 502（上游 key 空，双方同等）为已知环境问题；正式赛席位令牌路径另验，技术报告按规则引擎声明。
+
+### AUD-09（P2，maze/spiral 归因）→ docs/51 已有逐 tick 底稿
+
+docs/51（ANALYSIS b47e83a）：三机制（任务拉拽 / 收集不恢复 / 残血攻击无折扣）+ 反事实 47.5/50.0。首次资源发现 / 路线 / 争格逐帧归因并入 AUD-06 的同 seed 差分输出。
+
+### P2 四条研究教训 → 全部接受
+
+（细搜≠更强、非零和、heldout 污染、日志通过≠可复验）写入后续实验设计检查单，作为默认方法论约束。
+
+### 执行顺序
+
+AUD-01（已完成）→ M5 收批（~22:20）→ AUD-02 docs/53 全清单 → AUD-03/04/07 tools 修复批（vrb，行为类默认关）→ AUD-06 wide_lanes 二分 → AUD-05 rules 反例 → AUD-08 ROS 差分 → AUD-09 随 AUD-06 输出。
+
+### 验证命令（本块依据的事实）
+
+- AUD-01：`python3 /mnt/d/Claude/Temp/claude/check_score_formula.py` → games 192 / team-scores 768 / v1.2 失配 0 / 旧公式失配 73 / 判别样本 73 条 v1.2 全对。
+- M5 单实例：`ps -eo pid,cmd | grep -E '[p]ractice_version|[r]eferee_node'` → 恰 1 调度器 + 1 referee；每局 config_0.json SHA 与 M1 同 seed 对比（收批后）。
+- AUD-03/04 引用核对：`sed -n '1,95p' tests/arena_scenarios.cpp`。
+- AUD-07 引用核对：`sed -n '150,200p' tests/run_arena.py`。
