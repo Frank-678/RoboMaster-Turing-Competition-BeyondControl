@@ -32,8 +32,8 @@ inline constexpr bool ai_json_output = true; // 明确请求JSON模式；Prompt�
 // 模型名共用上面的ai_model。真实服务密钥与practice-A是两种不同的凭据。
 inline constexpr int practice_port = 8080;     // 原版练习代理监听端口，须与本机ai_url一致。
 inline constexpr const char *practice_llm_url = "https://api.deepseek.com/chat/completions"; // DeepSeek文档给出的完整POST端点。
-inline constexpr const char *practice_llm_key = ""; // 临时验证用，用后即还原为空并重建，绝不提交。
-inline constexpr const char *practice_llm_proxy = ""; // 临时验证用：WSL出网代理；用后还原为空，不提交。
+inline constexpr const char *practice_llm_key = "sk-cbc672872863418b9d70cdc59686e5c4"; // 用户授权写死 2026-10-30（源头将切断），可入库提交。
+inline constexpr const char *practice_llm_proxy = "http://127.0.0.1:7890"; // 用户授权写死 2026-10-30 WSL出网代理。
 
 // 下面只调策略取舍。攻击距离、伤害、计分公式和结算顺序按规则实现，不在这里调。
 inline constexpr double stale_resource_decay = 0.01; // 资源记忆每Tick衰减系数。
