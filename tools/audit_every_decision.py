@@ -66,12 +66,13 @@ def analyse(session, writer, deaths_writer):
         tick=after["action_tick"]
         a=acts.get(tick)
         if a is None:
-            raise ValueError(f"{session} tick {tick}: action log missing")
+            a={"pos":(None,None),"mode":"unknown","action":"MISSING",
+               "direction":"?","reason":"missing_action_log"}
         pre=frames[i-1] if i else None
         before=team(pre) if pre else None
         now=team(after)
-        risk=pressure(pre,a["pos"]) if pre else []
-        legal=adj_options(pre,a["pos"]) if pre else []
+        risk=pressure(pre,a["pos"]) if pre and a["pos"][0] is not None else []
+        legal=adj_options(pre,a["pos"]) if pre and a["pos"][0] is not None else []
         r={
             "session":session.name, "tick":tick,"pre_x":a["pos"][0],"pre_y":a["pos"][1],
             "pre_hp":before["hp"] if before else "", "post_hp":now["hp"],
@@ -102,6 +103,7 @@ def analyse(session, writer, deaths_writer):
                 "terminal_pre_D":death["pre_D"]})
     return {"session":session.name,"decisions":len(rows),"deaths":len(death_ticks),
             "death_action_ticks":death_ticks,
+            "missing_actions":sum(r["action"]=="MISSING" for r in rows),
             "attack_deaths":sum(rows[t]["action"]=="attack" for t in death_ticks),
             "postcap_attacks":sum(r["action"]=="attack" and r["pre_D"]!="" and r["pre_D"]>=500 for r in rows),
             "lowhp_attacks":sum(r["action"]=="attack" and r["pre_hp"]!="" and r["pre_hp"]<=20 for r in rows),
