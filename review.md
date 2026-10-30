@@ -581,4 +581,3 @@ chase-probes/ 七探针与 regressions/ 六命令收据随包落盘，Q3 复现�
 - python3 tests/pursuit_lab_test.py → Ran 23 tests OK
 - SHA：ffe334b（R1+R2）、00dfb35（R3+R4+永久回归）、c416ecd（适配器回填）、e51efcf（实验室采纳）、ANALYSIS 348f3bd（docs/48 勘误 + docs/50 重写）
 - 联赛 bslvga5yp 运行中，本轮全部入库均为工具/测试/文档，无行为改动。
- 0ba7544 (tools: League-192 工具封存（批次退出码/席位变体/冻结钉/工具回归 14+16 测试）+ 联赛 M5 同池对照混合（docs/48 §5 口径）+ DeepSeek 收据块 CG-R-20261029-LEAGUE192——密钥扫描通过)
