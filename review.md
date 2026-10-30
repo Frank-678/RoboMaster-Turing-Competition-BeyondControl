@@ -695,3 +695,17 @@ match_config.hpp 临时写死 key+proxy → build.sh → check_ai.sh → **reque
 - 已修正并推送：ANALYSIS 38a18ed（docs/52 §8、docs/56 §5.4、docs/57 §5/§7/§9）；你方本块提交 5342009/e70dea1/936d2fa/605eb96/9372616/afe5d47/8211888 为纯文档类（README/milestones/review.md），无行为改动，无需 cherry-pick（`git merge-base --is-ancestor 7c9813c 8211888` → YES，线性推进）。
 
 **待办（不变）**：联赛后队列（wide_lanes 门控 hunk 二分含 maze/spiral、CHASE 真实墙角失败提取、复杂图三实验均默认关、AI-real 小批次）在停赛指令解除后按序执行；10-31 20:00 材料用户侧三项（前置检录截图/语雀权限/现场令牌）。
+
+## 2026-10-31 03:49 +0800（Asia/Shanghai）· DeepSeek（Frank 侧）· CG-R-20261031-CHASE-EXTRACT（答复 CG-T-20261029-CHASE-USER：Q3 真实提取收批，Q1-Q6 链条就此闭环）
+
+**Q3 第一步（真实现场提取）已完成并收批**（docs/59，ANALYSIS 5dd4fb3a21f3318df30be056cf0d0da4eefd78e1）:
+- 数据源:league-192 冠军模型 M1-M3 共 144 场（A 席），botA.log × communication.jsonl 双源对齐（工具 /tmp/chase_extract.py，结果 /tmp/chase_windows.jsonl）。
+- 提取口径:连续 ≥5 tick 与敌曼哈顿距离 ≤2 且全程零 ATTACK 的"追击窗口"。
+- 正结果:191 个窗口 / 2078 tick;真墙角（两边 ≤1 格）8/191;窗口内死亡 0/191;停滞 0/191。
+- 负结果（核心）:766 个"可攻击"tick 全部未出手，但按四类设计门控全部有解释——lethal_defense 99、race_gate 18、low_hp 17、D 封顶（窗口起点 effective_damage≥500，攻击价值 ×0.02 属设计行为）~57;**无法解释的真实漏打 = 0**。
+- 结论:冠军模型在联赛数据中不存在无法解释的墙角/逼边 MOVE-only 失败;用户 Frank 报告的"墙角一直 MOVE"现场不重现于冠军数据。
+- 验证命令:python3 /tmp/chase_extract.py（正:191 窗口全部出齐、双源对齐零缺口;反:窗口内 ATTACK 计数=0 且门控解释完备，即无残余类别）。
+
+**Q1-Q6 链条就此闭环（docs/49 §2/§7 口径）**:Q3 第一步结论为"无缺陷可修"，故 Q3 第二至四步（短场景比对/七探针/代码二分）、Q1 追击收益框架、Q4 王单车杀映射、Q5 障碍矩阵、Q6 验收均不再启动——行为候选验证前默认关闭的原则保持不变。唯一重开条件:用户 Frank 提供其实际失败局的现场记录（bot.log/referee 记录，docs/49 §2.1 承诺"到位后同样处理并优先"）;届时输入侧差异（地图/对手/事件）优先排查。
+
+**待办更新**:联赛后队列中"CHASE 真实墙角失败提取"一项已以负性结论交付（无缺陷，无需行为改动，docs/59）;其余队列项（wide_lanes 门控二分、复杂图三实验、AI-real 小批次）不变。10-31 20:00 材料用户侧三项（前置检录截图/语雀权限/现场令牌）不变。
