@@ -1423,3 +1423,22 @@ M5−M1 平均**总分+1.275、R+3.6667、D−418.2667**；30局7更高、6更�
 
 
 **脚本范围补充（2026-10-30）**：后续提交 852224f5f12bdb5352f94cc6e25e3af9069fe58d 将 audit_league_horizons.py 从 M1+M5 扩为读取整个 192场 M1–M4 加 M5现存30场，计划扫描 **222场×500=111,000个Tick位置**，并输出相同CSV与证据缺口；这一数字是**运行时应覆盖的目标，不是本次已运行完成的审计量**。新日志仍无逐Tick裁判血量/事件全程真值，脚本不能证明哪个提前动作一定挽救死亡。
+
+## 2026-10-30 · ChatGPT · CG-C-20261030-MILESTONE-SINGLE-BRANCH（用户最新要求：Milestone日记与唯一工作分支）
+
+**执行规则：后续我方所有新提交集中到现有 `strategy/iterate-arena-2026-10-28`，不再改 `strategy/visible-resource-bfs`、研究仓 `ANALYSIS`/`COMPARISON` 和 `main`；保留所有历史，不删除分支。** `The-Logical-Structure-of-RMT-C/log` 仍由日志归档方持续更新，是本分支只读的比赛数据来源。若 DeepSeek 自己负责 log 上传，上传前须核对会话/配置/二进制/AI资格并记录提交SHA；我们的 Milestone 则始终写在本分支。
+
+已建立：
+- `milestones/README.md`：按日期的完整研发Milestone日记，含已晋升、失败否决、原版练习、192场联赛、最新M5 30/48、地图适配及图表，所有日期与实验域分开。
+- `milestones/RUN_INDEX.md`：**222局（M1–M4 192 + M5最新30）逐场** score/R/D/M/rank、代码版本commit、配置链接、botA日志和log快照commit。
+- `milestones/match_registry.csv`：相同222局机器可读，每行session、config SHA、binary SHA、source commit及原始URL。
+- `milestones/score_timeline.svg`：5项日期实验的对照分数+/-变化；**不同测试池不同图不拼连续线**。
+- `milestones/paired_M1_M5.svg`：30对同config SHA冠军与候选逐局曲线+差分；M1子集43.17 vs M5 44.445，Δ+1.275，但D较少、局分7高6低17同。
+- 代码仓 `README.md` 顶部已加入唯一入口。
+
+**DeepSeek每完成新功能/新实验须同步追加日记；禁止只有代码提交而无归档得分链。** 至少记录问题与预计收益→唯一改动点/代码SHA→参数哈希/安装二进制SHA→引擎/地图尺寸/对手/种子→对照分数和R/D/M/名次/死亡/invalid/AI成功→反例→晋升/否决→回退地址。新日志如果仍仅有botA而没有裁判frames，死亡次数一律标未知；不要再把终局 alive/HP 或摘要 deaths=0 误当全程无死亡。原版18×18训练结果不能宣称正式24×24通过。
+
+**快照管理**：本轮登记最新log HEAD `2dffdcb6d8cfe8ce500af9f45749c2fabb374e04`，RUN_INDEX里的“快照提交”是读取时的仓库快照，不是每局最初上传时间。202612xx是种子标签、不是历史日期。M5顶层league_summary仍报24而种子归档已30，应优先使用逐种子summary去重，继续增加实验后重算配对结果并更新两张图、README里n和分数。拒绝默认将M1/M2/M3/M4的均分连成策略趋势，因对手池不同。
+
+**下一步**：保留Milestone日记的 append-only 语义，若历史错误则新写“勘误”加证据；不要覆盖已否决实验和中止局。正式尺寸 practice1/2 原版校验器通过之前，训练98分目标状态仍为◐而非✅。
+
