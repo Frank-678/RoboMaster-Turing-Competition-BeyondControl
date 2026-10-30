@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# League-192 收批分析 v2：按 docs/48 §5 口径计算 M1/M2/M3/M4 证据
+# League 收批分析 v3：按 docs/48 §5 口径计算 M1–M5 证据；数据目录可作 argv[1]
 # 修复：原版陪练 = teams 中无 binaries 记录的席位；钉→标签带席位变体意识
-import json
+import json, sys
 from collections import defaultdict, Counter
 
-P = "/home/frank/cst/build/league/league-192/league_summary.json"
+P = (sys.argv[1] + "/league_summary.json") if len(sys.argv) > 1 else "/home/frank/cst/build/league/league-192/league_summary.json"
 d = json.load(open(P))
 res = d["results"]
 print("planned/completed/returned/failed:", d["planned"], d["completed"], d["returned"], d["failed_groups"])
@@ -39,8 +39,8 @@ for k in sorted(pins_by_mix_seat):
     print("  %s %s %s" % (k[0], k[1], dict(pins_by_mix_seat[k])))
 
 # 1) 逐局：座位→标签→得分/名次
-FOCAL = {"M1": "champion", "M2": "champion", "M3": "champion", "M4": "candidate"}
-OPP = {"M1": "original", "M2": "old_champion", "M3": "candidate", "M4": "champion"}
+FOCAL = {"M1": "champion", "M2": "champion", "M3": "champion", "M4": "candidate", "M5": "candidate"}
+OPP = {"M1": "original", "M2": "old_champion", "M3": "candidate", "M4": "champion", "M5": "original"}
 rows = []
 for r in res:
     parts = r["log_dir"].rstrip("/").split("/")
@@ -69,20 +69,22 @@ for r in res:
 
 # 2) 席位轮换平衡
 print("\n== 焦点 bot 席位分布 ==")
-for mix in ("M1", "M2", "M3", "M4"):
+for mix in ("M1", "M2", "M3", "M4", "M5"):
     c = Counter(r["fseat"] for r in rows if r["mix"] == mix)
     print("  %s %s" % (mix, dict(sorted(c.items()))))
 
 # 3) 每 mix 聚合
 print("\n== 每 mix 聚合 ==")
 agg = {}
-for mix in ("M1", "M2", "M3", "M4"):
+for mix in ("M1", "M2", "M3", "M4", "M5"):
     rs = [r for r in rows if r["mix"] == mix]
+    if not rs:
+        continue
     n = len(rs)
     fs = [r["fscore"] for r in rs]
     on = OPP[mix]
-    if mix == "M1":
-        os = [max(r["others_scores"].values()) for r in rs]   # 原版最佳
+    if mix in ("M1", "M5"):
+        os = [max(r["others_scores"].values()) for r in rs]   # 原版最佳（M1/M5 同池口径）
     else:
         os = [r["others_scores"][[s for s in r["others"] if r["lab"][s] == on][0]] for r in rs]
     beats = sum(1 for a, b in zip(fs, os) if a > b)
@@ -108,7 +110,7 @@ for mix in ("M1", "M2", "M3", "M4"):
 
 # 4) 席位效应
 print("\n== 焦点 bot 按席位均分 ==")
-for mix in ("M1", "M2", "M3", "M4"):
+for mix in ("M1", "M2", "M3", "M4", "M5"):
     by = defaultdict(list)
     for r in rows:
         if r["mix"] == mix:
@@ -118,10 +120,10 @@ for mix in ("M1", "M2", "M3", "M4"):
 # 5) 每图×每 mix
 print("\n== 每图×每 mix 焦点均分/均名次 ==")
 maps = sorted(set(r["map"] for r in rows))
-print("  map       " + "".join("%12s" % mix for mix in ("M1", "M2", "M3", "M4")))
+print("  map       " + "".join("%12s" % mix for mix in ("M1", "M2", "M3", "M4", "M5")))
 for m in maps:
     line = "  %-10s" % m
-    for mix in ("M1", "M2", "M3", "M4"):
+    for mix in ("M1", "M2", "M3", "M4", "M5"):
         rs = [r for r in rows if r["mix"] == mix and r["map"] == m]
         if not rs:
             line += " " * 12
@@ -165,7 +167,7 @@ for r in bad:
 
 # 9) AI 调用统计（manual：stage2 每场须真实 AI 成功调用）
 print("\n== 焦点 bot AI 调用（每 mix 合计） ==")
-for mix in ("M1", "M2", "M3", "M4"):
+for mix in ("M1", "M2", "M3", "M4", "M5"):
     calls = succ = fail = 0
     for r in rows:
         if r["mix"] != mix:
