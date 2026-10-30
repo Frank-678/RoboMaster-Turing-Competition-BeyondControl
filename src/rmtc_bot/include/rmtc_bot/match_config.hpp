@@ -21,7 +21,7 @@ inline constexpr const char *ai_token = "practice-A"; // 仅公开练习令牌�
 inline constexpr const char *ai_model = "deepseek-flash"; // 请求体中的模型名；练习启动器同时设置PRACTICE_MODEL。
 inline constexpr long ai_timeout_ms = 35000;  // 后台等完整响应；覆盖练习代理5秒连接+25秒读取，不阻塞动作。
 inline constexpr long ai_connect_timeout_ms = 5000; // 建连单独限5秒；原来的500ms对出网/TLS过短。
-inline constexpr int ai_max_tokens = 2200;    // 多事件JSON预算；公告示例512不是已确认的赛事硬上限，按实际配额修改。
+inline constexpr int ai_max_tokens = 512;     // 2026-10-30参赛手册：官方请求 max_tokens 设为 512（deepseek-flash、Bearer席位令牌、stream false）。多事件JSON在此预算内输出；512同时降低响应时延（REAL_TEST 5977ms 教训）。
 inline constexpr const char *ai_http_proxy = ""; // 机器人→网关的网络代理；空串明确表示直连。
 // 2026-10-28正式公告：统一deepseek-flash，其他字段直接转发，默认思考开启。
 // 必须在请求JSON顶层明确disabled；不是改URL，也不是只改练习裁判配置。
