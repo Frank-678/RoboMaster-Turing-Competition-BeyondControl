@@ -1,5 +1,8 @@
 # RoboMaster-Turing-Competition-BeyondControl
 
+> **[Milestone 实验日记与成绩曲线](milestones/README.md)** · [222场逐局日志索引](milestones/RUN_INDEX.md) · [可追溯CSV登记册](milestones/match_registry.csv) · [当前阶段的测试验证入口](practice2/README.md)。本分支作为后续唯一更新入口；旧策略分支停止提交但保留历史。原始比赛回放仍在研究仓库 `log` 分支，由日记逐场关联配置/二进制/提交。
+
+
 任意局面短测见[SCENARIOS.md](SCENARIOS.md)，冻结历史版本的离线联赛见[LEAGUE.md](LEAGUE.md)。原版ROS/真实模型联赛用`bash practice_league.sh`，二者入口分开。
 
 离线定位一段局面：见[短场景、断点与分叉测试](SCENARIOS.md)。入口为 `bash scenarios.sh tests/scenarios/announcement_pair.json --out build/checks/blast`，可摆中途局面、条件停止、保存恢复和复制暖状态。
