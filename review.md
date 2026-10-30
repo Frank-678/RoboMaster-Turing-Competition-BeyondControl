@@ -1038,3 +1038,134 @@ AUD-01（已完成）→ M5 收批（~22:20）→ AUD-02 docs/53 全清单 → A
 - M5 单实例：`ps -eo pid,cmd | grep -E '[p]ractice_version|[r]eferee_node'` → 恰 1 调度器 + 1 referee；每局 config_0.json SHA 与 M1 同 seed 对比（收批后）。
 - AUD-03/04 引用核对：`sed -n '1,95p' tests/arena_scenarios.cpp`。
 - AUD-07 引用核对：`sed -n '150,200p' tests/run_arena.py`。
+
+## 2026-10-30 · ChatGPT · CG-C-20261030-MAP-TRANSFER-PRACTICE2-RESOURCE-TIMELINE（Frank 紧急要求：尺寸迁移、全参数审查、资源/战斗时间线、practice2）
+
+**本块为下一轮必须优先阅读的新增交接**。与先前 AUD-01–09 不冲突；是将“练习 18×18 vs 正式 20×20 / 24×24”从单条 AUD-03 升为跨阶段 P0 证据有效性问题，并给出安全的 practice2 改造路线。已检查最新迭代分支源码、match_config.hpp 全部策略字段、arena 与 batch 调度、原版 practice/config 两阶段 JSON、practice.py 的 validate_config/--config 流程，以及正式 v1.2 §2.4、§4、§9、§10。又读取并逐 Tick 统计 log 分支 2026-10-29 league-pilot-new 的 **16 场 × 500 Tick**，结合 ANALYSIS docs/35、36、37、51、52。**本轮没有实际运行新裁判、验证 24×24 原版二进制兼容性、修改代码或调参**。公开练习回放的 map_view 真值只供离线诊断，绝不能作为参赛程序策略输入。
+
+### MP-00 · ⚠️ P0 严重程度：不一定是代码会越界，但确实会令全部调参结论跨域失真
+
+| 环境 | stage1 | stage2 | 关键身份 |
+| --- | --- | --- | --- |
+| 原版 practice/config/stage1.json、stage2.json | **18×18** | **18×18** | 公开练习样例，事件参数也不是正式标准 |
+| 正式规则 v1.2 §4.1 | **20×20** | **24×24** | 标准地图；**实际每局仍须读取合法 perception.map.width/height** |
+| 自建 tests/arena_scenarios.cpp L9–10 | **24×24** | **24×24** | stage1 维度错误，stage2 是合成压力地图并非官方地图真值 |
+| tests/league_maps.py | 不适用（仅 stage2） | **24×24** | 自建非官方地形家族，合法离线压力样例 |
+
+面积从 18→20：324→400，**+23.46%**；18→24：324→576，**+77.78%**；正式资源仍 16 份、总 200 R（两阶段），视野 ±4 仍为 9×9，不因地图放大而放大。初始资源格占面积约 4.94%（18²）、4.00%（20²）、2.78%（24²）；单车无边缘 81 格视野占比约 25.0%、20.25%、14.06%。这些只是基于面积的对比，**真实资源归属取决于生成分布、墙、出生点、其他车和可达性**，不能从面积比例直接推算正式赛抢光资源的 Tick。正式 stage1 100 Tick、stage2 500 Tick、资源总量、官方计分、9×9 协议均不应随地图尺寸缩放。
+
+【严重的是策略选择与模型训练的域偏移，不是已证明的 OOB Bug】现行 \`strategy.cpp\` L564–569 读取 width/height，L633–634 和 L1179–1180 视野动态裁边，候选最短路用 tiles_ 和实际坐标；9×9 解析是**官方固定感知协议**，绝不应擅自扩大为 11×11。未看到核心路径把地图全局硬写为 18×18，故不能宣称“正式地图会直接崩溃”。然而 \`tools/batch_practice.py\` L50–52 的 \`WIDTH,HEIGHT=18\`、\`SPAWNS=(1,1),(16,...)\`、\`CENTER=(9,9)\`，L85–90 生成格，L133–146 事件点裁在 17 /16，以及 \`practice/config/stage2.json\` 的 \`reach_target=[9,9]\`、堡垒 map_center、事件几何都具有**18×18 依赖**。直接只改 map.width/height 将产生“24×24 空边框 + 资源仍在旧 18×18 区域/事件仍在左上局部”的**伪正式场**。
+
+### MP-01 · 全部策略参数逐项分类（以当前迭代分支 match_config.hpp L38–88 为基准）
+
+说明：**【A】高优先级重新标定（地图尺度/稀疏度/竞速敏感）；【B】有条件重新测（危险/对手行为变化）；【C】当前关闭，不能直接宣称已生效；【D】规则或硬实时约束不能随地图同比例改。**这里的分类是研究优先级，不是建议现在直接改这些值；每个参数都应报告 stage1/stage2 × 18/20/24 实际生效性，以及新对局差异。
+
+| 参数（全部策略项逐一列出） | 分类 | 审查焦点 |
+| --- | --- | --- |
+| stale_resource_decay (0.01) | A | 资源在大图跨更长 Tick 可达，旧记忆衰减可能使远资源提前失去竞争力 |
+| resource_mission_bonus (5.0) | A | 对 5 分任务完成收益与资源每 10R=2.5 分同时评估，避免任务拉拽 |
+| reach_mission_value (8.0) | **A/P0** | 18 图任务 [9,9]；官方示例到点 [12,12]，实际读取公开任务；拉向稀疏中心会浪费最短资源窗口 |
+| healing_below_hp (40) | B | HP 制度不变，但治疗点路程/可达 Tick 与对手密度改变 |
+| fortress_hold_value (20) | B | 驻留效益受事件持续、堡垒到达距离、地图大小影响 |
+| fortress_capture_value (12) | B | 不写死堡垒 [11,11]–[13,13]，使用当场公告区域、连续 Tick |
+| prepare_fortress_value (0) | C | 默认关；启用前重测不同图的行程/公告期 |
+| hazard_lead_ticks (2) | B | 需要以实际路径退出距离 + 公告剩余 Tick 验证，不按边长线性缩放 |
+| goal_retention_bonus (0) | C | 当前关闭；跨图目标振荡频率可能不同 |
+| stale_grace_ticks (0) | C/A | 关闭；大图路径更长时可试有限宽限，必须防追已失效资源 |
+| resource_plan_depth (4) | A | 目标串深度与剩余资源发现密度有关，不能机械加大 |
+| resource_beam_width (5) | A | 大图分支复杂，候选多样性/质量与计算预算联合评估 |
+| resource_candidate_limit (8) | **A** | 官方共有 16 资源；跨大图远资源可能被 8 候选剪掉，记录召回和首次漏选 |
+| resource_plan_budget_ms (10) | **A/P0** | 576 vs 324 格，BFS 成本可能增大；测 wall time/预算超限与退化首步，不能直接把 10ms 按面积扩张而越 Tick |
+| frontier_value (0.02) | **A/P0** | 新视野收益和距离/任务/攻击的相对比例在 24 图发生改变；当前 stage2 frontier 与其他目标竞争 |
+| stage1_frontier_value (0.02) | **A/P0** | 官方 stage1 应 20 图单车百 Tick，不能用 24 图 stage1 测评直接晋升 |
+| explore_toward_resource_value (0.5) | A | 已知资源远距离与未知连通区绕行，地图扩大后目标权衡大变 |
+| mission_explore_value (0) | C | 关闭；重新开启必须针对任务坐标和真实探索收益做测试 |
+| explore_tour_value (0.03) | A | stage1 100 Tick 收集结束时仍未知多少格；路线覆盖率需重测 |
+| stage1_flood_value (0) | C/A | 当前关；20×20 有效可见边界的泛化应纳入实验 |
+| stage1_ring_value (0) | C/A | 当前关；近出生覆盖半径和资源空区在 20 图不同 |
+| stage2_race_gate (false) | C/A | 关闭；不是“前期绝不战斗”就更强，需将关键压制分支保留 |
+| race_reach_holdoff (0.0) | **C/A/P0** | 已做 0.8/1.0 独立实验并按预注册否决，不可凭单场 60 分直接强开 |
+| stage2_explore_gate_tick (0) | C/A | 关闭；“资源都在前 40/60 Tick 耗尽”源于 18 图，不允许写死作为 24 图饼窗结束 |
+| stage2_mission_pull_stale_ticks (0) | C/A | 关闭；长期资源未知时间在大图延长 |
+| stage2_assassin_value (0) | C/B | 关闭；早期攻击若能让对手失去资源机会才有经济价值，反例需测 |
+| stage2_pie_attack_discount (0) | C/A | 关闭；资源竞争窗口由局面估计，不以练习 18 图耗尽时刻定死 |
+| stage2_shadow_value (0) | C/A | 关闭；远图跟踪敌车作为信息来源须防把敌人隐藏轨迹假定真实 |
+| defend_stall_break_ticks (0) | C/B | 关闭；重估长廊对峙、同 Tick 防御和生存 |
+| opponent_contest_cost (1.0) | B | 大图更稀疏，争格概率与出生点/拥堵结构相关 |
+| opponent_pressure_cost (0.25) | B | 反击风险/射线位置不按地图面积直接变更 |
+| opponent_claim_discount (0.5) | **A** | 资源竞速：自己绕墙距离 vs 敌车曼哈顿下界，24 图的错误低估更常见 |
+| loop_recovery (true) | B | 保留；无法从尺寸判断该功能需关闭 |
+| loop_window_ticks (12) | B | 20/24 走廊周期、阻塞时长可能不同 |
+| recovery_ticks (12) | B | 地图放大后脱困目标距离可能超出期限 |
+| stalled_goal_cooldown_ticks (24) | B | 目标重选冷却在大图对稀缺远资源更贵 |
+| collision_replan (true) | B | 保留；跨地图测试同格争抢/有无合法改道 |
+| resource_refinement (true) | A | 保留规划重排；大图中需测 10ms 预算抢占 |
+| resource_refinement_trials (12) | A | 大图高成本路径重算，尝试次数可能导致预算耗尽 |
+| tactical_search (false) | C | **关闭**；资源 Beam 已开启，不得说“没有 Beam”；开战术树需差分验证 |
+| tactical_risk (0.6) | C/B | 仅战术搜索开启时相关，不能拿关闭的权重做有效消融 |
+| tactical_hp_value (0.015) | C/B | 同上；HP 100 规则常量不调整 |
+| tactical_death_cost (0) | C | 关闭；地图更大死亡失去位置/剩余资源机会更高但不得贸然打开 |
+| tactical_future_discount (0.65) | C/B | 战术搜索关闭；将来启用时按真实 Tick 事件/收益重标 |
+| tactical_goal_weight (0.65) | C/A | 同上，扩大地图后原目标行程更长 |
+| worst_case_survival (false) | C/B | 当前关闭；不要让过保守的风险预测盖掉资源竞速 |
+| low_hp_attack_discount (1.0) | C/B | 1 为 no-op；18 图 maze 证明残血追杀可能送对方满血复活与资源 |
+| explore_component_value (0) | C/A | 关闭且既有 heldout 为负；大图连通区尺度改变，只可作为新假说 |
+| post_cap_combat_weight (0.02) | **A/B** | D≥500 官方已封顶，但同分 D/死亡余量仍有价值；大图开战/相遇更晚，需验证该权重会否把可抢资源让掉 |
+| explore_probe_mission_bonus_scale (1.0) | A | 资源探针不保证真正拿到资源；大图远程探路误加任务奖励更危险 |
+
+**不要漏掉以上 50 个策略参数及它们在源码中的固定分支与上下游**。另外，有一批**非 StrategyParameters 的常量**必须审查/归类：\`safe_first_steps() horizon=8\`（危险局部规划半径，不随地图简单同比扩张）、局部资源搜寻候选 8 个、\`resource_tour\` 最多 16 点（官方当前总量）、\`last_resource_sighting_\` 比较 60 Tick（影响已打开的 frontier 逻辑/若启用其他派窗口模块）、\`manhattan(enemy,...)<4\`、\`attacker HP<60\`、\`consider() 的 distance+1 分母\`、\`9×9\` 固定协议、\`radius<=4\` 固定感知校验、\`stage1_ticks=100\`、\`stage2_ticks=500\`、\`R2 cap=120\`、\`D cap=500\`、\`damage 20/10\`、\`death D−60\`、\`spawn protection 2\` 等。**严格分开“赛规常量不能调”和“有条件需要标定的启发式”**；公告覆盖参数按真实公告动态读取，不为大图无依据放大攻击范围/血量。
+
+### MP-02 · 资源/战斗时间线：此次对话的两轮日志解读，统一归档
+
+我们读取了研究仓库 \`log/batch-2026-10-29-league-pilot-new/\` 的逐局 summary + **16/16 场 frames.jsonl、每场 500 Tick**（M1 8 场 + M2 8 场；都由 champion A 出战但 M2 对手池不同）。聚合：
+- 最终 A 平均 score **44.84/60**，R **60.625/120**，D **1189.4176**，A 死亡 0；16 场中 7 场获得第一名。多数终局对抗分已达 15，三任务多能完成，但资源份额难到 120。
+- 四队平均累计 R：t10 **96.875**、t20 **156.25/200（78.125%）**、t30 **181.875**、t40 **190.625**、t50 **198.125（99.06%）**、t80 **200/200**。A 平均 R:t10 **26.875**、t20 **46.25**、t30 **53.75**、t40 **57.5**、t50 **60.625**，之后几乎冻结。
+- 16 场资源耗尽 Tick 范围 **24–62**、中位 **40**；A 的 D 首次到 500 的中位 Tick **180**（最终 16/16 都达到 500）。意味着练习 18 图里的经济竞赛先于常规对抗兑现，但**不代表 24 图也必然 t40 结束**。
+- ANALYSIS docs/52 更大样本：192 局联赛中 M1 48 局 champion A R=**61.0**、D=**1168.6**、M 平均 **2.8**、总分 **43.96**，rank1%=54%；和试点地图/对手池不同，不相加作同分布效应。docs/52 也记载这 192 局 **3640/3640 次 AI HTTP 调用失败**，练习得到的 M 不能证明正式赛本场 AI 资格；必须先验证真实官方 AI/事件理解及时率。
+
+**60 分正例已找到且逐 Tick 复核**：\`log/batch-2026-10-29-seed-20261103/practice-941ca351a4dd4252b4c61890e326da82/frames.jsonl\`（rrh10-b1，18×18 原版 practice）。A 的 R≥120 在 **Tick39**，M=3 在 **Tick51**，D≥500 在 **Tick172**，终局 R=120、D=1155、M=3、score=60；前 50 Tick 的 D 仍为 0。**“先资源后打 D 并最终满分”在至少一场练习中成立，但不是最优性证明**。并且 docs/37 预注册最终结果：race_reach_holdoff=0.0 对照 7 局平均分 42.50/份额 .279；0.8 7 局 45.36/.336；1.0 共 8 局 45.94/.344、6W/2L，但 t30 完成率仅 **0.306** 没达预注册 **0.356**；参数最终**拒绝晋升、恢复 0.0**。严禁“挑 60 分局”翻转已注册实验裁决。
+
+**复杂地图的机制反例**：ANALYSIS docs/51 的 18×18 maze、spiral 都是 score 40、rank3、R40 而 D=1475/860 已满；maze 敌方 R70，spiral 敌方 R80。maze 在 t14 视野内已靠近高值资源却未转向，t23–41 早战死亡使后续资源竞赛失利；spiral 地图 t41 清空，A 首伤 t49，已经来不及抢资源。这两个反例说明：不能笼统主张“战斗早都不好”——maze 早战会让自己丢稀缺资源，spiral 甚至没早战也会因任务拉拽/发现力不足而输。更合适是**按经济收益选择可兑现攻击**：能阻止别人抢关键资源的战斗是经济策略，毫无阻碍资源竞争的缠斗应让位给资源。
+
+**对用户“先不顾一切抢资源，后面补伤害”的结论**：提升前期资源发现与归属优先级有强证据，但**不顾一切**不能采纳，因同时攻击可牵制对手、后期 D 可能因地图太大/遭受连续死亡/对手躲避而补不满，且前期必须确保任务资格/生存。建议比较 A 冻结冠军、B 资源极端优先（只保留保命攻击）、C 资源主导但在“改变资源归属/防致死/机会补刀”时仍允许主动攻击。**在正式尺寸配置上**同 seed、同地图/资源/事件、同出身席位和同对手版本配对；分别报告 R@t20/40/60、资源耗尽时间、已知/未知资源错失、首拾 Tick、D首次达500、M3时间、AI资格、总分、第一名率、失败局与随机性指纹。只使用本队公开感知；全图只用于赛后结果标注。
+
+### MP-03 · practice2：必须建“正式尺寸的验证副本”，禁止直接修改原版练习裁判
+
+**是否需要改？需要新测试配置和生成器，原则上不需要也不允许擅改原版 \`practice/bin/{referee,scoring,simulator,robot,validate_config}_node\`、\`practice/practice.py\` 的裁判逻辑或评分**。正式规则 §2.4 明许编辑**练习配置**；不意味着可将私改裁判的成绩称为官方真实性能。原版 practice 两阶段 18×18，是明示“独立练习场景”的包；所以 \`practice2\` 应是完整副本，原则上只新增配置与外侧调度：
+
+1. \`cp -a practice practice2\`（或用原始压缩包重解压至 practice2）。原版 \`practice/\`、原二进制 SHA 与原 \`manifest.json\` 保留不动；实践环境不要重复提交数 MB 二进制到仓库，可只提交 practice2 配置生成器/README 和预期 SHA。引擎相同≠内容同；严格写明 practice2 为用户自己构造的**正式尺寸近似**而非正式地图/裁判。
+2. 用 \`practice2/config/stage1-formal-size.json\` 建立 **20×20、单 A、100 Tick、只 MOVE/WAIT、12×10+4×20 资源、正确出生/连通性**；用 \`practice2/config/stage2-formal-size.json\` 建立 **24×24、四席、500 Tick、资源仍为16份总200、公开三任务和公告/事件**。分别从原 \`stage1.json\` / \`stage2.json\` 深拷贝，然后**重新生成所有与地图有关的坐标**：四出生点/单出生点、全部资源、障碍与可达性、stage2 reach 任务目标、\`mission_text\`、爆炸/幻术矩形、天使/辣椒多个点、世界分裂交点、堡垒地图中心的衍生范围；保证所有坐标合法且特殊点不重叠障碍，不要简单把宽高改到 24 却把资源集中在旧 18² 区域。注意每场变化时任务坐标必须从公开 missions 来，不能为了测试把参赛算法写死 [12,12]。配置也要有多种出生/墙密度/资源簇与均匀/边缘资源风格，保持资源**总数**规则，不按面积增加到28份。
+3. **先原封不动用 \`practice2/bin/validate_config\` 验证**：原版 \`practice.py\` L216–230 支持 \`--config\`，内部调用同一个原版二进制校验；因此无需为了切换配置而改 Python 规则源码。启动形式（顺序、不同端口、不同日志目录）：
+   \`bash practice2/start_referee.sh --stage 1 --config practice2/config/stage1-formal-size.json --port 8081 --data-dir "$HOME/.rmtc-practice2"\`
+   \`bash practice2/start_referee.sh --stage 2 --config practice2/config/stage2-formal-size.json --bots B,C,D --port 8081 --data-dir "$HOME/.rmtc-practice2"\`
+   注意当前 \`practice_launcher.cpp\` 仍执行 \`practice/start_referee.sh\`，而 \`tools/batch_practice.py\` 仍固定读 \`practice/config/stage2.json\` 且写死 18；所以**运行这两段命令不等于现有 \`bash practice.sh\`/ \`bash practice_batch.sh\` 已切到 practice2**。后续应用外部\`--config\`/目录参数或制作专门 \`practice2.sh\`/batch driver，不要静悄悄将旧默认入口重定向，必须 log run identity。
+4. **校验器可能拒绝 20/24**，因为二进制内部限制未知。本轮尚未在本机运行，绝不能承诺 24×24 原版二进制一定接受。如果拒绝：存 \`validation.stderr\`、原包 SHA 和输入 JSON，先确认是坐标、任务、事件几何/资源重叠，还是二进制确实只支持 18；绝不 patch validator 或替换 scoring_node 假装官方。若引擎本身限制 18，practice2 只能做**明确标注的扩展模拟器**或只用已有 24×24 arena 做几何压力测试，并向组委会请求正式尺寸/新版可验证练习包；无权据此认定正式赛裁判缺陷。
+5. 新 config 如独立并行启动，**仅改端口不隔离 ROS 话题**：必须用不同 \`ROS_DOMAIN_ID\`（且所有相应参赛车进程一致）或者停止旧 practice 后串行运行。机器人现有席位/域/网关为编译常量，不能让练习域28与正式域27混用导致假“无消息”；正式临场依通知配置。AI-real 上游要单独 check，不能把 mock 或未成功身份计为资格。
+6. **验收门槛**：原版18/18仍能通过基线；practice2 stage1 20×20、stage2 24×24 通过原 \`validate_config\`、成功 100/500 Tick、逐 Tick 全队公开感知尺寸正确、零非法动作、真值与选手输入隔离、R/D/M 与原始 scoring_node 匹配、记录退出码、engine/config/source/bot SHA；原版正式规则 v1.2 已在最新 DeepSeek 交接 AUD-01 报告 **768/768** 条总分符合 D/500，旧 \`practice/rules.txt\` D/300 是文本残留——本轮**仅查到该回执，未独立重跑其脚本**。因此别把上一段交接仍写成“引擎 D300 可能”而不提最新 768/768 反证。新尺寸应至少再跑一小批同样的评分核对。
+
+### MP-04 · 明确排除的错误修改路径
+
+- ❌ 只把 \`match_config.hpp\` 的 \`stage1_ticks\` 或 \`stage2_ticks\` 随地图增大而加长——正式时长不变。
+- ❌ 把 9×9 视野或 20/10 攻防伤害随 24×24 放大——官方硬约束不变。
+- ❌ 因为 24 图大就把 16 资源扩展至 28、把 R2=120 改大或改 D500→D300——改了游戏，不是练习正式赛。
+- ❌ 只调一套参数同时覆盖 stage1/stage2，尤其 stage1 24 图训练打勾为正式 20 图成功。
+- ❌ 调用 debug \`map_view\` 的真实资源、对手位置或事件参数作为参赛程序输入。
+- ❌ 以一场 rrh10 满分直接启用 \`race_reach_holdoff=1.0\`：已有预注册不晋升结果。
+- ❌ 把改造后的 practice2 声称“原版验证”“官方地图”，或拿 18×18 资源耗尽 t40 固定触发正式 24 图策略。
+- ❌ 正在执行 M5 冻结联赛时替换 \`practice/\`、\`practice_launcher.cpp\` 或 \`match_config.hpp\`。待已启动批次完成且归档后，隔离新工作目录进行方案复现。
+
+### MP-05 · 请 DeepSeek 的具体反馈与交付物（先设计/验证，后实施）
+
+| ID | 优先级 | 要交回的实物证据/裁定 | 当前状态 |
+| --- | --- | --- | --- |
+| MAP-01 | P0 | 对 \`match_config.hpp\` 以上全50项及策略源码额外常量建立“规则不变/启发式待测/默认关闭/不随地图缩放”分类及生效路径表 | 静态审计完成初稿；未测试正式尺寸 |
+| MAP-02 | P0 | 独立 practice2 两阶段配置生成器和 README（原版二进制校验），出具 JSON、validate 输出和 SHA | **尚未实现** |
+| MAP-03 | P0 | 原版二进制对20/24的兼容性实测（若拒绝不得篡改裁判），零非法动作、全场日志 | **未知；不得预判成功** |
+| MAP-04 | P0 | 自建 arena stage1 改标准20×20且只有一辆有效车，stage2 24×24；区分 off-spec 合成与规则标准案例 | 当前 stage1 24×24 确认，待修 |
+| MAP-05 | P1 | 同协议/对手族在18×18 vs 20×20 vs 24×24进行域偏移量化，记录 R 时间线、发现效率、伤害/任务满分 Tick、算力预算命中率 | 尚未实验 |
+| MAP-06 | P1 | 资源优先 A/B/C 对照：冻结冠军、极端抢资源、资源主导且保留关键进攻，按地图/出生/资源簇配对；验收第一名/得分及生存 | 已有18图日志和60分实例，**新策略未实现、未验证** |
+| MAP-07 | P1 | 对资源计划预算10ms/候选8/深度4/束宽5和frontier 0.02等作正式尺寸性能与首分歧消融，逐项区分 no-op | 待测 |
+| MAP-08 | P1 | 练习AI真实HTTP→资格→及时语义→动作兑现链路；不能只看 M=3 或 mock | 192局AI全部502的已知问题需单独闭环 |
+
+**关键反向问题：** 目前从18图推出的“提前停止探索、赶到任务点、前期进攻压制、D>500只留微权重”在24图上的机会成本是否反转？请首先找这些策略中 **第一个导致资源错失的 Tick**，验证是否由候选漏检/门控/预测/策略权重，而不要再次在一批对局里同时改很多阈值。对每个模型结论请回复“接受/异议/证据/下一步”，不要把静态审查自动盖成实战 ✅。本回执只追加 review，绝不要求后台持续运行或自动改冻结版本。
+
