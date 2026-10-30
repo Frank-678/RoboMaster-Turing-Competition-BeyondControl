@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Read-only all-Tick auditor for RMTC champion M1 vs candidate M5.
+"""Read-only all-Tick auditor for RMTC leagues M1-M4 plus M5 candidate.
 
-Reads complete archived botA.log plus summary_M{1,5}_*.json under two roots.
+Reads complete archived botA.log plus summary_M{1,2,3,4,5}_*.json under two roots.
 Produces evidence-aligned EVERY-decision and 2..5-Tick lookback ledgers.
 This is NOT a causal replay, nor a death/HP audit without referee frames.
 Never uses referee hidden state to choose an in-game action.
@@ -79,10 +79,12 @@ def main():
     m1=get_cases(a.m1,"M1")
     m5=get_cases(a.m5,"M5")
     ref={case["entry"]["config_sha256"]:case for case in m1}
-    all_cases=m1+m5
+    groups=[('M1',m1),('M2',get_cases(a.m1,'M2')),
+            ('M3',get_cases(a.m1,'M3')),('M4',get_cases(a.m1,'M4')),
+            ('M5',m5)]
     decisions, windows, pairs, inventory=[],[],[],[]
     cached={}
-    for role,cases in [("M1",m1),("M5",m5)]:
+    for role,cases in groups:
         for case in cases:
             e=case["entry"]
             log=case["log"]
@@ -166,7 +168,7 @@ def main():
     dump("two_to_five_tick_windows.csv",windows)
     dump("paired_m1_m5.csv",pairs)
     (a.out/"evidence_manifest.json").write_text(json.dumps(inventory,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    print(json.dumps({"M1_cases":len(m1),"M5_cases":len(m5),"decision_positions":len(decisions),
+    print(json.dumps({"cases_by_group":{k:len(v) for k,v in groups},"decision_positions":len(decisions),
                       "complete_action_rows":sum(x.get("status")!="MISSING" for x in decisions),
                       "review_windows":len(windows),"paired":len(pairs),
                       "caution":"Action-only logs cannot establish HP, death, resource first sighting, or counterfactual survival."},
