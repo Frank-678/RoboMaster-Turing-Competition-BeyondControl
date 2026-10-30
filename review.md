@@ -1169,3 +1169,67 @@ AUD-01（已完成）→ M5 收批（~22:20）→ AUD-02 docs/53 全清单 → A
 
 **关键反向问题：** 目前从18图推出的“提前停止探索、赶到任务点、前期进攻压制、D>500只留微权重”在24图上的机会成本是否反转？请首先找这些策略中 **第一个导致资源错失的 Tick**，验证是否由候选漏检/门控/预测/策略权重，而不要再次在一批对局里同时改很多阈值。对每个模型结论请回复“接受/异议/证据/下一步”，不要把静态审查自动盖成实战 ✅。本回执只追加 review，绝不要求后台持续运行或自动改冻结版本。
 
+## 2026-10-30 · ChatGPT · CG-C-20261030-FORMALSIZE-98-IMPLEMENTATION（按 Frank 指示落地：practice1/practice2；正式尺寸；目标98）
+
+已提交独立**正式尺寸、非官方地图**的双阶段练习夹具（仅增加文件，没触碰 `practice/`、选手冻结源码、现有 arena/league 工具，因 M5 收批期间避免改正在运行的树）。这次的可执行产物：
+
+| 文件 | 用途 |
+| --- | --- |
+| `practice1/config.json` | 第一阶段 **20×20**，单 A，16 资源价值200，事件关闭，使用原版练习配置结构 |
+| `practice2/config.json` | 第二阶段 **24×24**，A/B/C/D 四车，16 资源价值200，按正式 v1.2 标准效果参数修订爆炸、幻术、天使、堡垒、分裂、辣椒、反伤和易伤 |
+| `practice1/run.sh` / `practice2/run.sh` | 各自调用**不变的** `practice/start_referee.sh`，并显式传 `--config`、阶段、100/500 Tick、独立数据目录；开始前执行原版 `bin/validate_config` |
+| `tools/formal_practice_check.py` | 静态验证尺寸、唯一出生、BFS 连通、16 资源共200、阶段权限、正式参数；默认调用原版 binary validator，`--static-only` 仅做 Python 校验 |
+| `tools/formal_size_suite.py` | 给 stage1/stage2 按固定 seed 生成 uniform/cluster/edge/center/spread 五类可复现的合成资源布局，记录 manifest 和 SHA |
+| `practice1/README.md` / `practice2/README.md` | 使用边界及原版兼容性待验收说明 |
+
+本轮已由连接端重新读取新增 JSON，**确认**：20×20 单车、24×24 四车；两份均 16 资源共200，位置不重复，事件数值与预定标准对照。**没有实际执行** Python 生成器、原版 validate_config、ROS 2、500 Tick 对局或完整联赛；由于容器无法联网取得原仓且不具备目标 ROS 2/DDS 环境，不能把“配置看上去正确”打成运行 ✅。特别是原版验证二进制能否接受更大的地图**未知**；不允许 patch 原二进制来掩饰拒绝。相关原版 D/500 的 768/768 校验来自你前一块回执，不是本轮独立复测。
+
+### 使用与实测顺序（在目标 Ubuntu 22.04 + ROS 2 Humble 环境完成）
+
+先在单独工作目录核实原版 SHA 和基本 Python 依赖：
+
+```bash
+python3 tools/formal_practice_check.py --stage 1 --static-only
+python3 tools/formal_practice_check.py --stage 2 --static-only
+python3 tools/formal_practice_check.py --stage 1
+python3 tools/formal_practice_check.py --stage 2
+```
+
+校验器均通过后，再**依次**开赛，不要与 M5 当前实例抢占相同 ROS_DOMAIN_ID：
+
+```bash
+bash practice1/run.sh  # 另启动编译为 stage=1、席位 A 的选手程序
+bash practice2/run.sh  # 另启动编译为 stage=2、席位 A 的选手程序；附带原版 B/C/D 陪练
+```
+
+第二阶段默认 mock AI，只验证行动、地图和结算；它不产生正式资格。正式 AI 需使用原版允许的真实模式及合法网关另行联调，不在代码仓库存密钥。
+
+多地图夹具示例：
+
+```bash
+python3 tools/formal_size_suite.py --stage 1 --count 2 --output-dir build/formal-stage1
+python3 tools/formal_size_suite.py --stage 2 --count 2 --output-dir build/formal-stage2
+RMTC_FORMAL_CONFIG="$PWD/build/formal-stage1/stage1-uniform-20261030.json" bash practice1/run.sh
+RMTC_FORMAL_CONFIG="$PWD/build/formal-stage2/stage2-uniform-20261030.json" bash practice2/run.sh
+```
+
+如 config validation 报错：保存输入配置、标准输出/错误、原版 engine SHA；检查坐标、障碍、任务、事件、stage 与 20/24 支持范围。禁止篡改原版校验器/计分节点，失败不代表正式比赛只支持18。
+
+### “目标98”的明确数学定义及优先级
+
+正式规则第一阶段满分 **40**、第二阶段满分 **60**，但两阶段**官方并不累加**，第一阶段用于种子排位。为了训练，定义**非官方诊断指标** `T=S1+S2`，希望 `T>=98/100`。一种可解释的高目标是：
+
+- 第一阶段 `R1 >= 190` → `S1 >= 38`（需完成多数收集，100 Tick/20×20 单车）。
+- 第二阶段 `R2 >=120, D>=500, M=3` 且有正式 AI 计分资格 → `S2=60`。
+- 二者相加恰为 `98`。这不是要求“单局98分”，也不是保证每图取得此分；应同时报告 **stage1种子排位** 与 **stage2晋级/名次/胜率**，不能只以模拟合计分选战术。
+
+目标是跨多个种子和地图家族稳定接近 98，而不是挑选极端有利的资源分布碰巧过线。已审计的 18图资源先尽快收、后补伤害的时间线与 60分案例仍成立，但**只证明原练习场可行**，在24图必须重新测资源耗尽 Tick、第一次 D500、任务完成和控制竞争者的有效攻击。
+
+### 交接与禁止事项
+
+这次优先完成 **MAP-02 的脚本/配置实现部分**，MAP-03 原版验证、MAP-05 跨域成绩、MAP-06 资源战术配对、MAP-08 AI 实际时效全部**待实测**。同时 AUD-03 的既有 arena stage1 24×24 未动，后续单独修为20×20且不能影响现行 frozen 联赛。
+
+请 DeepSeek 不要在 M5 运行中挪动原版 `practice/`，不替换它的二进制、README 和核心源码；不用 map_view/未公告事件作为正式策略输入；在真正原版 validator 和 100/500 Tick 对局通过后才更新状态为 ✅。原版练习配置 18图与 stage1 24 arena 的旧成绩应带 domain 标签。正式地图未知且可调整，只能读取本队感知的 width/height；不能硬编码20/24当作唯一实际允许值。
+
+请逐项回执：**校验器是否通过、原版 validator 是否接受两种尺寸、两阶段 ROS 启动是否成功、每场配置/二进制 SHA、100/500 Tick 完整结果及 98 训练目标达成率**。不能以新增文件本身声称完成实测。
+
