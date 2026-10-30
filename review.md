@@ -643,3 +643,36 @@ AUD-01（已完成）→ M5 收批（~22:20）→ AUD-02 docs/53 全清单 → A
 - M5 单实例：`ps -eo pid,cmd | grep -E '[p]ractice_version|[r]eferee_node'` → 恰 1 调度器 + 1 referee；每局 config_0.json SHA 与 M1 同 seed 对比（收批后）。
 - AUD-03/04 引用核对：`sed -n '1,95p' tests/arena_scenarios.cpp`。
 - AUD-07 引用核对：`sed -n '150,200p' tests/run_arena.py`。
+
+
+## 2026-10-30 21:54 +0800（Asia/Shanghai）· DeepSeek（Frank 侧）· CG-R-20261030-INTERPRET-2ROUND（两轮解读回执：case-0 战斗取证 + 大审计六点）
+
+本块为 10-30 用户大审计指令⑥「两轮解读（case-0 战斗取证 + 本轮全审计）发 review.md」的回执，两仓同文追加。case-0 事实取自 M5 批次 seed06 现场局（10-30 20:07–20:12，session practice-8b14720ffd6b43258aff6269520394b1，config_sha256 fce12fa1…）；大审计六点依据任务 #6/#7/#8 与 docs/51（ANALYSIS b47e83a）、docs/54（ANALYSIS eabd26d）、docs/56（ANALYSIS 3c61a1e）。
+
+### 第一轮解读：case-0 战斗取证（seed06，A=candidate 49.0 胜 C=原版 43.5，D 465、A 7 死）
+
+- **「杀不掉」= 只补刀、无追击**：A 仅在对手 hp≤20 一击必杀时出手，全程仅 t183 补刀击杀 C 一次；B 侧 20hp 残血脱线逃脱时 A 不追（无追击行为分支）。
+- **「被多扣 hp」量化**：52 tick 挨打、其中 33 tick 纯挨打不还手（采集动作时被白打）；7 次死亡全部同一形状 40→20→0——站敌方 range-2 火线不防不撤，D 蹲点刷 A 4 杀。
+- **根因（三缺）**：①防守只判「本 tick 必死」，对 2-tick 死亡路径无反应；②low_hp_attack_discount 关（=1.0），残血既不攻击也不加速撤离；③撤退单步只挪 1 格，逃不出 range-2 火线。
+- **AUD-05 反例活体证据**：A 每次死亡 effective_damage 倒扣击杀奖励（-20/-40/-60；D 的 895 分大半为击杀奖励）→「互杀先入账后扣减」真实对局实锤，已入 rules 反例测试待办。
+- **修复杠杆（均行为类默认关，待竞技场评估）**：low_hp_attack_discount 0.3~0.5（已排队）；残血防守放宽为 2-tick 生存判定；撤离至火线外；追击残血目标。
+
+### 第二轮解读：大审计六点
+
+1. **每局立即逐决策审查（能否提前 2-5 tick 做得更好）** → 已执行 M5 前 24 局（任务 #6）；根因归类四类：候选漏检 / 门控 / 权重 / 预算，逐局结论入审计底稿。
+2. **激进拿资源 + 必要时冠军单挑验证** → M4 已证 candidate vs champion-B Δ+2.76（48/48）；M5 同池对照 32 局（A=candidate 前 24 局均分 45.35、13 次第一、R65.0/D726.8）。用户已下令停赛，冠军单挑局排队到联赛后队列。
+3. **审查「为什么总被打死」** → league-192 M1 冠军死亡模式取证（任务 #7）+ case-0（上）；共同模式=残血/火线决策缺位，导航与经济指标四图均匀（非导航问题）。
+4. **被忽视参数与决策合理性** → docs/54 已列全部 50 参数与实现路径逐行核对（战术层 beam 比赛关、资源串 beam 开、战斗=贪心+情境折扣）；AUD-07 消融 no-op 自动检测排队。
+5. **18×18 与正式 20×20/24×24 参数域偏移（实测调整写死参数的关键）** → 任务 #8 完成：18×18 硬编码清单（tools/batch_practice.py W/H=18+SPAWNS+CENTER(9,9)+6 墙、practice config stage1/2.json、practice1/2 夹具静态校验 PASS——20×20 394 可达格 / 24×24 570 可达格，均 16 资源 200R）。**需随正式尺寸重标定**：stage2 resource_plan_budget_ms=10、resource_candidate_limit=8、frontier 0.02、explore_toward_resource 0.5、reach_mission_value 8.0、resource_mission_bonus 5.0、opponent_claim_discount 0.5、post_cap_combat_weight 0.02、stale_resource_decay 0.01、60-tick 资源窗口时间闸门；stage1 全参数需先修 arena stage1 24×24→20×20（MAP-04）再标定。规则常量不调（9×9/±4、100/500 tick、R120/D500、攻20防10、±60、出生保护 2）；本地类不随图缩放（safe_first_steps horizon=8、manhattan<4、healing 公式）。
+6. **两轮解读发 review.md** → 本块。
+
+### 附：练习 AI 链路验证（收尾指令「不用环境变量」）
+
+match_config.hpp 临时写死 key+proxy → build.sh → check_ai.sh → **request_ok / http 200 / 1163ms / proxy configured / api.deepseek.com / deepseek-flash**。已还原空串并重建（match_config.sha256、ai_check.sha256 双校验 OK），全仓复扫 0 处真实 `sk-` 密钥，提交无 key。结论：练习→上游链路通，stage2「每场≥1 次真实 AI 调用」在链路上可行；比赛口径不变（不写死即 502，技术报告按规则引擎声明）。
+
+### 验证命令（本块依据的事实）
+
+- 链路：`cd /home/frank/cst && bash check_ai.sh` → `{"kind": "request_ok", "http_status": 200, "elapsed_ms": 1163, "upstream_proxy": "configured", "upstream_host": "api.deepseek.com", "model": "deepseek-flash"}`；还原重建后 `sha256sum --check --status build/rmtc_bot/match_config.sha256 build/rmtc_bot/ai_check.sha256` 双 OK。
+- 无密钥：全仓复扫（`grep -rl "sk-" src/ scripts/ tools/ tests/`）→ 0 文件；`git status --short` → 仅 `M  .gitignore`（install-v-candidate-A/B 忽略项）。
+- case-0：M5 批次 seed06 现场局 session practice-8b14720ffd6b43258aff6269520394b1（config_sha256 fce12fa1…，10-30 20:07–20:12）。
+- 依据文档：docs/51（ANALYSIS b47e83a）、docs/54（ANALYSIS eabd26d）、docs/56（ANALYSIS 3c61a1e）。
