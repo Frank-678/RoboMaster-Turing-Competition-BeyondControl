@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""版本联赛调度器（docs/38 §2）：12 图 × 4 席位 × 3 混合 = 144 场/版本。
+"""版本联赛调度器（docs/38 §2）：12 图 × 4 席位 × 4 混合 = 192 场/版本。
 每个 (图 seed, 混合) 跑一次驱动（--map-locked --count 4）：同图同事件日程，
 4 局仅轮换出生席位，消出生位置偏差。混合定义：
   M1 原版：A=本版本（champion），B/C/D=原版陪练（裁判 spawn）。
   M2 自战·旧冠军：A=champion，B=old_champion（冻结席位变体），C/D=原版陪练。
-  M3 自战·候选：candidate 就位后启用（当前跳过）。
+  M3 自战·候选（对手位）：A=champion，B=candidate，C/D=原版陪练。
+  M4 自战·候选（焦点位，docs/48 依 ChatGPT CG-C-20261029-HANDOFF-FINAL 第 1 条增）：
+     A=candidate，B=champion（席位变体），C/D=原版陪练——与 M1 同地图/同 A 席位/同对手池，
+     candidate 作为焦点版本的成对比较。
+  M5 同池对照（docs/48 §5 口径）：A=candidate，B/C/D=原版陪练——与 M1 完全同池（对手仅原版），
+     candidate 与原版陪练同池对比 M1 的 champion，消 M3/M4 的模型间互相对抗混杂。
 冻结契约（U6 条款）：开赛前逐一校验参战二进制 sha256 与清单一致，不符即中止。
 用法：
   bash practice_league.sh --maps 20261201,20261202 --mixes M1,M2 [--out DIR]
@@ -23,6 +28,8 @@ MIXES = {
     "M1": {"A": "champion"},
     "M2": {"A": "champion", "B": "old_champion"},
     "M3": {"A": "champion", "B": "candidate"},
+    "M4": {"A": "candidate", "B": "champion"},
+    "M5": {"A": "candidate"},
 }
 
 
@@ -85,12 +92,17 @@ def run_mix(seed, mix, our, out_dir, args):
     return (0 if p.returncode == 0 and complete else 1), battles
 
 
+def batch_exit_code(planned_groups, okn, total, failed):
+    """批次聚合退出码：缺组/缺局/失败组任一存在即非零（护栏有效但聚合退出码必须如实）。"""
+    return 0 if (planned_groups > 0 and okn == total == 4 * planned_groups and failed == 0) else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest", default=f"{CST}/tools/versions.json")
     ap.add_argument("--maps", default=None, help="逗号分隔 seed 子集；缺省全部 12 图")
     ap.add_argument("--mixes", default="M1,M2,M3",
-                    help="逗号分隔；M3 在 candidate 就位前自动跳过")
+                    help="逗号分隔；M3/M4/M5 在 candidate 就位前自动跳过")
     ap.add_argument("--out", default="/tmp/version_league")
     ap.add_argument("--only", default=None,
                     help="调试过滤：MIX:SEED（如 M2:20261201），只跑一项")
@@ -108,13 +120,13 @@ def main():
         mixes, seeds = [m0], [int(s0)]
 
     if not seeds or not mixes or any(m not in MIXES for m in mixes):
-        ap.error("地图seed和混合均不能为空，混合只能M1/M2/M3")
+        ap.error("地图seed和混合均不能为空，混合只能M1/M2/M3/M4/M5")
     failed, planned_groups = 0, 0
     skipped = []
     all_battles = []
     for mix in mixes:
-        if mix == "M3" and not manifest["versions"].get("candidate"):
-            log("M3 跳过：candidate 未就位；不计已完成场数")
+        if mix in ("M3", "M4", "M5") and not manifest["versions"].get("candidate"):
+            log(f"{mix} 跳过：candidate 未就位；不计已完成场数")
             skipped.append(mix)
             continue
         our = {seat: seat_base(manifest, version, seat)
@@ -135,7 +147,7 @@ def main():
                   failed_groups=failed, skipped_mixes=skipped, results=all_battles)
     with open(os.path.join(args.out, "league_summary.json"), "w") as stream:
         json.dump(report, stream, ensure_ascii=False, indent=2)
-    return 0 if (planned_groups > 0 and okn == total == 4 * planned_groups and failed == 0) else 1
+    return batch_exit_code(planned_groups, okn, total, failed)
 
 
 if __name__ == "__main__":

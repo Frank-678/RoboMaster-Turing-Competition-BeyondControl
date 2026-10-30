@@ -194,7 +194,8 @@ class PracticeTools(unittest.TestCase):
         self.assertEqual(error.exception.code, 7)
         self.assertEqual(header.read_bytes(), original)
         self.assertEqual(build.call_args.kwargs["cwd"], source)
-        self.assertIn(str(source / "build-v-fixture-B/source/src"), build.call_args.args[0])
+        # colcon 经 bash -c 调用（显式 source ROS）：整条命令串必须指向冻结副本路径。
+        self.assertIn(str(source / "build-v-fixture-B/source/src"), build.call_args.args[0][2])
 
     def test_empty_practice_run_is_not_zero_of_zero_success(self):
         args = SimpleNamespace()
@@ -202,6 +203,28 @@ class PracticeTools(unittest.TestCase):
              contextlib.redirect_stdout(io.StringIO()):
             rc, battles = practice_league.run_mix(1, "M1", {"A": "install"}, str(self.work), args)
         self.assertEqual((rc, battles), (1, []))
+
+    def test_league_batch_exit_code_aggregates_failures(self):
+        # 全完成 → 0；缺局/失败组/空计划 → 1（护栏有效但聚合退出码必须非零）。
+        self.assertEqual(practice_league.batch_exit_code(1, 4, 4, 0), 0)
+        self.assertEqual(practice_league.batch_exit_code(2, 8, 8, 0), 0)
+        self.assertEqual(practice_league.batch_exit_code(1, 3, 4, 0), 1)   # 缺局
+        self.assertEqual(practice_league.batch_exit_code(2, 8, 7, 0), 1)   # 返回数不足
+        self.assertEqual(practice_league.batch_exit_code(2, 8, 8, 1), 1)   # 有失败组
+        self.assertEqual(practice_league.batch_exit_code(0, 0, 0, 0), 1)   # 空计划
+
+    def test_referee_ready_requires_new_line_per_attempt(self):
+        # 每次尝试独立就绪基线：上一尝试残留的 Ready 行不能算本次就绪；
+        # 日志被截断重开后，以本次新出现的就绪行为准。
+        logf = self.work / "referee_stdout.log"
+        logf.write_text("练习裁判已就绪\n")
+        self.assertFalse(batch.referee_ready_since(self.work, 1))   # 旧行不算新就绪
+        logf.write_text("练习裁判已就绪\n练习裁判已就绪\n")
+        self.assertTrue(batch.referee_ready_since(self.work, 1))    # 本次新行
+        logf.write_text("练习裁判已就绪\n")                         # 截断重开后再就绪
+        self.assertTrue(batch.referee_ready_since(self.work, 3))
+        logf.write_text("")                                         # 截断后尚未就绪
+        self.assertFalse(batch.referee_ready_since(self.work, 3))
 
 
 if __name__ == "__main__":
