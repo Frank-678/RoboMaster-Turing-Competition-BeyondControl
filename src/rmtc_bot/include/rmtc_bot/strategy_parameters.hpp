@@ -34,6 +34,7 @@ struct StrategyParameters {
   double tactical_risk, tactical_hp_value, tactical_death_cost, tactical_future_discount, tactical_goal_weight;
   bool loop_recovery; // 离线可关闭作对照；正式仍由唯一配置封存。
   int loop_window_ticks, recovery_ticks, stalled_goal_cooldown_ticks; // 检测窗口、脱困期限、坏目标冷却。
+  int receipt_block_ticks; // 回执确认MOVE失败时目标格堵格记忆Tick数；0=关闭。
   bool worst_case_survival; // 1=生存判定按全敌攻击最坏情形（预测防御只作机会估值，不作伤害上界的确定排除项）；0=旧行为。
   double post_cap_combat_weight; // D≥500封顶后增量D的平局估值权重（同分同任务同R按D决胜）；0=旧行为（封顶后归零）。
   double explore_component_value; // 第二阶段扫图观察点覆盖最大化加权：按视野触及的最大未探索连通区大小加成；0=旧行为。
@@ -50,7 +51,7 @@ struct StrategyParameters {
       c::resource_beam_width,c::resource_candidate_limit,c::resource_plan_budget_ms,
       c::collision_replan,c::resource_refinement,c::resource_refinement_trials,c::tactical_search,
       c::tactical_risk,c::tactical_hp_value,c::tactical_death_cost,c::tactical_future_discount,c::tactical_goal_weight,
-      c::loop_recovery,c::loop_window_ticks,c::recovery_ticks,c::stalled_goal_cooldown_ticks,
+      c::loop_recovery,c::loop_window_ticks,c::recovery_ticks,c::stalled_goal_cooldown_ticks,c::receipt_block_ticks,
       c::worst_case_survival,c::post_cap_combat_weight,c::explore_component_value,c::low_hp_attack_discount,c::explore_probe_mission_bonus_scale,c::stage2_fisherman_gate};
   }
   void validate() const {
@@ -64,7 +65,8 @@ struct StrategyParameters {
         stale_grace_ticks<0 || stale_grace_ticks>20 ||
         resource_beam_width<1 || resource_beam_width>32 || resource_candidate_limit<1 || resource_candidate_limit>32 ||
         resource_refinement_trials<0 || resource_refinement_trials>32 || resource_plan_budget_ms<1 || resource_plan_budget_ms>30 || loop_window_ticks<6 || loop_window_ticks>32 ||
-        recovery_ticks<2 || recovery_ticks>64 || stalled_goal_cooldown_ticks<1 || stalled_goal_cooldown_ticks>200) throw std::runtime_error("invalid strategy budget");
+        recovery_ticks<2 || recovery_ticks>64 || stalled_goal_cooldown_ticks<1 || stalled_goal_cooldown_ticks>200 ||
+        receipt_block_ticks<0 || receipt_block_ticks>64) throw std::runtime_error("invalid strategy budget");
   }
 };
 } // namespace rmtc

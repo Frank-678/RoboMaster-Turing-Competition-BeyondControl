@@ -213,7 +213,7 @@ std::array<bool, 5> Strategy::safe_first_steps(Cell start, Tick tick, const std:
       if (std::abs(dx) + std::abs(dy) > horizon) continue;
       const Cell cell{start.first + dx, start.second + dy}; // dx/dy是对当前格的扫描偏移。
       const auto tile = tiles_.find(cell); // 格子的历史观测；找不到就属于未知。
-      if (tile == tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(cell)) continue;
+      if (tile == tiles_.end() || !tile->second.seen || tile->second.wall || tile->second.blocked_until > tick || occupied.count(cell)) continue;
       index[cell] = cells.size(); cells.push_back(cell);
     }
   }
@@ -284,7 +284,8 @@ std::vector<Strategy::ResourcePlan> Strategy::resource_plans(Cell start, Tick ti
         const Cell next{cell.first+steps[direction].first,cell.second+steps[direction].second};
         const auto tile=tiles_.find(next);
         const Tick action_tick=tick+state.elapsed+distance;
-        if (tile==tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(next) ||
+        if (tile==tiles_.end() || !tile->second.seen || tile->second.wall ||
+            tile->second.blocked_until > action_tick || occupied.count(next) ||
             parent.count(next) || split_wall(next,action_tick) || dangerous(next,action_tick+1)) continue;
         parent[next]={cell,distance+1};pending.push(next);
       }
@@ -434,7 +435,7 @@ void Strategy::update_effects(Tick tick) {
   }
 }
 
-std::optional<Strategy::ResourcePlan> Strategy::resource_tour(Cell start, Tick remaining_ticks,
+std::optional<Strategy::ResourcePlan> Strategy::resource_tour(Cell start, Tick tick, Tick remaining_ticks,
     const std::vector<Cell> &targets, const std::set<Cell> &occupied,
     const std::map<Cell, double> *values, Cell first_hint) const {
   if (targets.size() < 2 || targets.size() > 16) return std::nullopt; // 只对已知资源巡回；数量有界，不承诺全局最优。
@@ -451,10 +452,12 @@ std::optional<Strategy::ResourcePlan> Strategy::resource_tour(Cell start, Tick r
     route[origin] = {4, 0}; queue.push(origin);
     while (!queue.empty()) {
       const Cell cell = queue.front(); queue.pop();
+      const auto node = route.at(cell);
       for (int direction = 0; direction < 4; ++direction) {
         const Cell next{cell.first + steps[direction].first, cell.second + steps[direction].second};
         if (!walkable(next) || route.count(next)) continue;
-        const auto node = route.at(cell);
+        const auto tile = tiles_.find(next); // 瞬时堵格按到达时刻判断；下一帧BFS整体重算，过期自动恢复。
+        if (tile != tiles_.end() && tile->second.blocked_until > tick + node.second + 1) continue;
         route[next] = {node.second == 0 ? direction : node.first, node.second + 1};
         queue.push(next);
       }
@@ -585,6 +588,10 @@ Json Strategy::decide(const Json &p) {
       receipt_tick==tick-1 && receipt.value("action",std::string())=="move" && !moved && !respawn) {
     if (failed_destination_==previous_attempt->destination) ++failed_moves_;
     else {failed_destination_=previous_attempt->destination;failed_moves_=1;}
+    if (parameters_.receipt_block_ticks > 0) {
+      auto &tile = tiles_[previous_attempt->destination]; // 回执证实的瞬时堵格：本帧起规划绕行，过期自动解封。
+      tile.blocked_until = tick + parameters_.receipt_block_ticks;
+    }
   } else {failed_destination_.reset();failed_moves_=0;}
   const bool keep_goal = previous_goal && previous_goal->tick == tick - 1 && !respawn &&
       !(receipt_tick >= 0 && receipt.value("action", std::string()) == "move" && !moved);
@@ -789,8 +796,8 @@ Json Strategy::decide(const Json &p) {
       const Cell next{start.first+steps[direction].first,start.second+steps[direction].second};
       const auto tile=tiles_.find(next);
       if (next!=*failed_destination_ && safe_steps[direction] && tile!=tiles_.end() && tile->second.seen &&
-          !tile->second.wall && !occupied.count(next) && !split_wall(next,tick) && !dangerous(next,tick+1) &&
-          possible_fire(next)<hp-pre_damage) alternative=direction;
+          !tile->second.wall && tile->second.blocked_until<=tick && !occupied.count(next) &&
+          !split_wall(next,tick) && !dangerous(next,tick+1) && possible_fire(next)<hp-pre_damage) alternative=direction;
     }
     if (alternative>=0) {
       const int repeated=ray(start,*failed_destination_);
@@ -811,7 +818,8 @@ Json Strategy::decide(const Json &p) {
       if (node.first == -1 && !safe_steps[i]) continue;
       const Cell next{current.first + steps[i].first, current.second + steps[i].second}; // i是上右下左索引，next是邻格。
       const auto tile = tiles_.find(next); // 邻格的已知地图记录，可能不存在。
-      if (tile == tiles_.end() || !tile->second.seen || tile->second.wall || occupied.count(next) ||
+      if (tile == tiles_.end() || !tile->second.seen || tile->second.wall ||
+          tile->second.blocked_until > tick + node.distance || occupied.count(next) ||
           paths.count(next) || split_wall(next, tick + node.distance) ||
           dangerous(next, tick + node.distance + 1)) continue;
       // 对手会不会踩点还未知，不能据此封路。否则可能删掉已公告爆炸的唯一逃路。
@@ -1135,7 +1143,7 @@ Json Strategy::decide(const Json &p) {
     std::vector<Cell> tour_targets;
     tour_targets.reserve(resource_options.size());
     for (const auto &option : resource_options) if (option.second != start) tour_targets.push_back(option.second);
-    if (const auto tour = resource_tour(start, remaining_ticks, tour_targets, occupied))
+    if (const auto tour = resource_tour(start, tick, remaining_ticks, tour_targets, occupied))
       if (consider(tour->first, tour->utility, "collect_resource_tour", tour->first_resource, tour->benefit))
         direction_plan[tour->first]=tour->stops;
   }
@@ -1259,7 +1267,7 @@ Json Strategy::decide(const Json &p) {
         values[cell] = static_cast<double>(gain) + ring_bonus(cell);
       }
       if (picked.size() >= 2) {
-        if (const auto tour = resource_tour(start, remaining_ticks, picked, occupied, &values, hint)) {
+        if (const auto tour = resource_tour(start, tick, remaining_ticks, picked, occupied, &values, hint)) {
           consider(tour->first, parameters_.explore_tour_value * tour->utility, "explore_tour",
                    tour->first_resource, tour->benefit);
         }

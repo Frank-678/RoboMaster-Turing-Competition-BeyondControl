@@ -167,6 +167,9 @@ def main():
     # 独立留出不参与选择。额外消融使用同一选定参数，仅关闭一个新增模块。
     selected = {"name": "selected", "parameters": selected["parameters"]}
     comparison = [{"name": "baseline", "parameters": SETTINGS["baseline_parameters"]}, selected,
+                  {"name": "selected_block8", "parameters": dict(selected["parameters"], receipt_block_ticks=8)},
+                  {"name": "selected_block12", "parameters": dict(selected["parameters"], receipt_block_ticks=12)},
+                  {"name": "selected_block16", "parameters": dict(selected["parameters"], receipt_block_ticks=16)},
                   {"name": "selected_without_tactics", "parameters": dict(selected["parameters"], tactical_search=False)},
                   {"name": "selected_without_refinement", "parameters": dict(selected["parameters"], resource_refinement=False)},
                   {"name": "selected_without_collision_replan", "parameters": dict(selected["parameters"], collision_replan=False)},

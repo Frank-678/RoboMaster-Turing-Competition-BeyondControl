@@ -42,6 +42,7 @@ private:
     unsigned visits = 0; // 实际访问次数。
     double value = 0;    // 最后观测到的资源价值；0表示没有资源记录。
     bool high = false;  // 该资源是否属于高价值资源。
+    Tick blocked_until = -1; // 回执确认MOVE失败后目标格的瞬时堵格截止Tick；过期后重新允许规划通过。
   };
   struct Snapshot {
     // position属于当前感知；moved/receipt_tick解释上一Tick的实际执行结果。
@@ -78,7 +79,7 @@ private:
       bool need_normal, bool need_high, double value_target, const std::vector<Cell> &previous_plan) const;
   // 第一阶段巡回：对已知可达资源做近邻+有界2-opt顺序，只估值并执行首步；不跨未知格、不缓存未来动作。
   // values非空时用它替代地图资源价值（边界观察点巡回）；不写回tiles_。
-  std::optional<ResourcePlan> resource_tour(Cell start, Tick remaining_ticks,
+  std::optional<ResourcePlan> resource_tour(Cell start, Tick tick, Tick remaining_ticks,
       const std::vector<Cell> &targets, const std::set<Cell> &occupied,
       const std::map<Cell, double> *values = nullptr, Cell first_hint = {-1, -1}) const;
   std::optional<Cell> predict_opponent(const std::string &identity, Cell position, Tick tick);

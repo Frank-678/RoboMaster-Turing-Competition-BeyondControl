@@ -21,7 +21,7 @@ void configure(rmtc::StrategyParameters &p,const Json &values) {
   PARAMETER(stage2_assassin_value) PARAMETER(stage2_pie_attack_discount) PARAMETER(stage2_shadow_value) PARAMETER(defend_stall_break_ticks)
   PARAMETER(hazard_lead_ticks) PARAMETER(resource_plan_depth) PARAMETER(resource_beam_width)
   PARAMETER(resource_candidate_limit) PARAMETER(resource_plan_budget_ms)
-  PARAMETER(loop_recovery) PARAMETER(loop_window_ticks) PARAMETER(recovery_ticks) PARAMETER(stalled_goal_cooldown_ticks)
+  PARAMETER(loop_recovery) PARAMETER(loop_window_ticks) PARAMETER(recovery_ticks) PARAMETER(stalled_goal_cooldown_ticks) PARAMETER(receipt_block_ticks)
   PARAMETER(collision_replan) PARAMETER(resource_refinement) PARAMETER(resource_refinement_trials)
   PARAMETER(tactical_search) PARAMETER(tactical_risk) PARAMETER(tactical_hp_value) PARAMETER(tactical_death_cost)
   PARAMETER(tactical_future_discount) PARAMETER(tactical_goal_weight)

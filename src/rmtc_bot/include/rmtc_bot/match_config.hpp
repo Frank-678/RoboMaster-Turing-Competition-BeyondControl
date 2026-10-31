@@ -77,6 +77,7 @@ inline constexpr bool loop_recovery = true; // 真实位置在小区域反复、
 inline constexpr int loop_window_ticks = 12; // 至少12份连续可信回执；能识别周期1至6及四格内徘徊。
 inline constexpr int recovery_ticks = 12; // 脱困目标最多坚持12Tick，每帧仍检查道路和危险。
 inline constexpr int stalled_goal_cooldown_ticks = 24; // 暂缓刚导致循环的目标，过期后可重新竞争。
+inline constexpr int receipt_block_ticks = 0; // 回执确认MOVE失败时目标格堵格记忆Tick数；0=关闭（行为类改动默认关，待竞技场评估晋升）。
 inline constexpr bool collision_replan = true; // 同一起点同一落点连续两次MOVE失败，存在合法替代时改道一Tick。
 inline constexpr bool resource_refinement = true;  // 重评上一资源串，并尝试插入、交换/反转、删除目标。
 inline constexpr int resource_refinement_trials = 12; // 每帧最多12次局部修改，共享原有10ms软预算。
