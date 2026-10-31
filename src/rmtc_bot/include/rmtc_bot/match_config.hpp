@@ -58,12 +58,14 @@ inline constexpr double mission_explore_value = 0.0; // 沿到点任务方向探
 inline constexpr double explore_tour_value = 0.06; // 第一阶段空档期，把散布的边界观察点排成小巡回的机会权重；0为关闭。0.03→0.06 晋升（10-31 relaxed 31 图：w12-uniform-23 170→200 且 ×3 复验，其余 30 图逐位一致、零损失；ring 1.0 与 flood 0.1/0.05/0.02 均未过晋升线）。
 inline constexpr double stage1_flood_value = 0.0; // 第一阶段空档探索的最近边界洪泛权重（距离优先、同距离取更大新视野）；与巡回/frontier同场竞争，0为关闭。
 inline constexpr double stage1_ring_value = 0.0; // 第一阶段“近出生点完成覆盖”权重：巡回观察点按增益+近出生点加成排序，优先揭示距出生点近的未探索格（rooms-195左侧列30R口袋滞留t91-99的修复轴）；0为关闭。
-inline constexpr bool stage2_race_gate = false; // 第二阶段竞速闸门：两轮实验均显示早期主动交火有压制对手扫资源的价值，关闭。
+inline constexpr bool stage2_race_gate = true; // 第二阶段竞速闸门：R未封顶、且还有已知可收集资源时，采集竞速优先于主动开战和到点任务。官方图裁决（10-31 race 轮，race_on vs base vs racex 各两局）：R 40→60、死亡 11→7、A=45 两局全胜且逐tick确定（base A=40 两局皆 D 席 45 夺冠；racex 探索放宽 A=41.1/43.75 非确定、D 885→370 净亏）。官方图 frames.jsonl 证实全部 200 资源在 t20 前被四席瓜分完毕（A 60/B 40/C 50/D 50），A 几何上限即 R=60——各席出生点紧贴资源带，无人能先于对手到达邻带（B t8 取 [12,5]，A 最快 t14）。闸门把早期行动力钉在采集与压制，R 满后转战斗；真实对手若扫图更慢，闸门自适应延长采集期。
+inline constexpr bool stage2_race_explore_gate = false; // 第二阶段竞速闸门探索放宽（已否决）：R<120 且无已知可达资源但存在未探索格时，扫图优先于主动开战。官方图裁决（10-31 racex 轮）：A=41.1/43.75 两局均输 race_on 45——t20 后全图资源已清空，探索把 A 从边角带进中央混战（t29 attack_opportunity@[10,11]），死亡 7→11、D 885→370，且破坏逐tick确定性（g1/g2 比分分叉）。仅当对手扫图极慢时才有价值，不晋升。
 inline constexpr double race_reach_holdoff = 0.0; // 第二阶段竞速期到点任务暂缓折扣（0-1）：docs/35 损失路径=首分钟资源争抢——已知可达资源未清空时 reach_mission 按 (1-holdoff) 打折（V1 t62 弃 [7,4]+[6,2] 20R、V4 t14 弃 10R），资源清空后恢复原权重（M 点晚拿不丢）。与 stage2_race_gate 不同：不动交火轴（gate 两轮实验已证早期交火有压制对手扫资源的价值）。0=旧行为。
 inline constexpr int stage2_explore_gate_tick = 0; // 第二阶段资源饼通常在150Tick内被抢光：Tick≥此值且已知资源已清空时关闭扫图，让位给交火/据点；0为关闭。
 inline constexpr int stage2_mission_pull_stale_ticks = 6; // 第二阶段资源久未现身（前沿扫图空转）时向到点任务方向拉拽探索；0为关闭。0→6 晋升（sprint-1031 b2 批内 +0.0194：stage2 score 41.25→42.5、R 60→65、win_share 0.333→0.417；heldout 30 场景 +0.0042，组合 lhp+s2pull +0.0060；剂量窗窄 s2pull3 −0.018 负）。
 inline constexpr double stage2_assassin_value = 0.0; // 第二阶段派窗口刺杀：攻击正在扫资源簇的对手，打断其扫掠（击杀/击退→重生移位）把簇剩余资源留给我们；0为关闭。
 inline constexpr double stage2_pie_attack_discount = 0.0; // 第二阶段饼窗口攻击估值折扣：竞速期攻击会把我们从抢饼线路吸走（clusters-495：t20-26攻击致死、错过中簇70R）；还手不折扣。0=关闭，1=饼窗内除还手外不主动攻击。与race gate不同：只压攻击估值，不动任务/接近行为。
+inline constexpr bool stage2_fisherman_gate = false; // 第二阶段渔翁门（行为类默认关闭，竞技场评估晋升后开启）：未被火力波及时只攻击/接近一击必杀目标（hp≤attack_damage_），不为对称消耗战放弃采集；被还手时，若对方击杀我们的回合数不慢于我们击杀对方（对称/劣势换血）也撤退不还手。4 个对手互斗时渔翁得利——10-31 11:59 战例：A 与满血 C 对抽先死（全场 11 死），避战收资源的 D R=60 拿第一，我方 R=40 输 5 分。
 inline constexpr double stage2_shadow_value = 0.0; // 第二阶段饼窗口影子跟踪：对手连续同向穿过我们已知区朝未知区移动时，向其投影前端探路，与对手在饼簇两侧合流共享；0为关闭。不假设未知格里有资源，只利用对手行为蕴含的信息。
 inline constexpr int defend_stall_break_ticks = 0; // 第二阶段连续致命防御驻守超过该tick数后脱离接触（选距最近敌车最远的安全邻格）；0为关闭。
 inline constexpr double opponent_contest_cost = 1.0; // 稳定轨迹预计争同格时，给路线增加一份等待成本；启发式，非概率。

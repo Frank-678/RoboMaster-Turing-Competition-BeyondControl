@@ -17,6 +17,7 @@ struct StrategyParameters {
   double stage1_flood_value; // 第一阶段空档探索的最近边界洪泛权重（距离优先、同距离取更大新视野）；与散点巡回、frontier同场竞争，0为关闭。
   double stage1_ring_value; // 第一阶段近出生点完成覆盖权重：巡回观察点按增益+近出生点加成排序；0为关闭。
   bool stage2_race_gate; // 第二阶段R未封顶且还有已知可收集资源时，把主动交火与到点任务让位给采集竞速。
+  bool stage2_race_explore_gate; // 第二阶段R未封顶且无已知资源但存在未探索格时，扫图探索优先于主动开战（race gate 的探索放宽）。默认关，竞技场评估晋升后开启。
   double race_reach_holdoff; // 第二阶段已知可达资源未清空时对到点任务目标的折扣（0-1）；0=旧行为。
   int stage2_explore_gate_tick; // 第二阶段资源饼清空后关闭扫图的时刻闸门；0为关闭。
   int stage2_mission_pull_stale_ticks; // 第二阶段资源久未现身时向到点任务方向拉拽探索的饥饿阈值；0为关闭。
@@ -36,18 +37,19 @@ struct StrategyParameters {
   double explore_component_value; // 第二阶段扫图观察点覆盖最大化加权：按视野触及的最大未探索连通区大小加成；0=旧行为。
   double low_hp_attack_discount; // 低血量攻击折扣：hp<60且未被火力波及时攻击估值乘此值（策略层§6+战术层深度0攻击分支同口径）；1.0=旧行为。
   double explore_probe_mission_bonus_scale; // 资源探针的任务加成缩放；1.0=旧行为（探针与采集同额计入任务加成）。
+  bool stage2_fisherman_gate; // 第二阶段渔翁门：未被火力波及时只攻击/接近一击必杀目标；被还手且换血算不过（对方击杀回合数不慢于我方）也撤退不还手。默认关，竞技场评估晋升后开启。
   static StrategyParameters competition() {
     namespace c=match_config;
     return {c::stale_resource_decay,c::resource_mission_bonus,c::reach_mission_value,c::healing_below_hp,
       c::fortress_hold_value,c::fortress_capture_value,c::prepare_fortress_value,c::goal_retention_bonus,c::frontier_value,
       c::stale_grace_ticks,
       c::opponent_contest_cost,c::opponent_pressure_cost,c::opponent_claim_discount,c::stage1_frontier_value,c::explore_toward_resource_value,c::explore_tour_value,c::mission_explore_value,
-      c::stage1_flood_value,c::stage1_ring_value,c::stage2_race_gate,c::race_reach_holdoff,c::stage2_explore_gate_tick,c::stage2_mission_pull_stale_ticks,c::stage2_assassin_value,c::stage2_pie_attack_discount,c::stage2_shadow_value,c::defend_stall_break_ticks,c::hazard_lead_ticks,c::resource_plan_depth,
+      c::stage1_flood_value,c::stage1_ring_value,c::stage2_race_gate,c::stage2_race_explore_gate,c::race_reach_holdoff,c::stage2_explore_gate_tick,c::stage2_mission_pull_stale_ticks,c::stage2_assassin_value,c::stage2_pie_attack_discount,c::stage2_shadow_value,c::defend_stall_break_ticks,c::hazard_lead_ticks,c::resource_plan_depth,
       c::resource_beam_width,c::resource_candidate_limit,c::resource_plan_budget_ms,
       c::collision_replan,c::resource_refinement,c::resource_refinement_trials,c::tactical_search,
       c::tactical_risk,c::tactical_hp_value,c::tactical_death_cost,c::tactical_future_discount,c::tactical_goal_weight,
       c::loop_recovery,c::loop_window_ticks,c::recovery_ticks,c::stalled_goal_cooldown_ticks,
-      c::worst_case_survival,c::post_cap_combat_weight,c::explore_component_value,c::low_hp_attack_discount,c::explore_probe_mission_bonus_scale};
+      c::worst_case_survival,c::post_cap_combat_weight,c::explore_component_value,c::low_hp_attack_discount,c::explore_probe_mission_bonus_scale,c::stage2_fisherman_gate};
   }
   void validate() const {
     for (double value:{stale_resource_decay,resource_mission_bonus,reach_mission_value,healing_below_hp,

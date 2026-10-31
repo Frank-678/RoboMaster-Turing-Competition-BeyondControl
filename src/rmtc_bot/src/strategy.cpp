@@ -930,12 +930,21 @@ Json Strategy::decide(const Json &p) {
   };
   // 第二阶段竞速闸门：R未封顶、且还有已知可收集资源时，采集竞速优先于主动开战和到点任务。
   // 到点任务没有截止时间，M点晚拿不丢；主动交火在资源被抢光后再打也不迟（资源先到先得）。
+  // race_explore_gate：无已知资源但存在未探索格时同样压战（官方图 R2=30 分权重最大，R 未满前扫图优先于开战）。
   bool race_active = false;
   if (stage_ == 2 && parameters_.stage2_race_gate && resource_value < 120) {
+    bool known_resource = false;
     for (const auto &[cell, tile] : tiles_) {
       if (tile.value <= 0 || tile.wall) continue;
       const auto node = paths.find(cell);
-      if (node != paths.end() && node->second.first >= 0) { race_active = true; break; }
+      if (node != paths.end() && node->second.first >= 0) { known_resource = true; break; }
+    }
+    if (known_resource) {
+      race_active = true;
+    } else if (parameters_.stage2_race_explore_gate) {
+      for (int y = 0; y < height && !race_active; ++y)
+        for (int x = 0; x < width; ++x)
+          if (!tiles_.count({x, y})) { race_active = true; break; }
     }
   }
   // docs/35 损失路径（首分钟资源争抢）：任务链完成后，已知资源仍会被 reach_mission(8/(d+1)) 压过
@@ -1040,6 +1049,8 @@ Json Strategy::decide(const Json &p) {
           !(reflection && (enemy.defending || enemy_will_defend(enemy)))) { // 当前预测攻击只会反伤，就不奖励反复接近同一防御目标。
         const double damage = (enemy.defending || enemy_will_defend(enemy)) ? defended_damage_ : attack_damage_; // 接近后按当前可见状态估计伤害。
         const double contribution = std::min(damage, enemy.hp) + (enemy.hp <= damage ? 60.0 : 0.0); // 实际损血加可能击杀奖励。
+        // 渔翁门：未被火力波及时只接近一击必杀目标，不把采集路线拖去对称换血（攻击侧的换血裁决在§6）。
+        if (parameters_.stage2_fisherman_gate && incoming == 0 && enemy.hp > attack_damage_) continue;
         // 竞速期间或D已封顶且没有伤害任务时，不再主动接近敌车开战；被本Tick火力波及时的还手不受限。
         // D封顶只表示官方原始分不再增加；同分同任务同R时裁判按D决胜，故封顶后按 post_cap_combat_weight
         // 给增量D留平局价值（0=旧行为：完全归零）。战例：f728一局A与C同45分同R同M，D556<1160，名次第3。
@@ -1333,6 +1344,13 @@ Json Strategy::decide(const Json &p) {
         const bool predicted_defend = enemy->defending || enemy_will_defend(*enemy);
         if (reflection && predicted_defend) { reflected += reflection_amount; continue; }
         const double damage = predicted_defend ? defended_damage_ : attack_damage_; // 此目标预计受到的普通/防御伤害。
+        // 渔翁门：未被火力波及时只补刀一击必杀目标；被还手时，若对方击杀我们的回合数不慢于我们击杀对方（对称/劣势换血），也撤退不还手——4 个对手互斗时渔翁得利。
+        if (parameters_.stage2_fisherman_gate && !predicted_defend && enemy->hp > attack_damage_) {
+          if (incoming == 0) continue;
+          const int their_ticks = (int)std::ceil(enemy->hp / attack_damage_);
+          const int our_ticks = (int)std::ceil(hp / 20.0); // 对手普通攻击伤害为规则常量20；双方互攻时估算谁先死。
+          if (their_ticks >= our_ticks) continue;
+        }
         // 按独自击杀估值；多人同时贡献时奖励会平分，所以只是机会估计。
         contribution += std::min(damage, enemy->hp) + (enemy->hp <= damage ? 60.0 : 0.0);
       }
