@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-rmtc_test_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-rmtc_test_tmp="$(mktemp -d)"
+rmtc_test_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)" # 测试工程根目录。
+rmtc_test_tmp="$(mktemp -d)" # 临时可执行文件目录，退出时自动删除。
 trap 'rm -rf -- "$rmtc_test_tmp"' EXIT
-rmtc_test_flags=(-std=c++17 -Wall -Wextra -Wpedantic -Werror -pthread
+python3 "$rmtc_test_root/tests/startup_test.py"
+rmtc_test_flags=(-std=c++17 -Wall -Wextra -Wpedantic -Werror -pthread # 编译参数数组，保证带空格的路径不会拆错。
   -I "$rmtc_test_root/src/rmtc_bot/include")
 if [[ -n "${RMTC_JSON_INCLUDE:-}" ]]; then
   rmtc_test_flags+=(-I "$RMTC_JSON_INCLUDE")

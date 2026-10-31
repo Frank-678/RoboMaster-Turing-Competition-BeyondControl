@@ -107,9 +107,13 @@ def candidates(count):
               "mission_explore_value": [0.0, 0.25, 0.5, 1.0, 2.0],
               "frontier_value": [0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.1, 0.2],
               "tactical_hp_value": [0.005, 0.015, 0.03], "tactical_death_cost": [0.0, 0.25, 1.0], "tactical_goal_weight": [0.15, 0.35, 0.65],
-              "opponent_claim_discount": [1.0, 0.75, 0.5, 0.25]}
+              "opponent_claim_discount": [1.0, 0.75, 0.5, 0.25],
+              "stage1_flood_value": [0.0, 0.03, 0.05, 0.08, 0.12],
+              "stage2_race_gate": [True, False],
+              "stage2_explore_gate_tick": [0, 140, 160, 180, 200],
+              "stage2_mission_pull_stale_ticks": [0, 15, 20, 30, 40]}
     for i in range(max(0, count-4)):
-        values = dict(base, tactical_search=i % 5 != 4, resource_refinement=True, collision_replan=True)
+        values = dict(base, tactical_search=i % 5 != 4, resource_refinement=True, collision_replan=True, loop_recovery=True)
         values.update({key: randomizer.choice(choices) for key, choices in ranges.items()})
         result.append({"name": f"search_{i:02d}", "parameters": values})
     return result
@@ -163,6 +167,9 @@ def main():
     # 独立留出不参与选择。额外消融使用同一选定参数，仅关闭一个新增模块。
     selected = {"name": "selected", "parameters": selected["parameters"]}
     comparison = [{"name": "baseline", "parameters": SETTINGS["baseline_parameters"]}, selected,
+                  {"name": "selected_block8", "parameters": dict(selected["parameters"], receipt_block_ticks=8)},
+                  {"name": "selected_block12", "parameters": dict(selected["parameters"], receipt_block_ticks=12)},
+                  {"name": "selected_block16", "parameters": dict(selected["parameters"], receipt_block_ticks=16)},
                   {"name": "selected_without_tactics", "parameters": dict(selected["parameters"], tactical_search=False)},
                   {"name": "selected_without_refinement", "parameters": dict(selected["parameters"], resource_refinement=False)},
                   {"name": "selected_without_collision_replan", "parameters": dict(selected["parameters"], collision_replan=False)},

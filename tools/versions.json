@@ -20,7 +20,17 @@
       "build_dir": "build",
       "install_base": "install",
       "params_digest": "b1efdbc4d869a53ca05d850257e6dba99550ce4a7ccae8432cd9f04a441007c7",
-      "binary_sha256": "39557aa16d75fb07a2cae950efe549c4ae13d5625cc671a3440a4513ed399052"
+      "binary_sha256": "39557aa16d75fb07a2cae950efe549c4ae13d5625cc671a3440a4513ed399052",
+      "pins": {
+        "train_base_off_objective": 0.7970931712962963,
+        "deaths": 83,
+        "blocked": 93,
+        "stage1": 33.333,
+        "stage2": 41.25,
+        "D2": 1026.67,
+        "heldout_objective": 0.8298625,
+        "determinism_pin": 0.7710073
+      }
     },
     "old_champion": {
       "sha": "9bc72a7",

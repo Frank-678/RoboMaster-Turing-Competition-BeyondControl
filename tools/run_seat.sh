@@ -26,4 +26,6 @@ if [[ ! -x "$BOT" ]]; then
 fi
 mkdir -p "$PWD/log"
 echo "启动：$BOT（seat=$SEAT，node=rmtc_bot_$SEAT，日志=$LOGFILE）"
-exec "$BOT" --ros-args -r "__node:=rmtc_bot_$SEAT" 2>&1 | tee "$LOGFILE"
+# 直接重定向（不用管道 tee）：bash exec 后 Popen 进程即 bot 本体，
+# 驱动 stop_battle 的 terminate/kill 才能打到 bot（管道会 fork 出孤儿）。
+exec "$BOT" --ros-args -r "__node:=rmtc_bot_$SEAT" >"$LOGFILE" 2>&1

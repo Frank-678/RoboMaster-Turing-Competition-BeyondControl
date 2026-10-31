@@ -1,0 +1,105 @@
+{
+ "date": "2026-10-29",
+ "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+ "note": "驻守脱困轮：defend_stall_break_ticks 0/3/6/9/12。先验来自逐tick轨迹验证：致命防御长期停留真实存在（crossroads-542曾连续49Tick站防）。逐场景配对结论：所有变体每场景score/R与s04完全一致——驻守发生在饼耗尽后，脱困无法恢复R；仅D/win重排（train crossroads-542 D1155→945且win0→1；rooms-401 D600→700；val D643→666、win0.50→0.52）。按协议objective=score，score-inert不晋升，冠军不变。冠军逐位一致已由worktree对比证明（pre-edit HEAD与edit后limit=0同场景3次结果一致）。",
+ "champion_bit_identity": "verified via worktree rebuild of pre-edit HEAD; identical per-game results (crossroads-542 R=70 3x)",
+ "nondeterminism_note": "strategy.cpp:243 planner uses steady_clock deadline (resource_plan_budget_ms)；单局结果对机器负载敏感（crossroads-542 s04在两次调用中R=50与R=70两种轨迹）。同一次调用内的配对比较（profile间、场景间）是有效比较单位；跨调用绝对值有该量级噪声。",
+ "train": {
+  "profiles": [
+   "s04",
+   "db3",
+   "db6",
+   "db9",
+   "db12"
+  ],
+  "per_scene_score_identical": true,
+  "s04": {
+   "s1": 33.33,
+   "s2": 41.25,
+   "R": 60.0,
+   "D": 673.3,
+   "win": 0.25,
+   "deaths": 4.67
+  },
+  "db3": {
+   "s1": 33.33,
+   "s2": 41.25,
+   "R": 60.0,
+   "D": 664.2,
+   "win": 0.33,
+   "deaths": 4.5
+  },
+  "db6": {
+   "s1": 33.33,
+   "s2": 41.25,
+   "R": 60.0,
+   "D": 664.2,
+   "win": 0.33,
+   "deaths": 4.58
+  },
+  "db9": {
+   "s1": 33.33,
+   "s2": 41.25,
+   "R": 60.0,
+   "D": 664.2,
+   "win": 0.33,
+   "deaths": 4.67
+  },
+  "db12": {
+   "s1": 33.33,
+   "s2": 41.25,
+   "R": 60.0,
+   "D": 662.5,
+   "win": 0.33,
+   "deaths": 4.5
+  },
+  "fired_scenes": {
+   "crossroads-542": {
+    "s04": {
+     "D": 1155,
+     "win": 0.0
+    },
+    "db6": {
+     "D": 945,
+     "win": 1.0
+    },
+    "R_unchanged": 50
+   },
+   "rooms-401": {
+    "s04": {
+     "D": 600
+    },
+    "db6": {
+     "D": 700
+    },
+    "R_unchanged": 60
+   }
+  }
+ },
+ "validation": {
+  "seeds": [
+   48000,
+   48001
+  ],
+  "note": "验证集基为48000/48001（区别于train 101/307、封存heldout 29003、已弃用pilot 19001），场景结构与scenes(True)同构、席位完整轮换。仅作第二基配对确认，heldout未触碰。",
+  "s04": {
+   "s2": 42.9,
+   "win": 0.5,
+   "D": 643.0
+  },
+  "db6": {
+   "s2": 42.91,
+   "win": 0.52,
+   "D": 665.7,
+   "diff_scenes": 3
+  },
+  "db12": {
+   "s2": 42.93,
+   "win": 0.52,
+   "D": 658.4,
+   "diff_scenes": 3
+  }
+ },
+ "selection": "s04 (champion unchanged; defend_stall_break_ticks=0 kept off)",
+ "heldout": "not evaluated (selection unchanged; sealed 0.8437 reused)"
+}

@@ -107,7 +107,7 @@ def play(case, label, plan, versions, engine_binary, engine_build, directory, ti
     directory.mkdir(parents=True, exist_ok=True)
     scene, used = copy.deepcopy(case["scene"]), {}
     if any(key in scene["run"] for key in ("forks", "warm_until")):
-        raise ValueError("league uses independent version processes; use scenarios.sh for in-memory forks, or write separate paired cases")
+        raise ValueError("league uses independent version processes; use tests/scripts/scenarios.sh for in-memory forks, or write separate paired cases")
     for seat, agent in scene["agents"].items():
         if agent["type"] == "external":
             name = agent["version"].replace("$focal", label).replace("$anchor", plan["anchor"])

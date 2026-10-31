@@ -8,9 +8,11 @@
   M4 自战·候选（焦点位，docs/48 依 ChatGPT CG-C-20261029-HANDOFF-FINAL 第 1 条增）：
      A=candidate，B=champion（席位变体），C/D=原版陪练——与 M1 同地图/同 A 席位/同对手池，
      candidate 作为焦点版本的成对比较。
+  M5 同池对照（docs/48 §5 口径）：A=candidate，B/C/D=原版陪练——与 M1 完全同池（对手仅原版），
+     candidate 与原版陪练同池对比 M1 的 champion，消 M3/M4 的模型间互相对抗混杂。
 冻结契约（U6 条款）：开赛前逐一校验参战二进制 sha256 与清单一致，不符即中止。
 用法：
-  bash practice_league.sh --maps 20261201,20261202 --mixes M1,M2 [--out DIR]
+  bash tests/scripts/practice_league.sh --maps 20261201,20261202 --mixes M1,M2 [--out DIR]
 """
 import argparse
 import hashlib
@@ -27,6 +29,7 @@ MIXES = {
     "M2": {"A": "champion", "B": "old_champion"},
     "M3": {"A": "champion", "B": "candidate"},
     "M4": {"A": "candidate", "B": "champion"},
+    "M5": {"A": "candidate"},
 }
 
 
@@ -70,7 +73,7 @@ def verify_frozen(manifest):
 def run_mix(seed, mix, our, out_dir, args):
     """对一个 (图, 混合) 跑驱动 --map-locked --count 4，返回 (ok_battles, total)。"""
     summary = os.path.join(out_dir, f"summary_{mix}_{seed}.json")
-    cmd = ["bash", f"{CST}/practice_batch.sh",
+    cmd = ["bash", f"{CST}/tests/scripts/practice_batch.sh",
            "--count", "4", "--seed", str(seed), "--map-locked",
            "--summary", summary]
     for seat, base in sorted(our.items()):
@@ -99,7 +102,7 @@ def main():
     ap.add_argument("--manifest", default=f"{CST}/tools/versions.json")
     ap.add_argument("--maps", default=None, help="逗号分隔 seed 子集；缺省全部 12 图")
     ap.add_argument("--mixes", default="M1,M2,M3",
-                    help="逗号分隔；M3 在 candidate 就位前自动跳过")
+                    help="逗号分隔；M3/M4/M5 在 candidate 就位前自动跳过")
     ap.add_argument("--out", default="/tmp/version_league")
     ap.add_argument("--only", default=None,
                     help="调试过滤：MIX:SEED（如 M2:20261201），只跑一项")
@@ -117,12 +120,12 @@ def main():
         mixes, seeds = [m0], [int(s0)]
 
     if not seeds or not mixes or any(m not in MIXES for m in mixes):
-        ap.error("地图seed和混合均不能为空，混合只能M1/M2/M3/M4")
+        ap.error("地图seed和混合均不能为空，混合只能M1/M2/M3/M4/M5")
     failed, planned_groups = 0, 0
     skipped = []
     all_battles = []
     for mix in mixes:
-        if mix in ("M3", "M4") and not manifest["versions"].get("candidate"):
+        if mix in ("M3", "M4", "M5") and not manifest["versions"].get("candidate"):
             log(f"{mix} 跳过：candidate 未就位；不计已完成场数")
             skipped.append(mix)
             continue

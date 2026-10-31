@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-29",
+  "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+  "settings": {
+    "version": 1,
+    "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+    "map_styles": [
+      "open",
+      "maze",
+      "rooms",
+      "lanes",
+      "clusters",
+      "crossroads"
+    ],
+    "opponent_styles": [
+      "collector",
+      "aggressive",
+      "defender",
+      "fortress",
+      "opportunist",
+      "wanderer"
+    ],
+    "train_seeds": [
+      101,
+      307
+    ],
+    "heldout_seeds": [
+      29003
+    ],
+    "baseline_parameters": {
+      "stale_resource_decay": 0.01,
+      "resource_mission_bonus": 5.0,
+      "reach_mission_value": 8.0,
+      "healing_below_hp": 70.0,
+      "fortress_hold_value": 20.0,
+      "fortress_capture_value": 12.0,
+      "hazard_lead_ticks": 2,
+      "goal_retention_bonus": 0.1,
+      "resource_plan_depth": 3,
+      "resource_beam_width": 5,
+      "resource_candidate_limit": 8,
+      "resource_plan_budget_ms": 10,
+      "frontier_value": 0.02,
+      "opponent_contest_cost": 1.0,
+      "opponent_pressure_cost": 0.25,
+      "opponent_claim_discount": 1.0,
+      "explore_toward_resource_value": 0.0,
+      "explore_tour_value": 0.0,
+      "mission_explore_value": 2.0,
+      "stage1_flood_value": 0.0,
+      "stage2_race_gate": false,
+      "stage2_explore_gate_tick": 0,
+      "stage2_mission_pull_stale_ticks": 0,
+      "tactical_search": false,
+      "tactical_risk": 0.35,
+      "tactical_hp_value": 0.015,
+      "tactical_death_cost": 1.0,
+      "tactical_future_discount": 0.65,
+      "tactical_goal_weight": 0.35,
+      "resource_refinement": false,
+      "resource_refinement_trials": 12,
+      "collision_replan": false,
+      "loop_recovery": false,
+      "loop_window_ticks": 12,
+      "recovery_ticks": 12,
+      "stalled_goal_cooldown_ticks": 24
+    },
+    "pilot_heldout_seeds": [
+      19001
+    ]
+  },
+  "selection": "stage2_shadow_value（对手运动信息影子跟踪）R比特级惰性，未晋升，默认0.0关闭，冠军参数不变。",
+  "note": "新策略族：饼窗口内对手forecast（两次连续相同位移）方向穿过我们已知区朝未知区移动时，向其投影前端（k=2..6已知可走格）探路，与对手在饼簇两侧合流共享。sh01/02/04（0.1/0.2/0.4）：R逐局比特级不变（两阶段全12+12），D 673→698/703略升——模块确实改变了移动（更靠近对手、更多交火、D增加）但饼份额纹丝不动。信息论触发器成立（行为可测变化），但lap先到先得结构下中簇共享在这些训练图上不兑现：对手扫掠要么已完成、要么簇在我们的方向上由我们收。家族闭合。阶段一比特级隔离确认。",
+  "rounds": {
+    "shadow": {
+      "profiles": [
+        "s04",
+        "sh01",
+        "sh02",
+        "sh04"
+      ],
+      "stage1": "bit-identical (R per scene, 12/12)",
+      "stage2_summary": {
+        "s04": {
+          "R_mean": 60.0,
+          "D_mean": 673.3,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.67
+        },
+        "sh01": {
+          "R_mean": 60.0,
+          "D_mean": 673.3,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.67
+        },
+        "sh02": {
+          "R_mean": 60.0,
+          "D_mean": 698.3,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.67
+        },
+        "sh04": {
+          "R_mean": 60.0,
+          "D_mean": 703.3,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.75
+        }
+      }
+    }
+  },
+  "selection_guard": "selection未变（s04），不重跑heldout；封存heldout复用：obj 0.8437（stage1 32.67/40, stage2 43.89/60）。",
+  "selected": "selected-parameters-shadow-2026-10-29.json（s04, shadow默认0.0关闭）",
+  "heldout_scenes": "29003（封存复用，未重评）",
+  "heldout_results": "sealed reuse: obj 0.8437",
+  "heldout_summaries": {
+    "stage1_score_mean": 32.666666666666664,
+    "stage2_score_mean": 43.8875,
+    "R_mean": 69.58333333333333,
+    "D_mean": 590.1041666666666,
+    "M_mean": 2.8333333333333335,
+    "deaths_mean": 4.708333333333333,
+    "win_share": 0.5416666666666666
+  }
+}

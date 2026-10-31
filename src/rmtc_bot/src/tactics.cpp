@@ -238,6 +238,9 @@ TacticalChoice tactical_choice(const TacticalInput &input,const StrategyParamete
         }
         std::vector<double> tails;for (const auto &state:child.states) tails.push_back(tail_value(state,input.tick+depth));
         child.utility=aggregate(child.discounted,p.tactical_risk)+p.tactical_goal_weight*aggregate(tails,p.tactical_risk);
+        // 低血量攻击折扣（与strategy.cpp§6同口径）：hp<60时压缩深度0攻击分支估值，1.0=旧行为。
+        if (p.low_hp_attack_discount < 1.0 && depth == 0 && action.kind == K::attack &&
+            input.fighters[0].hp < 60) child.utility *= p.low_hp_attack_discount;
         expanded.push_back(std::move(child));
       }
     }

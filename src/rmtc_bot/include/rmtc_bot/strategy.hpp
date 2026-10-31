@@ -3,6 +3,7 @@
 #include <deque>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -10,6 +11,8 @@
 #include "rmtc_bot/events.hpp"
 #include "rmtc_bot/strategy_parameters.hpp"
 
+// 主线：读真实坐标 → 更新记忆/事件 → 避险 → 比较资源、任务、战斗 → 返回本Tick一个动作。
+// 不在这里收发ROS或等待模型；Session保证同一Tick只推进一次。
 class Strategy {
 public:
   explicit Strategy(int stage = 2); // stage：比赛阶段；实际入口明确传入配置中的1或2。
@@ -17,29 +20,35 @@ public:
   // 只在换场调用。普通死亡不会清掉地图和仍有效的增益。
   void reset();
 
-  // Called once per new tick. Return action and, if needed, direction.
-  // The communication layer supplies tick and session_id.
+  // 只返回action/direction，场次和Tick由通信层原样回填。
+  // null表示本Tick不发布；正常第二阶段的兜底动作是DEFEND。
   nlohmann::json decide(const nlohmann::json &perception);
   void merge_events(const std::vector<rmtc::Event> &events);
+  // 把已校验事件交给下一次LLM请求，避免模型反复“重新发现”同一个事件。
   nlohmann::json known_events() const;
+  nlohmann::json event_diagnostics(rmtc::Tick tick) const; // 已知事件按当前Tick计数及本车已重建效果，供人工排查。
   const std::string &reason() const { return reason_; } // 最近动作的原因，供日志解释。
   nlohmann::json navigation_diagnostics() const; // 日志：无进展多久、循环次数、脱困目标；不暴露真值。
   void note_model_reply() { model_reply_seen_ = true; } // 本场已见非mock模型正文；仅影响收益假设，不冒充裁判资格。
 
 private:
-  using Cell = rmtc::Cell;
-  using Tick = rmtc::Tick;
+  using Cell = rmtc::Cell; // 一个绝对格子[x,y]，不是相对方向。
+  using Tick = rmtc::Tick; // 裁判逻辑回合，不能拿墙钟时间代替。
   struct Tile {
-    bool seen = false, wall = false;
-    Tick last_seen = -1, wall_since = -1;
-    unsigned visits = 0;
-    double value = 0;
-    bool high = false;
+    // seen=false是未知；wall=false不代表已经确认可以走。
+    bool seen = false, wall = false; // 是否已探明、最后是否看见墙。
+    Tick last_seen = -1, wall_since = -1; // 最后观测Tick、首次连续看见此墙的Tick。
+    // visits只算感知确认到过的格子；发出MOVE不增加目的地访问次数。
+    unsigned visits = 0; // 实际访问次数。
+    double value = 0;    // 最后观测到的资源价值；0表示没有资源记录。
+    bool high = false;  // 该资源是否属于高价值资源。
+    Tick blocked_until = -1; // 回执确认MOVE失败后目标格的瞬时堵格截止Tick；过期后重新允许规划通过。
   };
   struct Snapshot {
-    Cell position;
-    bool alive, protected_spawn, respawn, moved;
-    Tick receipt_tick;
+    // position属于当前感知；moved/receipt_tick解释上一Tick的实际执行结果。
+    Cell position; // 此帧裁判确认的本车位置。
+    bool alive, protected_spawn, respawn, moved; // 存活、出生保护、刚复活、上Tick成功移动。
+    Tick receipt_tick; // 本帧last_action对应的执行Tick；-1表示缺少可信回执。
   };
   struct OpponentTrack {
     Cell position, delta; // 上次真实位置、最近一次世界方向位移；不预测隐藏坐标。
@@ -63,20 +72,25 @@ private:
     double utility, benefit; // 整串收益/耗时、整串收益；均为估值，不回写官方成绩。
     std::vector<Cell> stops; // 尚未执行的资源目标串，每帧重新验证，不是待发送动作队列。
   };
-  // 在已知格上比较最多三个资源目标；每步核对公告期限和剩余Tick，只返回各首方向的最好资源串。
+  // 在已知格上按配置深度比较资源目标；每步核对公告期限和剩余Tick，只返回各首方向的最好资源串。
   std::vector<ResourcePlan> resource_plans(Cell start, Tick tick, Tick remaining_ticks,
       const std::vector<Cell> &targets, const std::set<Cell> &occupied,
       const std::array<bool, 4> &first_allowed, double current_r,
       bool need_normal, bool need_high, double value_target, const std::vector<Cell> &previous_plan) const;
   // 第一阶段巡回：对已知可达资源做近邻+有界2-opt顺序，只估值并执行首步；不跨未知格、不缓存未来动作。
   // values非空时用它替代地图资源价值（边界观察点巡回）；不写回tiles_。
-  std::optional<ResourcePlan> resource_tour(Cell start, Tick remaining_ticks,
+  std::optional<ResourcePlan> resource_tour(Cell start, Tick tick, Tick remaining_ticks,
       const std::vector<Cell> &targets, const std::set<Cell> &occupied,
       const std::map<Cell, double> *values = nullptr, Cell first_hint = {-1, -1}) const;
   std::optional<Cell> predict_opponent(const std::string &identity, Cell position, Tick tick);
   // 预测仅用同一敌车连续观测；断帧/瞬移重置，预测只降低候选收益，不当成必然占位。
   bool split_wall(Cell cell, Tick tick) const;
+  // 只判断已知爆炸和分裂，不把所有对手预测混成确定危险。
   bool dangerous(Cell cell, Tick tick) const;
+  // start为当前位置，tick为当前回合，occupied为当前看见的敌车占位。
+  // 返回值依次是上/右/下/左/原地，表示第一步是否存在安全接续。
+  std::array<bool, 5> safe_first_steps(Cell start, Tick tick, const std::set<Cell> &occupied) const;
+  // 从实际历史重建本车效果：幻术看激活位置，易伤/回血看成功移动，堡垒看连续驻留。
   void update_effects(Tick tick);
   int stage_, width_ = 0, height_ = 0; // 比赛阶段、本场地图宽高；0表示尚未收到地图。
   rmtc::StrategyParameters parameters_; // 本对象固定取舍；一场中不修改。
@@ -103,12 +117,14 @@ private:
   std::size_t navigation_known_ = 0, navigation_missions_ = 0; // 已观测格数、完成任务数。
   int navigation_capture_ = 0; // 已确认堡垒驻留进度之和。
   bool recovery_blocked_ = false; // 已验证当前循环区无安全出口时持续守住，每帧重查，不再反复启动空跑。
+  int lethal_defend_streak_ = 0; // 连续致命防御驻守tick计数（跨tick累计，新场清零）；用于驻守超时后脱离接触。
   unsigned recovery_count_ = 0; // 本场触发次数，换场清零。
   std::map<std::pair<std::string,Cell>,Tick> deferred_goals_; // 目标类别/坐标→暂缓截止，不改地图可走性。
   std::vector<Cell> planned_resources_; // 仅供下一帧重评的资源串；换场、断帧、失败和改目标后清空。
   bool model_reply_seen_ = false, resource_counts_known_ = false;
   int observed_normal_ = 0, observed_high_ = 0; // 连续完整历史下，从官方R增量确认的拾取次数。
   Tick previous_score_tick_ = -1;
+  Tick last_resource_sighting_ = -1; // 最近一次在视野里看到资源的Tick；第二阶段探索闸门以此判断资源饼是否清空。
   double previous_resource_total_ = 0;
   std::map<std::string, rmtc::Event> events_; // 稳定事件key→最后一次校验通过的解释。
   std::map<std::string, int> capture_progress_; // 堡垒key→当前已确认连续驻留Tick数。

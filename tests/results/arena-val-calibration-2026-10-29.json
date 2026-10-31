@@ -1,0 +1,57 @@
+{
+ "date": "2026-10-29",
+ "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+ "note": "新增独立验证种子基48000/48001（不动arena_settings.json、不动封存heldout）。校准：已知heldout结局的三个档案在验证集复跑。结果：f2.08轴镜像heldout（阶段二败、D643→567），f1.00轴翻转（验证集阶段一胜155.0R vs 148.3R，heldout败）→验证集不能替代heldout作整体代理，仅作同家族第二基配对确认。f2家族在验证集非单调（峰值f2.05 43.38 vs s04 42.90），train全量轮次s04最优且随权重递减、train[:6]/train[:16]分别最优点为s04/f2.04/f2.08——每个子集各有不同最优成员，家族效应是地图几何噪声，无成员能在两个基上同时胜出→家族算术闭合，不烧heldout。f1.00在train与val双胜、heldout败(2:1)，已按协议以heldout裁决封存。",
+ "val_calibration": {
+  "s04": {
+   "s1": 29.67,
+   "s1R": 148.3,
+   "s2": 42.9,
+   "s2R": 64.6,
+   "D": 643.0,
+   "win": 0.5,
+   "deaths": 4.92
+  },
+  "f2.08": {
+   "s1": 29.67,
+   "s1R": 148.3,
+   "s2": 41.54,
+   "s2R": 63.1,
+   "D": 567.2,
+   "win": 0.4,
+   "deaths": 4.6
+  },
+  "f1.00": {
+   "s1": 31.0,
+   "s1R": 155.0,
+   "s2": 42.9,
+   "s2R": 64.6,
+   "D": 643.0,
+   "win": 0.5,
+   "deaths": 4.92
+  }
+ },
+ "mirror_verdict": {
+  "mirror_s1": false,
+  "mirror_s2": true,
+  "mirror_overall": false,
+  "usable_as_heldout_proxy": false
+ },
+ "f2_val_sequence": {
+  "s04": 42.9,
+  "f2.03": 42.92,
+  "f2.04": 42.91,
+  "f2.05": 43.38,
+  "f2.06": 43.11,
+  "f2.08": 41.54
+ },
+ "f2_train_full_round": {
+  "s04": 0.7623,
+  "f2.03": 0.761,
+  "f2.04": 0.7556,
+  "f2.05": 0.7553,
+  "f2.06": 0.6922,
+  "f2.08": 0.7404
+ },
+ "conclusion": "f2家族每个子集各自选出不同成员（train6:s04 / train16:f2.04 / train24:f2.08 / val60:f2.05 / heldout:s04）——无成员可跨基一致胜出；验证集存在但不能替代heldout；协议不变。"
+}

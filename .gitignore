@@ -43,6 +43,9 @@ build/
 Build/
 build-*/
 
+install/
+log/
+
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt
@@ -72,3 +75,15 @@ Testing/
 /compile_commands.json
 
 .vscode/
+__pycache__/
+# 本地评测输出不作为源码提交；历史报告归分析仓库，选定参数仍供评测器读取。
+/tests/results/*
+!/tests/results/selected-parameters.json
+
+install-v-candidate-A/
+install-v-candidate-B/
+
+# 阶段/变体实验构建目录（赛前实验，不入库）
+build_stage*/
+install_stage*/
+/bin_bots/ 

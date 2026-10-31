@@ -21,6 +21,19 @@ def groups(levers):
         "postcap": [{"name": "pc002", "parameters": {"post_cap_combat_weight": 0.02}},
                     {"name": "pc005", "parameters": {"post_cap_combat_weight": 0.05}},
                     {"name": "pc01", "parameters": {"post_cap_combat_weight": 0.1}}],
+        "coverage": [{"name": "cov002", "parameters": {"explore_component_value": 0.002}},
+                     {"name": "cov008", "parameters": {"explore_component_value": 0.008}},
+                     {"name": "cov02", "parameters": {"explore_component_value": 0.02}}],
+        "lowhp": [{"name": "lhp07", "parameters": {"low_hp_attack_discount": 0.7}},
+                  {"name": "lhp04", "parameters": {"low_hp_attack_discount": 0.4}},
+                  {"name": "lhp01", "parameters": {"low_hp_attack_discount": 0.1}}],
+        "race": [{"name": "rrh10", "parameters": {"race_reach_holdoff": 1.0}},
+                 {"name": "rrh08", "parameters": {"race_reach_holdoff": 0.8}},
+                 {"name": "rrh05", "parameters": {"race_reach_holdoff": 0.5}}],
+        "fortress": [{"name": "pf03", "parameters": {"prepare_fortress_value": 3.0}},
+                     {"name": "pf06", "parameters": {"prepare_fortress_value": 6.0}},
+                     {"name": "pf12", "parameters": {"prepare_fortress_value": 12.0}},
+                     {"name": "pf24", "parameters": {"prepare_fortress_value": 24.0}}],
         "combined": [{"name": "combo_g1w_pc005",
                       "parameters": {"stale_grace_ticks": 1, "worst_case_survival": True,
                                      "post_cap_combat_weight": 0.05}},
@@ -33,7 +46,7 @@ def groups(levers):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--levers", choices=sorted(set(["grace", "survival", "postcap", "combined"])),
+    parser.add_argument("--levers", choices=sorted(set(["grace", "survival", "postcap", "combined", "coverage", "lowhp", "race", "fortress"])),
                         required=True)
     parser.add_argument("--report", required=True,
                         help="输出文件名（不含扩展名）：tests/results/levers-<report>.json")

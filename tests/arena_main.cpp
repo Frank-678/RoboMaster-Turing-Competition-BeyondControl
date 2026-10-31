@@ -17,12 +17,15 @@ void configure(rmtc::StrategyParameters &p,const Json &values) {
   PARAMETER(goal_retention_bonus) PARAMETER(stale_grace_ticks) PARAMETER(frontier_value) PARAMETER(stage1_frontier_value) PARAMETER(opponent_contest_cost) PARAMETER(opponent_pressure_cost)
   PARAMETER(opponent_claim_discount)
   PARAMETER(explore_toward_resource_value) PARAMETER(explore_tour_value) PARAMETER(mission_explore_value)
+  PARAMETER(stage1_flood_value) PARAMETER(stage1_ring_value) PARAMETER(stage2_race_gate) PARAMETER(race_reach_holdoff) PARAMETER(stage2_explore_gate_tick) PARAMETER(stage2_mission_pull_stale_ticks)
+  PARAMETER(stage2_assassin_value) PARAMETER(stage2_pie_attack_discount) PARAMETER(stage2_shadow_value) PARAMETER(defend_stall_break_ticks)
   PARAMETER(hazard_lead_ticks) PARAMETER(resource_plan_depth) PARAMETER(resource_beam_width)
   PARAMETER(resource_candidate_limit) PARAMETER(resource_plan_budget_ms)
+  PARAMETER(loop_recovery) PARAMETER(loop_window_ticks) PARAMETER(recovery_ticks) PARAMETER(stalled_goal_cooldown_ticks) PARAMETER(receipt_block_ticks)
   PARAMETER(collision_replan) PARAMETER(resource_refinement) PARAMETER(resource_refinement_trials)
   PARAMETER(tactical_search) PARAMETER(tactical_risk) PARAMETER(tactical_hp_value) PARAMETER(tactical_death_cost)
   PARAMETER(tactical_future_discount) PARAMETER(tactical_goal_weight)
-  PARAMETER(worst_case_survival) PARAMETER(post_cap_combat_weight)
+  PARAMETER(worst_case_survival) PARAMETER(post_cap_combat_weight) PARAMETER(explore_component_value) PARAMETER(low_hp_attack_discount)
 #undef PARAMETER
   for (const auto &entry:values.items()) if (!recognized.count(entry.key())) throw std::runtime_error("unknown arena parameter: "+entry.key());
   p.validate(); // 规则伤害、距离、D扣除等根本不在可写参数名单。
@@ -134,7 +137,7 @@ Json competition_dump() {
     {"tactical_search",p.tactical_search},{"tactical_risk",p.tactical_risk},{"tactical_hp_value",p.tactical_hp_value},
     {"tactical_death_cost",p.tactical_death_cost},{"tactical_future_discount",p.tactical_future_discount},
     {"tactical_goal_weight",p.tactical_goal_weight},
-    {"worst_case_survival",p.worst_case_survival},{"post_cap_combat_weight",p.post_cap_combat_weight}};
+    {"worst_case_survival",p.worst_case_survival},{"post_cap_combat_weight",p.post_cap_combat_weight},{"explore_component_value",p.explore_component_value},{"low_hp_attack_discount",p.low_hp_attack_discount},{"race_reach_holdoff",p.race_reach_holdoff}};
 }
 }
 int main(int argc,char **argv) {

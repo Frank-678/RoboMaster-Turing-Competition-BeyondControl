@@ -6,7 +6,7 @@
 自战（docs/38 联赛）：--our A:install --our B:install-v-old-B 表示 A/B 两席都跑我方二进制
 （不同 install 底座），其余席位由裁判 spawn 原版陪练。席位二进制经 tools/run_seat.sh 启动，
 节点名重映射 rmtc_bot_<seat> 避免双实例 ROS 命名冲突（源码与冠军二进制不变）。
-网络配置：只经 bash practice_batch.sh 从已编译 match_config.hpp 交接；不另设模型/密钥文件。
+网络配置：只经 bash tests/scripts/practice_batch.sh 从已编译 match_config.hpp 交接；不另设模型/密钥文件。
 """
 import argparse
 import copy
@@ -17,6 +17,7 @@ import json
 import os
 import random
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -48,7 +49,7 @@ def env_for_referee():
                 "ROS_DOMAIN_ID", "ROS_LOCALHOST_ONLY", "RMW_IMPLEMENTATION",
                 "RMTC_PRACTICE_PORT")
     if any(not os.environ.get(k) for k in required):
-        raise SystemExit("请用 bash practice_batch.sh；网络只配置match_config.hpp并重新构建。")
+        raise SystemExit("请用 bash tests/scripts/practice_batch.sh；网络只配置match_config.hpp并重新构建。")
     env = dict(os.environ)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env

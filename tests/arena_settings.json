@@ -44,6 +44,10 @@
     "explore_toward_resource_value": 0.0,
     "explore_tour_value": 0.0,
     "mission_explore_value": 2.0,
+    "stage1_flood_value": 0.0,
+    "stage2_race_gate": false,
+    "stage2_explore_gate_tick": 0,
+    "stage2_mission_pull_stale_ticks": 0,
     "tactical_search": false,
     "tactical_risk": 0.35,
     "tactical_hp_value": 0.015,
@@ -52,7 +56,11 @@
     "tactical_goal_weight": 0.35,
     "resource_refinement": false,
     "resource_refinement_trials": 12,
-    "collision_replan": false
+    "collision_replan": false,
+    "loop_recovery": false,
+    "loop_window_ticks": 12,
+    "recovery_ticks": 12,
+    "stalled_goal_cooldown_ticks": 24
   },
   "pilot_heldout_seeds": [
     19001
