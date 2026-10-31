@@ -71,8 +71,8 @@ def main():
         # 故意使用与正式配置不同的值，验证启动器确实传递编译期配置。
         import re
         config, replacements = re.subn(
-            r"(?m)^(inline constexpr int ai_max_tokens = )\\d+;",
-            r"\\g<1>731;", config)
+            r"(?m)^(inline constexpr int ai_max_tokens = )\d+;",
+            r"\g<1>731;", config)
         assert replacements == 1, "ai_max_tokens declaration changed; update fixture"
         header.write_text(config)
         stub = work / "exec_stub.cpp"
