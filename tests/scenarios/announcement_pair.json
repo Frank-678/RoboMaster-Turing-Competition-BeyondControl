@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "name": "announced-explosion",
+  "stage": 2,
+  "tick_limit": 500,
+  "qualified": true,
+  "seed": 17,
+  "map": {
+    "width": 9,
+    "height": 9,
+    "vision_radius": 4,
+    "walls": [
+      [
+        0,
+        3
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        7,
+        3
+      ],
+      [
+        8,
+        3
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        7,
+        5
+      ],
+      [
+        8,
+        5
+      ]
+    ],
+    "spawns": [
+      [
+        4,
+        4
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        8,
+        0
+      ],
+      [
+        8,
+        8
+      ]
+    ]
+  },
+  "initial": {
+    "tick": 200,
+    "resources": [
+      {
+        "position": [
+          6,
+          4
+        ],
+        "value": 20
+      }
+    ],
+    "cars": {
+      "A": {
+        "position": [
+          4,
+          4
+        ],
+        "hp": 100
+      }
+    }
+  },
+  "missions": [],
+  "events": [
+    {
+      "id": "blast",
+      "notice_tick": 200,
+      "delivery_tick": 200,
+      "event": {
+        "kind": "explosion",
+        "start": 202,
+        "end": 203,
+        "area": [
+          4,
+          4,
+          8,
+          4
+        ],
+        "amount": 35,
+        "source": "测试公告：Tick202矩形[4,4]至[8,4]爆炸，伤害35。"
+      }
+    }
+  ],
+  "agents": {
+    "A": {
+      "type": "strategy",
+      "event_delivery": "oracle"
+    }
+  },
+  "run": {
+    "until_tick": 203,
+    "save_at": [
+      201
+    ],
+    "forks": [
+      {
+        "name": "notice",
+        "run": {
+          "expect": [
+            {
+              "path": "/world/cars/A/hp",
+              "op": "eq",
+              "value": 100
+            }
+          ]
+        }
+      },
+      {
+        "name": "no_notice",
+        "agents": {
+          "A": {
+            "event_delivery": "none"
+          }
+        },
+        "run": {
+          "expect": [
+            {
+              "path": "/world/cars/A/hp",
+              "op": "eq",
+              "value": 65
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

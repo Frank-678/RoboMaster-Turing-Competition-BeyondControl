@@ -1,0 +1,307 @@
+{
+  "date": "2026-10-29",
+  "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+  "settings": {
+    "version": 1,
+    "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+    "map_styles": [
+      "open",
+      "maze",
+      "rooms",
+      "lanes",
+      "clusters",
+      "crossroads"
+    ],
+    "opponent_styles": [
+      "collector",
+      "aggressive",
+      "defender",
+      "fortress",
+      "opportunist",
+      "wanderer"
+    ],
+    "train_seeds": [
+      101,
+      307
+    ],
+    "heldout_seeds": [
+      29003
+    ],
+    "baseline_parameters": {
+      "stale_resource_decay": 0.01,
+      "resource_mission_bonus": 5.0,
+      "reach_mission_value": 8.0,
+      "healing_below_hp": 70.0,
+      "fortress_hold_value": 20.0,
+      "fortress_capture_value": 12.0,
+      "hazard_lead_ticks": 2,
+      "goal_retention_bonus": 0.1,
+      "resource_plan_depth": 3,
+      "resource_beam_width": 5,
+      "resource_candidate_limit": 8,
+      "resource_plan_budget_ms": 10,
+      "frontier_value": 0.02,
+      "opponent_contest_cost": 1.0,
+      "opponent_pressure_cost": 0.25,
+      "opponent_claim_discount": 1.0,
+      "explore_toward_resource_value": 0.0,
+      "explore_tour_value": 0.0,
+      "mission_explore_value": 2.0,
+      "stage1_flood_value": 0.0,
+      "stage2_race_gate": false,
+      "stage2_explore_gate_tick": 0,
+      "stage2_mission_pull_stale_ticks": 0,
+      "tactical_search": false,
+      "tactical_risk": 0.35,
+      "tactical_hp_value": 0.015,
+      "tactical_death_cost": 1.0,
+      "tactical_future_discount": 0.65,
+      "tactical_goal_weight": 0.35,
+      "resource_refinement": false,
+      "resource_refinement_trials": 12,
+      "collision_replan": false,
+      "loop_recovery": false,
+      "loop_window_ticks": 12,
+      "recovery_ticks": 12,
+      "stalled_goal_cooldown_ticks": 24
+    },
+    "pilot_heldout_seeds": [
+      19001
+    ]
+  },
+  "selection": "三组探针（规划预算/记忆保真/治疗阈值）均未产生正收益，冠军参数不变，封存heldout复用。",
+  "note": "三个残余权重的独立探针，24训练场景（12阶段一+12阶段二）。(1) 规划预算族：resource_plan_depth 6 / beam 7 / candidate_limit 16 / budget_ms 20 全部与s04比特级相同——规划器在这些地图上从不扩展到深度5之外；阶段一170/200缺口不是搜索预算问题，而是贪心最近优先顺序+视野揭示顺序（探索权重已扫，train/heldout翻转）。家族闭合。(2) 记忆保真：stale_resource_decay 0.0——R逐局比特级不变；但阶段二D均值673→655，唯一例外maze-354 D 540→320跌破500封顶线，单局score 52.5→47.1（−5.4）。完美记忆追幽灵资源→减少交火→D跌到封顶以下。结合上沿0.05/0.1已证负（open-307 100→80）：decay 0.01双向最优。(3) 治疗阈值：healing_below_hp 20/60——score逐局不变（R同、D仍封顶），deaths 4.83/4.50 vs 4.67在噪音内；死亡不绑定R再次确认。40保持默认。",
+  "rounds": {
+    "planner_budget": {
+      "profiles": [
+        "s04",
+        "d6b7",
+        "d6",
+        "b7",
+        "c16",
+        "b20",
+        "c16b20"
+      ],
+      "verdict": "全部与s04比特级相同（R/D/score逐局全同），无per_game记录必要",
+      "summary": {
+        "s04": {
+          "stage1_R_mean": 166.7,
+          "stage2_R_mean": 60.0
+        }
+      }
+    },
+    "memory_healing": {
+      "profiles": [
+        "s04",
+        "dec0",
+        "heal20",
+        "heal60"
+      ],
+      "per_game": [
+        {
+          "scene": "open-101",
+          "s04": {
+            "R": 40,
+            "D": 625,
+            "M": 2
+          },
+          "dec0": {
+            "R": 40,
+            "D": 625,
+            "M": 2
+          }
+        },
+        {
+          "scene": "open-307",
+          "s04": {
+            "R": 100,
+            "D": 720,
+            "M": 3
+          },
+          "dec0": {
+            "R": 100,
+            "D": 720,
+            "M": 3
+          }
+        },
+        {
+          "scene": "maze-148",
+          "s04": {
+            "R": 30,
+            "D": 500,
+            "M": 3
+          },
+          "dec0": {
+            "R": 30,
+            "D": 500,
+            "M": 3
+          }
+        },
+        {
+          "scene": "maze-354",
+          "s04": {
+            "R": 90,
+            "D": 540,
+            "M": 3
+          },
+          "dec0": {
+            "R": 90,
+            "D": 320,
+            "M": 3
+          }
+        },
+        {
+          "scene": "rooms-195",
+          "s04": {
+            "R": 30,
+            "D": 600,
+            "M": 2
+          },
+          "dec0": {
+            "R": 30,
+            "D": 600,
+            "M": 2
+          }
+        },
+        {
+          "scene": "rooms-401",
+          "s04": {
+            "R": 60,
+            "D": 600,
+            "M": 3
+          },
+          "dec0": {
+            "R": 60,
+            "D": 600,
+            "M": 3
+          }
+        },
+        {
+          "scene": "lanes-242",
+          "s04": {
+            "R": 40,
+            "D": 600,
+            "M": 2
+          },
+          "dec0": {
+            "R": 40,
+            "D": 600,
+            "M": 2
+          }
+        },
+        {
+          "scene": "lanes-448",
+          "s04": {
+            "R": 60,
+            "D": 790,
+            "M": 3
+          },
+          "dec0": {
+            "R": 60,
+            "D": 790,
+            "M": 3
+          }
+        },
+        {
+          "scene": "clusters-289",
+          "s04": {
+            "R": 120,
+            "D": 630,
+            "M": 3
+          },
+          "dec0": {
+            "R": 120,
+            "D": 630,
+            "M": 3
+          }
+        },
+        {
+          "scene": "clusters-495",
+          "s04": {
+            "R": 30,
+            "D": 800,
+            "M": 2
+          },
+          "dec0": {
+            "R": 30,
+            "D": 800,
+            "M": 2
+          }
+        },
+        {
+          "scene": "crossroads-336",
+          "s04": {
+            "R": 70,
+            "D": 520,
+            "M": 2
+          },
+          "dec0": {
+            "R": 70,
+            "D": 520,
+            "M": 2
+          }
+        },
+        {
+          "scene": "crossroads-542",
+          "s04": {
+            "R": 50,
+            "D": 1155,
+            "M": 3
+          },
+          "dec0": {
+            "R": 50,
+            "D": 1155,
+            "M": 3
+          }
+        }
+      ],
+      "summary": {
+        "s04": {
+          "stage1_R_mean": 166.7,
+          "stage2_R_mean": 60.0,
+          "D_mean": 673.3,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.67
+        },
+        "dec0": {
+          "stage1_R_mean": 166.7,
+          "stage2_R_mean": 60.0,
+          "D_mean": 655.0,
+          "score_mean": 40.8,
+          "win_share": 0.25,
+          "deaths_mean": 4.58
+        },
+        "heal20": {
+          "stage1_R_mean": 166.7,
+          "stage2_R_mean": 60.0,
+          "D_mean": 677.5,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.83
+        },
+        "heal60": {
+          "stage1_R_mean": 166.7,
+          "stage2_R_mean": 60.0,
+          "D_mean": 675.8,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.5
+        }
+      }
+    }
+  },
+  "selection_guard": "selection未变（s04），不重跑heldout；封存heldout复用：obj 0.8437（stage1 32.67/40, stage2 43.89/60）。",
+  "selected": "selected-parameters-planner-memory-2026-10-29.json（s04）",
+  "heldout_scenes": "29003（封存复用，未重评）",
+  "heldout_results": "sealed reuse: obj 0.8437",
+  "heldout_summaries": {
+    "stage1_score_mean": 32.666666666666664,
+    "stage2_score_mean": 43.8875,
+    "R_mean": 69.58333333333333,
+    "D_mean": 590.1041666666666,
+    "M_mean": 2.8333333333333335,
+    "deaths_mean": 4.708333333333333,
+    "win_share": 0.5416666666666666
+  }
+}

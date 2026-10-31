@@ -1,0 +1,506 @@
+{
+  "date": "2026-10-29",
+  "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+  "settings": {
+    "version": 1,
+    "scope": "Offline hand-written v1.2 rule model with delayed event oracle. Pilot holdout 19001 rejected; final source uses fresh 29003. Not official referee or real AI qualification.",
+    "map_styles": [
+      "open",
+      "maze",
+      "rooms",
+      "lanes",
+      "clusters",
+      "crossroads"
+    ],
+    "opponent_styles": [
+      "collector",
+      "aggressive",
+      "defender",
+      "fortress",
+      "opportunist",
+      "wanderer"
+    ],
+    "train_seeds": [
+      101,
+      307
+    ],
+    "heldout_seeds": [
+      29003
+    ],
+    "baseline_parameters": {
+      "stale_resource_decay": 0.01,
+      "resource_mission_bonus": 5.0,
+      "reach_mission_value": 8.0,
+      "healing_below_hp": 70.0,
+      "fortress_hold_value": 20.0,
+      "fortress_capture_value": 12.0,
+      "hazard_lead_ticks": 2,
+      "goal_retention_bonus": 0.1,
+      "resource_plan_depth": 3,
+      "resource_beam_width": 5,
+      "resource_candidate_limit": 8,
+      "resource_plan_budget_ms": 10,
+      "frontier_value": 0.02,
+      "opponent_contest_cost": 1.0,
+      "opponent_pressure_cost": 0.25,
+      "opponent_claim_discount": 1.0,
+      "explore_toward_resource_value": 0.0,
+      "explore_tour_value": 0.0,
+      "mission_explore_value": 2.0,
+      "stage1_flood_value": 0.0,
+      "stage2_race_gate": false,
+      "stage2_explore_gate_tick": 0,
+      "stage2_mission_pull_stale_ticks": 0,
+      "tactical_search": false,
+      "tactical_risk": 0.35,
+      "tactical_hp_value": 0.015,
+      "tactical_death_cost": 1.0,
+      "tactical_future_discount": 0.65,
+      "tactical_goal_weight": 0.35,
+      "resource_refinement": false,
+      "resource_refinement_trials": 12,
+      "collision_replan": false,
+      "loop_recovery": false,
+      "loop_window_ticks": 12,
+      "recovery_ticks": 12,
+      "stalled_goal_cooldown_ticks": 24
+    },
+    "pilot_heldout_seeds": [
+      19001
+    ]
+  },
+  "selection": "stage2_assassin_value（派窗口刺杀）——所有权重均输给s04，未提升，模块保持默认关闭，冠军参数不变。",
+  "note": "新的策略族：攻击正在扫资源簇的对手，用击杀/击退→重生移位打断其扫掠，把簇剩余资源留给我们。机制trace（crossroads-336，唯一翻转）：t45我们距(4,12)3格、对手距2格，加成0.2把决策从'左移抢资源'翻成'向上攻击'；对手hp≤20（杀门后仍触发），两击未死，我们t47死亡，资源被s04在t47采走。R −10、死亡+0.41。机理定案：把采集竞速换成战斗不会把争议资源转给我们——邻格对手在战斗中照样先捡走；且我们25%的死亡本就发生在派窗口，战斗暴露只会增加死亡。非零权重0.02/0.05/0.1与0.5/1.0/2.0（含一击必杀门）各自比特级相同：响应是单一负翻转，家族平坦无正区。",
+  "rounds": {
+    "ablation_kill_gated": {
+      "per_game": [
+        {
+          "scene": "open-101",
+          "s04": {
+            "R": 40.0,
+            "D": 625.0,
+            "score": 25.0,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "asn.05": {
+            "R": 40.0,
+            "D": 625.0,
+            "score": 25.0,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "asn.10": {
+            "R": 40.0,
+            "D": 625.0,
+            "score": 25.0,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "asn.20": {
+            "R": 40.0,
+            "D": 625.0,
+            "score": 25.0,
+            "deaths": 4,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "open-307",
+          "s04": {
+            "R": 100.0,
+            "D": 720.0,
+            "score": 55.0,
+            "deaths": 5,
+            "win_share": 1.0
+          },
+          "asn.05": {
+            "R": 100.0,
+            "D": 720.0,
+            "score": 55.0,
+            "deaths": 5,
+            "win_share": 1.0
+          },
+          "asn.10": {
+            "R": 100.0,
+            "D": 720.0,
+            "score": 55.0,
+            "deaths": 5,
+            "win_share": 1.0
+          },
+          "asn.20": {
+            "R": 100.0,
+            "D": 720.0,
+            "score": 55.0,
+            "deaths": 5,
+            "win_share": 1.0
+          }
+        },
+        {
+          "scene": "maze-148",
+          "s04": {
+            "R": 30.0,
+            "D": 500.0,
+            "score": 37.5,
+            "deaths": 5,
+            "win_share": 0.0
+          },
+          "asn.05": {
+            "R": 30.0,
+            "D": 500.0,
+            "score": 37.5,
+            "deaths": 5,
+            "win_share": 0.0
+          },
+          "asn.10": {
+            "R": 30.0,
+            "D": 500.0,
+            "score": 37.5,
+            "deaths": 5,
+            "win_share": 0.0
+          },
+          "asn.20": {
+            "R": 30.0,
+            "D": 500.0,
+            "score": 37.5,
+            "deaths": 5,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "maze-354",
+          "s04": {
+            "R": 90.0,
+            "D": 540.0,
+            "score": 52.5,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "asn.05": {
+            "R": 90.0,
+            "D": 540.0,
+            "score": 52.5,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "asn.10": {
+            "R": 90.0,
+            "D": 540.0,
+            "score": 52.5,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "asn.20": {
+            "R": 90.0,
+            "D": 540.0,
+            "score": 52.5,
+            "deaths": 4,
+            "win_share": 1.0
+          }
+        },
+        {
+          "scene": "rooms-195",
+          "s04": {
+            "R": 30.0,
+            "D": 600.0,
+            "score": 32.5,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "asn.05": {
+            "R": 30.0,
+            "D": 600.0,
+            "score": 32.5,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "asn.10": {
+            "R": 30.0,
+            "D": 600.0,
+            "score": 32.5,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "asn.20": {
+            "R": 30.0,
+            "D": 600.0,
+            "score": 32.5,
+            "deaths": 3,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "rooms-401",
+          "s04": {
+            "R": 60.0,
+            "D": 600.0,
+            "score": 45.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "asn.05": {
+            "R": 60.0,
+            "D": 600.0,
+            "score": 45.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "asn.10": {
+            "R": 60.0,
+            "D": 600.0,
+            "score": 45.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "asn.20": {
+            "R": 60.0,
+            "D": 600.0,
+            "score": 45.0,
+            "deaths": 7,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "lanes-242",
+          "s04": {
+            "R": 40.0,
+            "D": 600.0,
+            "score": 35.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "asn.05": {
+            "R": 40.0,
+            "D": 600.0,
+            "score": 35.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "asn.10": {
+            "R": 40.0,
+            "D": 600.0,
+            "score": 35.0,
+            "deaths": 7,
+            "win_share": 0.0
+          },
+          "asn.20": {
+            "R": 40.0,
+            "D": 600.0,
+            "score": 35.0,
+            "deaths": 7,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "lanes-448",
+          "s04": {
+            "R": 60.0,
+            "D": 790.0,
+            "score": 45.0,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "asn.05": {
+            "R": 60.0,
+            "D": 790.0,
+            "score": 45.0,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "asn.10": {
+            "R": 60.0,
+            "D": 790.0,
+            "score": 45.0,
+            "deaths": 3,
+            "win_share": 0.0
+          },
+          "asn.20": {
+            "R": 60.0,
+            "D": 790.0,
+            "score": 45.0,
+            "deaths": 3,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "clusters-289",
+          "s04": {
+            "R": 120.0,
+            "D": 630.0,
+            "score": 60.0,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "asn.05": {
+            "R": 120.0,
+            "D": 630.0,
+            "score": 60.0,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "asn.10": {
+            "R": 120.0,
+            "D": 630.0,
+            "score": 60.0,
+            "deaths": 4,
+            "win_share": 1.0
+          },
+          "asn.20": {
+            "R": 120.0,
+            "D": 630.0,
+            "score": 60.0,
+            "deaths": 4,
+            "win_share": 1.0
+          }
+        },
+        {
+          "scene": "clusters-495",
+          "s04": {
+            "R": 30.0,
+            "D": 800.0,
+            "score": 22.5,
+            "deaths": 6,
+            "win_share": 0.0
+          },
+          "asn.05": {
+            "R": 30.0,
+            "D": 800.0,
+            "score": 22.5,
+            "deaths": 6,
+            "win_share": 0.0
+          },
+          "asn.10": {
+            "R": 30.0,
+            "D": 800.0,
+            "score": 22.5,
+            "deaths": 6,
+            "win_share": 0.0
+          },
+          "asn.20": {
+            "R": 30.0,
+            "D": 800.0,
+            "score": 22.5,
+            "deaths": 6,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "crossroads-336",
+          "s04": {
+            "R": 70.0,
+            "D": 520.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "asn.05": {
+            "R": 60.0,
+            "D": 520.0,
+            "score": 40.0,
+            "deaths": 9,
+            "win_share": 0.0
+          },
+          "asn.10": {
+            "R": 60.0,
+            "D": 520.0,
+            "score": 40.0,
+            "deaths": 9,
+            "win_share": 0.0
+          },
+          "asn.20": {
+            "R": 60.0,
+            "D": 520.0,
+            "score": 40.0,
+            "deaths": 9,
+            "win_share": 0.0
+          }
+        },
+        {
+          "scene": "crossroads-542",
+          "s04": {
+            "R": 50.0,
+            "D": 1155.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "asn.05": {
+            "R": 50.0,
+            "D": 1155.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "asn.10": {
+            "R": 50.0,
+            "D": 1155.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          },
+          "asn.20": {
+            "R": 50.0,
+            "D": 1155.0,
+            "score": 42.5,
+            "deaths": 4,
+            "win_share": 0.0
+          }
+        }
+      ],
+      "summary": {
+        "s04": {
+          "R_mean": 60.0,
+          "D_mean": 673.3333333333334,
+          "score_mean": 41.25,
+          "win_share": 0.25,
+          "deaths_mean": 4.666666666666667
+        },
+        "asn.05": {
+          "R_mean": 59.166666666666664,
+          "D_mean": 673.3333333333334,
+          "score_mean": 41.041666666666664,
+          "win_share": 0.25,
+          "deaths_mean": 5.083333333333333
+        },
+        "asn.10": {
+          "R_mean": 59.166666666666664,
+          "D_mean": 673.3333333333334,
+          "score_mean": 41.041666666666664,
+          "win_share": 0.25,
+          "deaths_mean": 5.083333333333333
+        },
+        "asn.20": {
+          "R_mean": 59.166666666666664,
+          "D_mean": 673.3333333333334,
+          "score_mean": 41.041666666666664,
+          "win_share": 0.25,
+          "deaths_mean": 5.083333333333333
+        }
+      }
+    }
+  },
+  "module_inert_round0": "三个非零权重（0.5/1.0/2.0）比特级相同，仅crossroads-336一处翻转（R 70→60, deaths 4.67→5.08）；杀门加在0.02/0.05/0.1上同样比特级相同且同一翻转。",
+  "selection_guard": "selection未变（s04），不重跑heldout；封存heldout复用：obj 0.8437（stage1 32.67/40, stage2 43.89/60, R 69.6, D 590.1, M 2.83, deaths 4.71, win 0.54）。",
+  "selected": "selected-parameters-gate-frontier-2026-10-29.json（s04, assassin关闭）",
+  "heldout_scenes": "29003（封存复用，未重评）",
+  "heldout_results": "sealed reuse: obj 0.8437",
+  "heldout_summaries": {
+    "stage1_score_mean": 32.666666666666664,
+    "stage2_score_mean": 43.8875,
+    "R_mean": 69.58333333333333,
+    "D_mean": 590.1041666666666,
+    "M_mean": 2.8333333333333335,
+    "deaths_mean": 4.708333333333333,
+    "win_share": 0.5416666666666666
+  },
+  "source_sha256": {
+    "src/rmtc_bot/src/strategy.cpp": "b9724aba2c2f1dbac8d0c17745ac14c3615a88952eaf19446cb6924e358d17de",
+    "src/rmtc_bot/src/tactics.cpp": "f890c4fce21335149a2f8e26a406c2dfc2cc05c92f942e3bf088d1f1a55c38b7",
+    "src/rmtc_bot/include/rmtc_bot/match_config.hpp": "222eb0336eccd922b01111b243ef55d4d3e42437213ad460c4d01928becf451b",
+    "src/rmtc_bot/include/rmtc_bot/strategy_parameters.hpp": "bc3363acfca7f470127f34dc8d6153d09d0b47113d99e43dad8a537c610093f1",
+    "tests/arena.cpp": "04007f7d60832ae6a5af334c1285705b5cf4e740ce385b81fc231b1d416b1d51",
+    "tests/arena_scenarios.cpp": "2ac359e30b46cff354f5cadb00fac9380eac260a883e90aa534f36254eac0e4a",
+    "tests/arena_opponents.cpp": "f07f9ed357388caece386609e1b1a12be80dd2a2b82225c7efd6f01e65f2480a",
+    "tests/arena_main.cpp": "443a11bfc3dd1cf095181e06e512db01196c05c086b84f0c087f998c9a79e9a4"
+  }
+}

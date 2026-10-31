@@ -1,0 +1,85 @@
+{
+  "spec": "docs/38 版本联赛清单（冻结）。seeds = 12 张联赛图一次性冻结；versions = 版本身份（sha/params_digest 取自 git，binary_sha256 取自独立构建底座）；seats = 席位变体记录（build_seat_variants.sh 自动填充）。",
+  "seeds": [
+    20261201,
+    20261202,
+    20261203,
+    20261204,
+    20261205,
+    20261206,
+    20261207,
+    20261208,
+    20261209,
+    20261210,
+    20261211,
+    20261212
+  ],
+  "versions": {
+    "champion": {
+      "sha": "eb321df",
+      "build_dir": "build",
+      "install_base": "install",
+      "params_digest": "b1efdbc4d869a53ca05d850257e6dba99550ce4a7ccae8432cd9f04a441007c7",
+      "binary_sha256": "39557aa16d75fb07a2cae950efe549c4ae13d5625cc671a3440a4513ed399052",
+      "pins": {
+        "train_base_off_objective": 0.7970931712962963,
+        "deaths": 83,
+        "blocked": 93,
+        "stage1": 33.333,
+        "stage2": 41.25,
+        "D2": 1026.67,
+        "heldout_objective": 0.8298625,
+        "determinism_pin": 0.7710073
+      }
+    },
+    "old_champion": {
+      "sha": "9bc72a7",
+      "build_dir": "build-v-old_champion",
+      "install_base": null,
+      "params_digest": "d9cd2a2fb425e8578b22078d1413f862bf9ab74a59debb683bb42c2cc1394962",
+      "binary_sha256": null
+    },
+    "candidate": {
+      "sha": "38b5d09",
+      "build_dir": "build-v-candidate",
+      "install_base": null,
+      "params_digest": "903ec32b9b1d4f40eafad9c404daf4a3d38210ed11ead3fc87d140367e85a893",
+      "binary_sha256": null,
+      "note": "M3 候选 = 当前源码 + old7_no_etr0 五参数覆盖（docs/46 §6；tdc 死参数剔除，见 r2_compare9 消融）；行为类默认关闭，仅联赛候选席位。"
+    }
+  },
+  "seats": {
+    "old_champion": {
+      "B": {
+        "install_base": "/home/frank/cst-league-old/install-v-old_champion-B",
+        "binary_sha256": "bcebb860ae2a0d62f2bacbe336544acd43ea330b4ba6479ff6a81cbb8239bf1e",
+        "params_sha256": "d9cd2a2fb425e8578b22078d1413f862bf9ab74a59debb683bb42c2cc1394962"
+      }
+    },
+    "candidate": {
+      "B": {
+        "install_base": "/home/frank/cst/install-v-candidate-B",
+        "binary_sha256": "dd77411fa18e29d5c05bc1cc3754de1183583a302f9b77047d53fcfb825f513d",
+        "params_sha256": "bca6f974b5be9b36432a66b1cc79fee2dba6f5f32ccfde98dd053e962a3b5ab1",
+        "original_params_sha256": "33ac5ca98376d891ec22ac4986a96708c47f18b914634ce608bad96e10cc2d51",
+        "source_manifest": "/home/frank/cst/build-v-candidate-B/frozen.json"
+      },
+      "A": {
+        "install_base": "/home/frank/cst/install-v-candidate-A",
+        "binary_sha256": "d76489d8a929b97749e78f95b1ab9a09eda9a0062e489455e469729ae9946c1e",
+        "params_sha256": "903ec32b9b1d4f40eafad9c404daf4a3d38210ed11ead3fc87d140367e85a893",
+        "original_params_sha256": "33ac5ca98376d891ec22ac4986a96708c47f18b914634ce608bad96e10cc2d51",
+        "source_manifest": "/home/frank/cst/build-v-candidate-A/frozen.json"
+      }
+    },
+    "champion": {
+      "B": {
+        "install_base": "/home/frank/cst-champion-eb321df/install-v-champion-B",
+        "binary_sha256": "98aec3f3c423d3705caade2e7775803d2cf65dac0db6e624f816f8314cb7e843",
+        "params_sha256": "5df1b3515a7597d321f62f751903c1dcdbc8c4f80d40415f84746e1df9677096",
+        "original_params_sha256": "b1efdbc4d869a53ca05d850257e6dba99550ce4a7ccae8432cd9f04a441007c7",
+        "source_manifest": "/home/frank/cst-champion-eb321df/build-v-champion-B/frozen.json"
+      }
+    }
+  }
+}
