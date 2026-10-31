@@ -12,7 +12,7 @@
      candidate 与原版陪练同池对比 M1 的 champion，消 M3/M4 的模型间互相对抗混杂。
 冻结契约（U6 条款）：开赛前逐一校验参战二进制 sha256 与清单一致，不符即中止。
 用法：
-  bash practice_league.sh --maps 20261201,20261202 --mixes M1,M2 [--out DIR]
+  bash tests/scripts/practice_league.sh --maps 20261201,20261202 --mixes M1,M2 [--out DIR]
 """
 import argparse
 import hashlib
@@ -73,7 +73,7 @@ def verify_frozen(manifest):
 def run_mix(seed, mix, our, out_dir, args):
     """对一个 (图, 混合) 跑驱动 --map-locked --count 4，返回 (ok_battles, total)。"""
     summary = os.path.join(out_dir, f"summary_{mix}_{seed}.json")
-    cmd = ["bash", f"{CST}/practice_batch.sh",
+    cmd = ["bash", f"{CST}/tests/scripts/practice_batch.sh",
            "--count", "4", "--seed", str(seed), "--map-locked",
            "--summary", summary]
     for seat, base in sorted(our.items()):

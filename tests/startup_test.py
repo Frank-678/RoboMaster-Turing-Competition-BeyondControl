@@ -67,6 +67,13 @@ def main():
             prefix = f'inline constexpr const char *{key} = '
             lines = config.splitlines()
             config = "\n".join(prefix + '"' + value + '";' if line.startswith(prefix) else line for line in lines) + "\n"
+        # 将输出上限固定为测试专用值；不依赖正式赛配置当前是512还是其他值。
+        # 故意使用与正式配置不同的值，验证启动器确实传递编译期配置。
+        import re
+        config, replacements = re.subn(
+            r"(?m)^(inline constexpr int ai_max_tokens = )\d+;",
+            r"\g<1>731;", config)
+        assert replacements == 1, "ai_max_tokens declaration changed; update fixture"
         header.write_text(config)
         stub = work / "exec_stub.cpp"
         stub.write_text(r'''
@@ -101,7 +108,7 @@ extern "C" int execlp(const char *path, const char *arg, ...) noexcept {
       !matches("PRACTICE_MODEL", "fixture-model") || !matches("PRACTICE_LLM_KEY", "fixture-key") ||
       !matches("https_proxy", "http://proxy.invalid:7890") ||
       !matches("RMTC_CHECK_THINKING", "disabled") || !matches("RMTC_CHECK_JSON_OUTPUT", "1") ||
-      !matches("RMTC_CHECK_MAX_TOKENS", "2200")) std::exit(5);
+      !matches("RMTC_CHECK_MAX_TOKENS", "731")) std::exit(5);
   va_list values; va_start(values, arg);
   const char *script = va_arg(values, const char *);
   if (!script || std::strcmp(script, "scripts/check_ai.py") || va_arg(values, const char *)) std::exit(6);

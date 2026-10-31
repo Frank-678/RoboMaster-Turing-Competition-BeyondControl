@@ -2,22 +2,22 @@
 
 不同历史源码同场对打使用[LEAGUE.md](LEAGUE.md)的独立worker；`external` agent仅供联赛入口，普通短场景仍使用strategy/npc/script。
 
-入口：`bash scenarios.sh 场景.json --out 结果前缀`。直接摆好第200 Tick的车辆、资源与事件，只跑需要验证的一段。它只链接离线策略和自建裁判，不启动ROS、不调用模型、不修改`practice/`。
+入口：`bash tests/scripts/scenarios.sh 场景.json --out 结果前缀`。直接摆好第200 Tick的车辆、资源与事件，只跑需要验证的一段。它只链接离线策略和自建裁判，不启动ROS、不调用模型、不修改`practice/`。
 
 ## 先跑四个例子
 
 ```bash
 # A只有15HP，选择移动；B选择攻击。攻击先结算，A死亡，移动取消。
-bash scenarios.sh tests/scenarios/attack_before_move.json --out build/checks/death
+bash tests/scripts/scenarios.sh tests/scenarios/attack_before_move.json --out build/checks/death
 
 # 相同低血量局面交给本版本策略，防御后剩5HP。
-bash scenarios.sh tests/scenarios/defend_survives.json --out build/checks/guard
+bash tests/scripts/scenarios.sh tests/scenarios/defend_survives.json --out build/checks/guard
 
 # 同一局面复制成有公告解释/无解释两支，任务计分资格保持相同。
-bash scenarios.sh tests/scenarios/announcement_pair.json --out build/checks/blast
+bash tests/scripts/scenarios.sh tests/scenarios/announcement_pair.json --out build/checks/blast
 
 # 先执行0、1、2，再从Tick3复制完整暖状态，分别跑到8。
-bash scenarios.sh tests/scenarios/warm_forks.json --out build/checks/warm
+bash tests/scripts/scenarios.sh tests/scenarios/warm_forks.json --out build/checks/warm
 ```
 
 需要已有`g++`和`nlohmann-json3-dev`。首次编译，之后按源码、头文件、编译器和选项缓存。非标准测试环境可加`--json-include /包含nlohmann目录的路径`，普通Ubuntu不用填。不要求手工输入环境变量。
@@ -115,13 +115,13 @@ bash scenarios.sh tests/scenarios/warm_forks.json --out build/checks/warm
 
 ```bash
 # 从Tick5恢复，继续执行5、6、7。原终点断言不会自动挪到新终点。
-bash scenarios.sh --resume build/checks/warm.left.tick-5.checkpoint.json \
+bash tests/scripts/scenarios.sh --resume build/checks/warm.left.tick-5.checkpoint.json \
   --until-tick 8 --clear-breakpoints --out build/checks/continued
 
 # 世界导出成可修改的冷场景，然后编辑坐标、血量、资源、事件。
-bash scenarios.sh --export-scene build/checks/blast.notice.tick-201.checkpoint.json \
+bash tests/scripts/scenarios.sh --export-scene build/checks/blast.notice.tick-201.checkpoint.json \
   --until-tick 210 --clear-breakpoints --out build/checks/editable.scene.json
-bash scenarios.sh build/checks/editable.scene.json --out build/checks/edited
+bash tests/scripts/scenarios.sh build/checks/editable.scene.json --out build/checks/edited
 ```
 
 `--resume`保留世界，用保存的本队公开输入、已交付解释和动作重建策略/NPC，验证历史动作一致。拒绝误改的回放包、不同构建或历史动作分歧。墙钟搜索会受负载影响，文件重放不宣称跨机器逐位序列化全部私有状态。
@@ -135,8 +135,8 @@ bash scenarios.sh build/checks/editable.scene.json --out build/checks/edited
 ## 小局面的最优参照
 
 ```bash
-bash scenarios.sh tests/oracles/early_escape.json --oracle --out build/checks/escape-best
-bash scenarios.sh tests/oracles/resource_chain.json --oracle --out build/checks/resource-best
+bash tests/scripts/scenarios.sh tests/oracles/early_escape.json --oracle --out build/checks/escape-best
+bash tests/scripts/scenarios.sh tests/oracles/resource_chain.json --oracle --out build/checks/resource-best
 python3 tests/oracle_test.py
 ```
 

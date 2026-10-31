@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/frank/cst
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 echo "== git status =="
 git status --short
 echo "== last commit =="

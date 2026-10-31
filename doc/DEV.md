@@ -20,7 +20,7 @@ bash run.sh
 
 第二阶段的 `ai_url`、`ai_token`、`ai_model` 必须填，留空会拒绝启动。URL必须是完整的 `/chat/completions` 地址，不能只填服务主页。超时和输出长度也取配置中的明确值；请求在后台等待，不阻塞动作回调。
 
-正式比赛填本场官方网关、席位令牌和指定模型。练习时机器人填本地代理 `http://127.0.0.1:8080/v1/chat/completions` 和 `practice-A`（按席位改），同一头文件还提供`practice_llm_url/key/proxy`；`bash practice.sh`将这些配置交给原版练习程序，第二阶段明确使用real模式，不修改`practice/`。更换配置、阶段或席位后必须重新编译并重启。地址关系和完整操作步骤见[README.md](README.md)。
+正式比赛填本场官方网关、席位令牌和指定模型。练习时机器人填本地代理 `http://127.0.0.1:8080/v1/chat/completions` 和 `practice-A`（按席位改），同一头文件还提供`practice_llm_url/key/proxy`；`bash practice.sh`将这些配置交给原版练习程序，第二阶段明确使用real模式，不修改`practice/`。更换配置、阶段或席位后必须重新编译并重启。地址关系和完整操作步骤见[README.md](../README.md)。
 
 ## 最小策略
 
@@ -47,7 +47,7 @@ bash run.sh
 
 ## 八类事件
 
-事件机制按赛事规则 v1.2，输入格式见 [公开通信协议](practice/CONTESTANT_PROTOCOL.md) §3–5。区域、点位、起止 Tick 及效果参数由模型解释当场公告，下面都是本地执行逻辑。
+事件机制按赛事规则 v1.2，输入格式见 [公开通信协议](../practice/CONTESTANT_PROTOCOL.md) §3–5。区域、点位、起止 Tick 及效果参数由模型解释当场公告，下面都是本地执行逻辑。
 
 | 类型 | 行为 |
 | --- | --- |
@@ -135,4 +135,4 @@ tests/mock_gateway.py 仅在本机临时端口提供固定模拟模型响应，�
 
 [ARENA.md](ARENA.md)记录六地图/六陪练、两轮训练与独立留出。当前封存参数在`match_config.hpp`：资源任务4、到点4、治疗阈值40HP、目标深度4；连续两次受阻后改道。三Tick战术虽然实现并有规则回归，本轮训练选择关闭，不能把功能数当成绩。路线反转/插入/删除没有在本批消融中带来成绩变化。
 
-`bash arena.sh --tune`是赛前工具，不读密钥、不改practice、不热更新参数；`bash tests/run.sh`和CTest也包含本地裁判规则边界。规则常量不参加搜索。模拟AI资格/延迟解释不是实际模型调用；完整标准车验收仍受当前DDS环境限制。参数与成绩详见[结构化结果](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/checks/code-results/arena-2026-10-28.json)。
+`bash tests/scripts/arena.sh --tune`是赛前工具，不读密钥、不改practice、不热更新参数；`bash tests/run.sh`和CTest也包含本地裁判规则边界。规则常量不参加搜索。模拟AI资格/延迟解释不是实际模型调用；完整标准车验收仍受当前DDS环境限制。参数与成绩详见[结构化结果](https://github.com/Frank-678/The-Logical-Structure-of-RMT-C/blob/56da8b3de414635bb0cfced3bdf90fcf68409957/checks/code-results/arena-2026-10-28.json)。

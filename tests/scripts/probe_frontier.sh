@@ -1,6 +1,6 @@
 #!/bin/bash
 set -u
-cd /home/frank/cst
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.."
 H=/tmp/head_src
 rm -rf "$H"; mkdir -p "$H/src/rmtc_bot/include/rmtc_bot" "$H/src/rmtc_bot/src"
 for f in src/rmtc_bot/src/strategy.cpp src/rmtc_bot/src/tactics.cpp src/rmtc_bot/src/events.cpp \
