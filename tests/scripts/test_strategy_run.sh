@@ -1,6 +1,6 @@
 #!/bin/bash
 set -u
-cd /home/frank/cst
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.."
 T=$(mktemp -d)
 g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -pthread -I src/rmtc_bot/include \
   src/rmtc_bot/src/strategy.cpp src/rmtc_bot/src/tactics.cpp src/rmtc_bot/src/events.cpp \

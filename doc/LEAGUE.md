@@ -11,19 +11,19 @@
 ```bash
 git fetch origin
 # 从Git对象读完整提交，不改工作区，不混入未提交改动。
-bash league.sh freeze old --ref 65c87145ae3b15572c3b1674181a74677fe86770
-bash league.sh freeze current --ref 8da0edecf59218647c83a19536da1c822cbcfd0d
-bash league.sh suite \
+bash tests/scripts/league.sh freeze old --ref 65c87145ae3b15572c3b1674181a74677fe86770
+bash tests/scripts/league.sh freeze current --ref 8da0edecf59218647c83a19536da1c822cbcfd0d
+bash tests/scripts/league.sh suite \
   --versions old=build/league/versions/old current=build/league/versions/current \
   --anchor old --out build/league/plan.json
-bash league.sh run build/league/plan.json --limit 2 --out build/league/smoke
+bash tests/scripts/league.sh run build/league/plan.json --limit 2 --out build/league/smoke
 # 两个候选×144局面=288组合；去掉limit跑全表。
-bash league.sh run build/league/plan.json --out build/league/full
+bash tests/scripts/league.sh run build/league/plan.json --out build/league/full
 ```
 
 `--anchor`固定对手版本；比较候选时对手池不变。归档组让候选和三辆anchor同场。一个旧版本是一套旧源码及旧参数，不是新代码改几个权重。
 
-只查单格桥：`bash league.sh run build/league/plan.json --cases 'bridge-*-pressure' --out build/league/bridge`。同一命令重跑复用相同签名的已通过局面，中断局面重跑。计划/版本/裁判构建变了就换输出目录，工具会拒绝混批。
+只查单格桥：`bash tests/scripts/league.sh run build/league/plan.json --cases 'bridge-*-pressure' --out build/league/bridge`。同一命令重跑复用相同签名的已通过局面，中断局面重跑。计划/版本/裁判构建变了就换输出目录，工具会拒绝混批。
 
 ## 直接摆任意初态、定观察范围
 
@@ -64,7 +64,7 @@ bash league.sh run build/league/plan.json --out build/league/full
 
 200起到205止执行200–204；条件在完整Tick边界检查，不在攻击和移动之间增加现实中不存在的行动机会。条件用JSON Pointer和eq/ne/lt/le/gt/ge/exists；拼错路径会报错。
 
-直接摆局是**策略冷启动**。世界已有无双，不等于新策略知道过去如何领取；测知情状态要从稍早时刻跑一小段本队公开输入前缀。独立历史进程的私有对象没有序列化接口，save_at只保存世界，tape保存输入/动作；不能称热进程快照。内存暖分叉与校验重放继续用`scenarios.sh`。联赛遇到`forks/warm_until`会明确拒绝，请写两份配对case，不会忽略这些字段。
+直接摆局是**策略冷启动**。世界已有无双，不等于新策略知道过去如何领取；测知情状态要从稍早时刻跑一小段本队公开输入前缀。独立历史进程的私有对象没有序列化接口，save_at只保存世界，tape保存输入/动作；不能称热进程快照。内存暖分叉与校验重放继续用`tests/scripts/scenarios.sh`。联赛遇到`forks/warm_until`会明确拒绝，请写两份配对case，不会忽略这些字段。
 
 ## 12类局面与对手
 
@@ -114,7 +114,7 @@ bash league.sh run build/league/plan.json --out build/league/full
 
 | 文件/入口 | 职责 |
 | --- | --- |
-| league.sh | 转到根目录，进入统一CLI |
+| tests/scripts/league.sh | 转到根目录，进入统一CLI |
 | version_store.py | Git取固定提交，生成参数导出，冻结并验哈希 |
 | version_worker.cpp | 初始化旧Strategy；逐行接本队输入，返回动作/原因/耗时 |
 | scenario_runner.cpp --serve | 裁判按步结算，全图与各车输入分开 |
@@ -131,17 +131,17 @@ python3 tests/scenario_test.py
 
 ## 原版ROS与真实模型联赛
 
-快速离线用`league.sh`；原版`practice/`、DDS、真实模型用`practice_league.sh`。两个入口保留，不能把离线胜率当作原版实测结果。同名冲突已处理：DeepSeek原`tests/version_league.py`改名为`tests/practice_version_league.py`，离线文件保留原名。
+快速离线用`tests/scripts/league.sh`；原版`practice/`、DDS、真实模型用`tests/scripts/practice_league.sh`。两个入口保留，不能把离线胜率当作原版实测结果。同名冲突已处理：DeepSeek原`tests/version_league.py`改名为`tests/practice_version_league.py`，离线文件保留原名。
 
-先在唯一的`match_config.hpp`填好`practice_llm_url / practice_llm_key / practice_llm_proxy / practice_port / ai_model`和ROS域，再`bash build.sh`。`practice_batch.sh`通过C++启动器把这些已编译值交给原版裁判；不另读`llm.env`，不需要手工export。真实调用会消耗配额。
+先在唯一的`match_config.hpp`填好`practice_llm_url / practice_llm_key / practice_llm_proxy / practice_port / ai_model`和ROS域，再`bash build.sh`。`tests/scripts/practice_batch.sh`通过C++启动器把这些已编译值交给原版裁判；不另读`llm.env`，不需要手工export。真实调用会消耗配额。
 
 ```bash
 # 先核对清单里已有的冠军/旧冠军路径、二进制摘要；不会重新命名已有版本。
-bash practice_league.sh --maps 20261201,20261202 --mixes M1,M2 --out build/practice-league/pilot
+bash tests/scripts/practice_league.sh --maps 20261201,20261202 --mixes M1,M2 --out build/practice-league/pilot
 # 同图同事件只转四次出生点；也能单独跑批量驱动。
-bash practice_batch.sh --seed 20261201 --map-locked --count 4 --summary build/practice-league/example.json
+bash tests/scripts/practice_batch.sh --seed 20261201 --map-locked --count 4 --summary build/practice-league/example.json
 # 补编号3，必须与原批count/seed/summary和程序身份一致；完整生成再筛选。
-bash practice_batch.sh --seed 20261201 --map-locked --count 4 --only 3 --summary build/practice-league/example.json
+bash tests/scripts/practice_batch.sh --seed 20261201 --map-locked --count 4 --only 3 --summary build/practice-league/example.json
 python3 tools/archive_batch.py --summary build/practice-league/example.json --to build/practice-league/archive
 python3 tests/practice_tools_test.py
 ```
@@ -156,8 +156,8 @@ python3 tests/practice_tools_test.py
 
 | 文件/函数 | 做什么 |
 | --- | --- |
-| `practice_league.sh / tests/practice_version_league.py` | 按图seed、对手混合、四次出生轮换调度原版对局，核对冻结程序；缺局和0/0都失败 |
-| `practice_batch.sh / practice_launcher --batch` | 唯一配置入口，把模型、密钥、出网代理、ROS域和监听端口交给驱动，不打印密钥 |
+| `tests/scripts/practice_league.sh / tests/practice_version_league.py` | 按图seed、对手混合、四次出生轮换调度原版对局，核对冻结程序；缺局和0/0都失败 |
+| `tests/scripts/practice_batch.sh / practice_launcher --batch` | 唯一配置入口，把模型、密钥、出网代理、ROS域和监听端口交给驱动，不打印密钥 |
 | `tools/batch_practice.py::variants` | 固定随机流先生成各编号，再筛选补跑，避免重测另一张图 |
 | `config_digest / seat_hashes` | 记录完整地图配置与实际各席程序的身份，拒绝混用旧摘要 |
 | `owned_run / run_battle` | 从本机API确认session、目录和配置；等待四席注册、启动、观察结束，所有异常都回收 |

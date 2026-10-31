@@ -1,6 +1,6 @@
 # 源码导读
 
-历史版本联赛的冻结、逐帧输入与全部参数清单见[LEAGUE.md](LEAGUE.md)；原版ROS入口是`practice_league.sh`，实测工具函数见该文末。
+历史版本联赛的冻结、逐帧输入与全部参数清单见[LEAGUE.md](LEAGUE.md)；原版ROS入口是`tests/scripts/practice_league.sh`，实测工具函数见该文末。
 
 短场景工具的文件、函数、状态字段与起止Tick语义见[SCENARIOS.md](SCENARIOS.md)。它是独立测试入口，不被正式ROS机器人链接。
 
@@ -33,7 +33,7 @@
 | `tests/unstuck_benchmark.cpp` | 六个500Tick导航压力/正常路径夹具，与旧核心配对 |
 | `tests/run_unstuck.py` | 编译导航夹具，断言脱困与保留正常绕路，可只读比较旧工程 |
 | `ARENA.md` | 自建对手池、六类地图、规则模型、参数搜索和留出边界 |
-| `arena.sh` | 一键离线对战与调参；不改正式参数 |
+| `tests/scripts/arena.sh` | 一键离线对战与调参；不改正式参数 |
 | `DEV.md` | 依赖、策略机制、事件表、测试方法和当前验证范围 |
 | `CODE_GUIDE.md` | 本文件：主线、文件、类型和函数索引 |
 | `STATE_MACHINE.md` | 全部编号规则对应、状态图、策略路径与预测边界 |

@@ -1,6 +1,6 @@
 # 赛前多地图、多风格对战与调参
 
-入口是 `bash arena.sh --tune`。不启动 ROS，不使用密钥，不修改 `practice/`，不自动改比赛配置。最后将选定参数明确写回 `match_config.hpp`，重新构建并封存。比赛程序没有 JSON 参数入口，也没有赛中学习。
+入口是 `bash tests/scripts/arena.sh --tune`。不启动 ROS，不使用密钥，不修改 `practice/`，不自动改比赛配置。最后将选定参数明确写回 `match_config.hpp`，重新构建并封存。比赛程序没有 JSON 参数入口，也没有赛中学习。
 
 这是按规则 v1.2 编写的独立测试裁判。不同风格改变地图、任务、公告时间和对手行为，攻击距离、伤害、复活、计分等规则始终一致。它有助于发现策略缺陷，结果不能称为原版裁判、标准车或正式赛成绩。
 
@@ -9,12 +9,12 @@
 Ubuntu 安装 `g++`、`python3`、`nlohmann-json3-dev` 后，在工程根目录执行：
 
 ```bash
-bash arena.sh --tune --candidates 24
+bash tests/scripts/arena.sh --tune --candidates 24
 ```
 
 脚本先运行规则边界测试，再编译策略与对战入口。训练轮次和留出验证完成后，结果写入 `tests/results/arena-2026-10-28.json`，选中参数写入 `tests/results/selected-parameters.json`。这些文件只供赛前查看，不被机器人读取。
 
-已有选定参数时，`bash arena.sh` 会重跑该组参数及消融对照；这属于重复验算，不再是首次留出验证。`--json-include 路径` 仅适用于离线构建时头文件不在系统目录的情况。正常安装依赖后无需填写，也无需输入比赛环境变量。
+已有选定参数时，`bash tests/scripts/arena.sh` 会重跑该组参数及消融对照；这属于重复验算，不再是首次留出验证。`--json-include 路径` 仅适用于离线构建时头文件不在系统目录的情况。正常安装依赖后无需填写，也无需输入比赛环境变量。
 
 ## 地图和陪练
 
