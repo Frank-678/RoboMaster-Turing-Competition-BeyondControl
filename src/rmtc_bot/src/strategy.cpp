@@ -987,10 +987,17 @@ Json Strategy::decide(const Json &p) {
     // 资源正常现身时保持原权重，不把采集线拖离资源区；到点任务方向仍是已探明路线，不把未知格当空地。
     const bool mission_pull_starved = stage_ == 2 && parameters_.stage2_mission_pull_stale_ticks > 0 &&
         tick - last_resource_sighting_ >= parameters_.stage2_mission_pull_stale_ticks;
-    if (!race_active) {
+    // 到点任务紧迫期：Tick 超过阈值仍未完成到点任务时，任务估值改由 stage2_reach_urgency_value 给出。
+    // 联赛 10-31 勘误（task_id 核对）：全部 M=2 均为 collect_high/collect_two_normal 缺失，reach 完成率 100%——
+    // 本路径针对的失败模式零出现，默认关作保险。紧迫期同时绕过 race gate 的任务暂缓（都到紧迫期了，先拿 M 点）。
+    const bool reach_urgent = stage_ == 2 && parameters_.stage2_reach_urgency_value > 0 &&
+        tick >= parameters_.stage2_reach_urgency_tick;
+    if (!race_active || reach_urgent) {
       for (const auto &target : reach) {
         const double reach_scale = known_resource_race ? 1.0 - parameters_.race_reach_holdoff : 1.0;
-        if (cell == target) consider(node.first, parameters_.reach_mission_value * reach_scale / (node.distance + 1), "reach_mission", target);
+        const double reach_value = reach_urgent ? parameters_.stage2_reach_urgency_value
+                                                : parameters_.reach_mission_value;
+        if (cell == target) consider(node.first, reach_value * reach_scale / (node.distance + 1), "reach_mission", target);
         else if (node.first >= 0) {
           // 目标尚未探明时只走已知路线中靠近目标的格子，不穿过未知墙。
           int unknown_neighbors = 0; // 这个格子旁有多少尚未探明的地图内邻格。
