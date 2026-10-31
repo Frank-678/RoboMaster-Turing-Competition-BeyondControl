@@ -43,6 +43,9 @@ build/
 Build/
 build-*/
 
+install/
+log/
+
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt
@@ -83,4 +86,4 @@ install-v-candidate-B/
 # 阶段/变体实验构建目录（赛前实验，不入库）
 build_stage*/
 install_stage*/
-/bin_bots/
+/bin_bots/ 
