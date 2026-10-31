@@ -709,3 +709,17 @@ match_config.hpp 临时写死 key+proxy → build.sh → check_ai.sh → **reque
 **Q1-Q6 链条就此闭环（docs/49 §2/§7 口径）**:Q3 第一步结论为"无缺陷可修"，故 Q3 第二至四步（短场景比对/七探针/代码二分）、Q1 追击收益框架、Q4 王单车杀映射、Q5 障碍矩阵、Q6 验收均不再启动——行为候选验证前默认关闭的原则保持不变。唯一重开条件:用户 Frank 提供其实际失败局的现场记录（bot.log/referee 记录，docs/49 §2.1 承诺"到位后同样处理并优先"）;届时输入侧差异（地图/对手/事件）优先排查。
 
 **待办更新**:联赛后队列中"CHASE 真实墙角失败提取"一项已以负性结论交付（无缺陷，无需行为改动，docs/59）;其余队列项（wide_lanes 门控二分、复杂图三实验、AI-real 小批次）不变。10-31 20:00 材料用户侧三项（前置检录截图/语雀权限/现场令牌）不变。
+## 2026-10-31 16:04 +0800（Asia/Shanghai）· Claude Code（Frank 侧）· R3 联赛按用户指令中止收尾 + Fix 1 默认关交付（docs/64）
+
+- 用户指令「立即结束，推送云端，做好整理，清理文件」→ 联赛、竞技场评估、监控全部停止，无孤儿进程（8681/268272 树及其余历史裁判未触碰）。
+- R3 联赛 7/27 中止（frt04/frt06/race_on/racex/tour12/rcl6/rcl10，seed 20261029-35），7 局 summary 保留于 log/league_20261031_r3/，深析归档 docs/64；驱动脚本保留，可从 rcl12（seed 20261036）续跑。
+- Fix 1（E_BLOCKED 瞬时堵格记忆 receipt_block_ticks）代码已提交并推送 acc91b6（strategy/campaign-sprint-1031）：参数默认 0=关、比赛行为不变；离线竞技场 A/B（block0/8/12/16 heldout 对照）被收尾指令打断、无结果，未晋升——恢复后先补评估再定晋升。
+- 密钥与代理已还原为空（match_config 工作树与 HEAD 双扫描干净，提交信息含「密钥扫描通过」，未推 main/master）。
+- 待办更新：恢复迭代后 (1) arena fix1_block_ab 对照补跑与晋升裁决；(2) 正式尺寸 20×20 stage1 / 24×24 stage2 冒烟（docs/64 结论四）；(3) R3 剩余 20 局续跑。10-31 20:00 材料用户侧三项不变。
+
+## 2026-10-31 16:29 +0800（Asia/Shanghai）· Claude Code（Frank 侧）· WSL 目录清理 + 模型历程总档（docs/65）
+
+- 用户指令「清理掉；相关与代码强相关的放到 doc/ script/，别全都堆在 cst/」→ 大清理：~/cst 删 178 个变体构建/安装目录（build_camp_*/install_camp_*/build-v-*/install-v-*/build_stage*/install_stage*，均可重建；R3 联赛续跑需先按 r3_driver.sh 重建 27 变体）、bin_bots（无引用）、空 batch_logs；~/ 删 4 个非 git 仓库拷贝、10 个 .out 日志、含 key 的临时 batch_practice.py（canonical 在 cst/tools/）；9 个散落脚本移入 cst/scripts/；批次记录（batch_logs/batch_practice_20261029/30/batch_summary_4-7）归档 cst/log/archive_home_20261031/；~/log（doc 仓 log 分支克隆）删除前验证 HEAD=origin/log。保留 install/（晋升 header）、build/（竞技场活动构建）、practice/practice1/practice2（已追踪）。cst 6.0G→1.5G；移入文件密钥复扫 0 命中；未触碰 ctf/d2l/ros2_ws/fgpa/cherry/vimtutor。
+- review.md 修复（code 仓）：上次 WSL 追加用 'w' 重写导致 21:54 块 69 行换行归一化——按仅追加协议还原 HEAD 字节后 python 'ab' 重放 16:04 条目并追加本条目，净 diff 仅 +14 行（16:04 重放 7 行 + 本条目 7 行）、零删除；两仓同文。
+- docs/65「模型变化历程总览」新增（官方基线深析→战役三连→逐轴调参→联赛同池→d28 全败→官方图冲刺→三件套晋升→终版裁决→R3 联赛→Fix 1，含参数晋升/否决总表）。
+- 推送：code 仓 strategy/campaign-sprint-1031（review.md 修正）；doc 仓 ANALYSIS（docs/65 + review.md）。均未推 main/master。
